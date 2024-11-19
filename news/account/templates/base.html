@@ -1,0 +1,43 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/base.css' %}">
+</head>
+<body>
+    <div id="header">
+        <span class="logo">NEWS</span>
+        {% if request.user.is_authenticated %}
+            <ul class="menu">
+                
+                <li {% if section == "chart" %}class="selected"{% endif %}>
+                    <a href="{% url 'account:chart' %}">차트</a>
+                </li>
+                <li {% if section == "images" %}class="selected"{% endif %}>
+                    <a href="#">감정분석</a>
+                </li>
+                <li {% if section == "people" %}class="selected"{% endif %}>
+                    <a href="#">연관어분석</a>
+                </li>
+                
+            </ul>
+        {% endif %}
+        <span class="user">
+            {% if request.user.is_authenticated %}
+                Hello, {{ request.user.first_name|default:request.user.username }},
+                <a href="{% url 'account:logout' %}">Logout</a>
+            {% else %}
+                <a href="{% url 'account:login' %}">Log-in</a>
+            {% endif %}
+        </span>
+    </div>
+    <div id="content">
+        {% block content %}
+        {% endblock %}
+    </div>
+</body>
+</html>
