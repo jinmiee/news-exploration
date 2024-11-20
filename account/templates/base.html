@@ -28,10 +28,10 @@
         {% endif %}
         <span class="user">
             {% if request.user.is_authenticated %}
-                Hello, {{ request.user.first_name|default:request.user.username }},
-                <a href="{% url 'account:logout' %}">Logout</a>
-            {% else %}
-                <a href="{% url 'account:login' %}">Log-in</a>
+            <form method="post" action="{% url 'account:logout' %}">
+                {% csrf_token %}
+                <button type="submit">Logout</button>
+            </form>
             {% endif %}
         </span>
     </div>
