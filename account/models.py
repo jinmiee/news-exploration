@@ -7,4 +7,4 @@ class Article(models.Model):
 
     class Meta:
         # MongoDB의 기존 컬렉션을 사용하도록 설정
-        db_table = 'youtube_data'
+        db_table = 'youtube_data_1121_09'

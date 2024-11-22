@@ -82,7 +82,7 @@ WSGI_APPLICATION = 'news.wsgi.application'
 DATABASES = {
         'default': {
             'ENGINE': 'djongo',
-            'NAME': 'db',
+            'NAME': 'youtube_data',
             'ENFORCE_SCHEMA': False,
             'CLIENT': {
                 'host': "mongodb+srv://jinmiee:1234@cluster.ccru7.mongodb.net/?retryWrites=true&w=majority&appName=cluster"
