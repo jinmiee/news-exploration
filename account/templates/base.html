@@ -11,7 +11,7 @@
 <body>
     <div id="header">
         <span class="logo">NEWS</span>
-        {% if request.user.is_authenticated %}
+        {% comment %} {% if request.user.is_authenticated %} {% endcomment %}
             <ul class="menu">
                 
                 <li {% if section == "chart" %}class="selected"{% endif %}>
@@ -25,15 +25,15 @@
                 </li>
                 
             </ul>
-        {% endif %}
+        {% comment %} {% endif %} {% endcomment %}
         <span class="user">
-            {% if request.user.is_authenticated %}
+            {% comment %} {% if request.user.is_authenticated %} {% endcomment %}
             <form method="post" action="{% url 'account:logout' %}">
                 {% csrf_token %}
                 <button type="submit">Logout</button>
             </form>
             <a href="{% url 'account:mypage' %}"style="margin-right: 10px;">마이페이지</a>
-            {% endif %}
+            {% comment %} {% endif %} {% endcomment %}
             
         </span>
     </div>
