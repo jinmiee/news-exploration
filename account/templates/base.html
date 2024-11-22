@@ -17,11 +17,11 @@
                 <li {% if section == "chart" %}class="selected"{% endif %}>
                     <a href="{% url 'account:chart' %}">차트</a>
                 </li>
-                <li {% if section == "images" %}class="selected"{% endif %}>
-                    <a href="#">감정분석</a>
+                <li {% if section == "emotion" %}class="selected"{% endif %}>
+                    <a href="{% url 'account:emotion' %}">감정분석</a>
                 </li>
-                <li {% if section == "people" %}class="selected"{% endif %}>
-                    <a href="#">연관어분석</a>
+                <li {% if section == "relate" %}class="selected"{% endif %}>
+                    <a href="{% url 'account:relate' %}">연관어분석</a>
                 </li>
                 
             </ul>
@@ -32,7 +32,9 @@
                 {% csrf_token %}
                 <button type="submit">Logout</button>
             </form>
+            <a href="{% url 'account:mypage' %}"style="margin-right: 10px;">마이페이지</a>
             {% endif %}
+            
         </span>
     </div>
     <div id="content">
