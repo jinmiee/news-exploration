@@ -3,11 +3,15 @@ from django.shortcuts import render
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import login_required
 from .forms import UserRegistrationForm
+from .models import Article
+
 
 # Create your views here.
 # @login_required
 def chart(request):
-    return render(request, 'analysis/chart.html', {'section': 'chart'}) 
+    data = Article.objects.all()[:5]
+    context = {'section': 'chart', 'videos': data}
+    return render(request, 'analysis/chart.html', context) 
 
 # @login_required
 def emotion(request):

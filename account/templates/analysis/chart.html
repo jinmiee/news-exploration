@@ -3,5 +3,10 @@
 {% block content %}
     <h1>News Chart</h1>
     <p>Welcome {{ user.username }} !</p>
-    
+    {% for video in videos %}
+        <div class="video">
+            <h2>{{ video.title }}</h2>
+            <iframe width="560" height="315" src="{{ video.url }}" frameborder="0" allowfullscreen></iframe>
+        </div>
+    {% endfor %}
 {% endblock %}
