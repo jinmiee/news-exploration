@@ -5,19 +5,19 @@ from django.contrib.auth.decorators import login_required
 from .forms import UserRegistrationForm
 
 # Create your views here.
-@login_required
+# @login_required
 def chart(request):
     return render(request, 'analysis/chart.html', {'section': 'chart'}) 
 
-@login_required
+# @login_required
 def emotion(request):
     return render(request, 'analysis/emotion.html', {'section': 'emotion'}) 
 
-@login_required
+# @login_required
 def relate(request):
     return render(request, 'analysis/relate.html', {'section': 'relate'}) 
 
-@login_required
+# @login_required
 def mypage(request):
     return render(request, 'analysis/mypage.html', {'section': 'mypage'}) 
 
