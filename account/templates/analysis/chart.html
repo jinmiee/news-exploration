@@ -1,12 +1,16 @@
 {% extends "base.html" %}
+{% load youtube_extras %}
 {% block title %}Chart{% endblock %}
 {% block content %}
     <h1>News Chart</h1>
-    <p>Welcome {{ user.username }} !</p>
+    <p>Welcome {{ user.username }}!</p>
     {% for video in videos %}
         <div class="video">
             <h2>{{ video.title }}</h2>
-            <iframe width="560" height="315" src="{{ video.url }}" frameborder="0" allowfullscreen></iframe>
+            <!-- 새로운 필터로 유튜브 ID를 추출하여 썸네일 표시 -->
+            <a href="{{ video.url }}" target="_blank">
+                <img src="https://img.youtube.com/vi/{{ video.url|youtube_id }}/hqdefault.jpg" alt="{{ video.title }}" />
+            </a>
         </div>
     {% endfor %}
 {% endblock %}

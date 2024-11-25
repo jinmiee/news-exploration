@@ -3,14 +3,18 @@ from django.shortcuts import render
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import login_required
 from .forms import UserRegistrationForm
-from .models import Article
+from .models import YouTubeData
 
 
 # Create your views here.
 # @login_required
 def chart(request):
-    data = Article.objects.all()[:5]
-    context = {'section': 'chart', 'videos': data}
+    videos = YouTubeData.objects.all()[:5]
+    for video in videos:
+        video_id = video.url.split('v=')[-1]  # 비디오 ID 추출
+        video.url = f'https://www.youtube.com/embed/{video_id}'
+    context = {'section': 'chart', 'videos': videos}
+
     return render(request, 'analysis/chart.html', context) 
 
 # @login_required
