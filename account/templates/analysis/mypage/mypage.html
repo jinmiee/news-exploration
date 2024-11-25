@@ -1,11 +1,13 @@
 {% extends "base.html" %}
 {% block title %}mypage{% endblock %}
 {% block content %}
-    <h1>mypage</h1>
+    <h1>{{ user.username }}님의 페이지</h1>
     <p>Welcome {{ user.username }} !</p>
     
-    회원정보수정
-    <p><a href="{% url 'account:password_change' %}">비밀번호 변경</a></p>
+    <p>
+    <h2>회원정보수정</h2>
+    <a href="{% url 'account:password_change' %}">비밀번호 변경</a>
+    </p>
 
     <h2>찜한영상</h2>
 
