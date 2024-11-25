@@ -1,21 +1,29 @@
-from django.http import HttpResponse
-from django.shortcuts import render
-from django.contrib.auth import authenticate, login
-from django.contrib.auth.decorators import login_required
-from .forms import UserRegistrationForm
+from datetime import timedelta
+
+from django.http import JsonResponse
+from django.utils import timezone
+from django.shortcuts import render, get_object_or_404
 from .models import YouTubeData
 
-
-# Create your views here.
 # @login_required
 def chart(request):
-    videos = YouTubeData.objects.all()[:5]
-    for video in videos:
-        video_id = video.url.split('v=')[-1]  # 비디오 ID 추출
-        video.url = f'https://www.youtube.com/embed/{video_id}'
-    context = {'section': 'chart', 'videos': videos}
+    # 현재 시간과 어제 오후 6시 및 오늘 오후 6시 계산
+    now = timezone.now()
+    today_6pm_kst = timezone.localtime().replace(hour=18, minute=0, second=0, microsecond=0)
+    yesterday_6pm_kst = today_6pm_kst - timedelta(days=1)
 
-    return render(request, 'analysis/chart.html', context) 
+    # KST를 UTC로 변환
+    yesterday_6pm_utc = yesterday_6pm_kst - timedelta(hours=9)
+    today_6pm_utc = today_6pm_kst - timedelta(hours=9)
+
+    # 쿼리 실행: 어제 오후 6시 ~ 오늘 오후 6시 데이터 가져오기
+    top_news = YouTubeData.objects.filter(
+        upload_date__gte=yesterday_6pm_utc,
+        upload_date__lte=today_6pm_utc
+    ).order_by('-views')[:10]
+
+    # 템플릿에 데이터 전달
+    return render(request, 'analysis/chart.html', {'top_news': top_news})
 
 # @login_required
 def emotion(request):

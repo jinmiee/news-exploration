@@ -1,16 +1,23 @@
 {% extends "base.html" %}
-{% load youtube_extras %}
-{% block title %}Chart{% endblock %}
+{% block title %}YouTube News Chart{% endblock %}
+
 {% block content %}
-    <h1>News Chart</h1>
-    <p>Welcome {{ user.username }}!</p>
-    {% for video in videos %}
-        <div class="video">
-            <h2>{{ video.title }}</h2>
-            <!-- 새로운 필터로 유튜브 ID를 추출하여 썸네일 표시 -->
-            <a href="{{ video.url }}" target="_blank">
-                <img src="https://img.youtube.com/vi/{{ video.url|youtube_id }}/hqdefault.jpg" alt="{{ video.title }}" />
-            </a>
-        </div>
-    {% endfor %}
+    <h1>YouTube Top 10 News Chart</h1>
+    <p>Welcome, {{ user.username }}!</p>
+
+    <ul style="list-style-type: none; padding: 0;">
+        {% for item in top_news %}
+            <li style="margin-bottom: 20px;">
+                <!-- 제목 표시 -->
+                <p style="text-decoration: none; font-size: 18px; font-weight: bold;">
+                    {{ forloop.counter }}. {{ item.title }}
+                </p>
+                <p style="margin: 5px 0; color: #555;">
+                    조회수: <strong>{{ item.views }}</strong> | 좋아요: <strong>{{ item.likes }}</strong> | 업로드 날짜: <strong>{{ item.upload_date|date:"Y-m-d H:i:s" }}</strong>
+                </p>
+            </li>
+        {% empty %}
+            <li>데이터가 없습니다.</li>
+        {% endfor %}
+    </ul>
 {% endblock %}
