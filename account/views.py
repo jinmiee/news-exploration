@@ -27,7 +27,7 @@ def relate(request):
 
 # @login_required
 def mypage(request):
-    return render(request, 'analysis/mypage.html', {'section': 'mypage'}) 
+    return render(request, 'analysis/mypage/mypage.html', {'section': 'mypage'}) 
 
 
 def register(request):
