@@ -29,6 +29,7 @@ urlpatterns = [
     path('password-change/', auth_views.PasswordChangeView.as_view(success_url=reverse_lazy('account:password_change_done')), name='password_change'),
     path('password-change/done/', auth_views.PasswordChangeDoneView.as_view(), name='password_change_done'),
     path('', views.chart, name='chart'),
+    path('video-details/', views.video_details, name='video_details'),
     path('emotion/', views.emotion, name='emotion'),
     path('relate/', views.relate, name='relate'),
     path('register/', views.register, name='register'),

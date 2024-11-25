@@ -3,6 +3,9 @@ from datetime import timedelta
 from django.http import JsonResponse
 from django.utils import timezone
 from django.shortcuts import render, get_object_or_404
+from django.views.decorators.csrf import csrf_exempt
+import json
+
 from .models import YouTubeData
 
 # @login_required
@@ -24,6 +27,25 @@ def chart(request):
 
     # 템플릿에 데이터 전달
     return render(request, 'analysis/chart.html', {'top_news': top_news})
+
+@csrf_exempt
+def video_details(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        video_url = data.get('url')
+
+        # URL로 데이터 검색
+        video = YouTubeData.objects.filter(url=video_url).first()
+
+        if not video:
+            return JsonResponse({"error": "Video not found."}, status=404)
+
+        # 댓글 가져오기
+        comments = [{"author": c['author'], "comment": c['comment']} for c in video.comments]
+
+        return JsonResponse({"video_url": video.url, "comments": comments})
+
+    return JsonResponse({"error": "Invalid request method."}, status=400)
 
 # @login_required
 def emotion(request):

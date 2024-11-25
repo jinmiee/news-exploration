@@ -23,7 +23,7 @@ class YouTubeData(models.Model):
     title = models.TextField()  # 동영상 제목
     views = models.BigIntegerField()  # 조회수 (큰 숫자 처리)
     upload_date = models.DateTimeField()  # 업로드 날짜
-    url = models.URLField()  # 동영상 URL
+    url = models.URLField(unique=True)  # 동영상 URL
     channel = models.CharField(max_length=255)  # 채널 제목
     desc = models.TextField(blank=True, null=True)  # 동영상 설명 (옵션)
     likes = models.BigIntegerField(blank=True, null=True)  # 좋아요 수
