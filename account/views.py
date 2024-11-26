@@ -6,6 +6,7 @@ from django.shortcuts import render, get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 import json
 
+from .forms import UserRegistrationForm
 from .models import YouTubeData
 
 # @login_required
@@ -40,10 +41,7 @@ def video_details(request):
         if not video:
             return JsonResponse({"error": "Video not found."}, status=404)
 
-        # 댓글 가져오기
-        comments = [{"author": c['author'], "comment": c['comment']} for c in video.comments]
-
-        return JsonResponse({"video_url": video.url, "comments": comments})
+        return JsonResponse({"video_url": video.url})
 
     return JsonResponse({"error": "Invalid request method."}, status=400)
 

@@ -27,10 +27,6 @@
         <div id="video-container" style="margin-bottom: 20px;">
             <iframe id="video-frame" width="560" height="315" frameborder="0" allowfullscreen></iframe>
         </div>
-        <div id="comments-container">
-            <h4>댓글</h4>
-            <ul id="comments-list" style="list-style-type: none; padding: 0;"></ul>
-        </div>
     </div>
 
     <!-- JavaScript -->
@@ -43,7 +39,6 @@
 
             // 기존 사이드바 콘텐츠 초기화
             document.getElementById('video-frame').src = '';
-            document.getElementById('comments-list').innerHTML = '';
 
             fetch('/account/video-details/', {
                 method: 'POST',
@@ -66,19 +61,7 @@
                 document.getElementById('video-frame').src = videoUrl.replace("watch?v=", "embed/");
 
                 // 댓글 업데이트
-                const commentsList = document.getElementById('comments-list');
-                commentsList.innerHTML = '';
-                if (data.comments && data.comments.length > 0) {
-                    data.comments.forEach(comment => {
-                        const li = document.createElement('li');
-                        li.textContent = `${comment.author}: ${comment.comment}`;
-                        commentsList.appendChild(li);
-                    });
-                } else {
-                    const li = document.createElement('li');
-                    li.textContent = '댓글이 없습니다.';
-                    commentsList.appendChild(li);
-                }
+
             })
             .catch(error => {
                 console.error('Error:', error);
