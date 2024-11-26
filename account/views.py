@@ -1,10 +1,14 @@
+from collections import defaultdict
 from datetime import timedelta
 
+from django.db.models.functions import TruncDate
 from django.http import JsonResponse
 from django.utils import timezone
 from django.shortcuts import render, get_object_or_404
+from django.utils.timezone import localtime
 from django.views.decorators.csrf import csrf_exempt
 import json
+from datetime import date
 
 from .forms import UserRegistrationForm
 from .models import YouTubeData
@@ -12,7 +16,7 @@ from .models import YouTubeData
 
 # @login_required
 def chart(request): # 차트 뷰
-    # 현재 시간 가져오기 
+    # 현재 시간 가져오기
     now = timezone.now()
     # 오늘 오후 6시 (KST) 계산
     today_6pm_kst = timezone.localtime().replace(hour=18, minute=0, second=0, microsecond=0)
@@ -52,6 +56,33 @@ def video_details(request):
     
     # 요청이 POST 방식이 아닐 경우 에러 응답
     return JsonResponse({"error": "Invalid request method."}, status=400)
+
+
+def weekly_issues(request):
+    # 현재 날짜와 시간 가져오기
+    today = localtime().date()
+    week_ago = today - timedelta(days=7)
+
+    # 7일 동안 업로드된 동영상을 가져오기
+    weekly_videos = YouTubeData.objects.filter(
+        upload_date__gte=week_ago,
+        upload_date__lte=today
+    ).order_by('-upload_date', '-views')  # 최신순 및 조회수 높은 순 정렬
+
+    # 날짜별로 데이터를 그룹화
+    grouped_issues = defaultdict(list)
+    for video in weekly_videos:
+        date_key = video.upload_date.date()
+        if len(grouped_issues[date_key]) < 10:  # 날짜별 최대 10개로 제한
+            grouped_issues[date_key].append(video)
+
+    # 날짜별 데이터 정렬
+    sorted_issues = sorted(grouped_issues.items(), key=lambda x: x[0], reverse=True)
+
+    # 템플릿에 데이터 전달
+    return render(request, 'analysis/weekly_issues.html', {'sorted_issues': sorted_issues})
+
+
 
 # @login_required
 def emotion(request):

@@ -7,6 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'css/base.css' %}">
+
 </head>
 <body>
     <div id="header">
@@ -23,7 +24,9 @@
                 <li {% if section == "relate" %}class="selected"{% endif %}>
                     <a href="{% url 'account:relate' %}">연관어분석</a>
                 </li>
-                
+                <li {% if section == "weekly_issues" %}class="selected"{% endif %}>
+                    <a href="{% url 'account:weekly_issues' %}">주간이슈</a>
+                </li>
             </ul>
         {% comment %} {% endif %} {% endcomment %}
         <span class="user">
