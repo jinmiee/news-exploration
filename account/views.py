@@ -60,7 +60,6 @@ def video_details(request):
     return JsonResponse({"error": "Invalid request method."}, status=400)
 
 
-<<<<<<< HEAD
 #상세분석
 # @login_required
 def detail(request):
@@ -97,7 +96,8 @@ def detail(request):
     }
 
     return render(request, 'analysis/detail.html', context)
-=======
+
+
 def weekly_issues(request):
     # 현재 날짜 가져오기
     today = localtime().date()
@@ -127,7 +127,6 @@ def weekly_issues(request):
     # 정렬된 데이터를 템플릿에 전달
     # sorted_issues는 (날짜, [동영상 리스트]) 형태의 리스트
     return render(request, 'analysis/weekly_issues.html', {'sorted_issues': sorted_issues})
->>>>>>> 3c78d531bf4f4147553b8eecb5e721211fc47592
 
 
 
