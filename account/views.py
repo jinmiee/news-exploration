@@ -9,40 +9,48 @@ import json
 from .forms import UserRegistrationForm
 from .models import YouTubeData
 
+
 # @login_required
-def chart(request):
-    # 현재 시간과 어제 오후 6시 및 오늘 오후 6시 계산
+def chart(request): # 차트 뷰
+    # 현재 시간 가져오기 
     now = timezone.now()
+    # 오늘 오후 6시 (KST) 계산
     today_6pm_kst = timezone.localtime().replace(hour=18, minute=0, second=0, microsecond=0)
+    # 어제 오후 6시 (KST) 계산
     yesterday_6pm_kst = today_6pm_kst - timedelta(days=1)
 
-    # KST를 UTC로 변환
+    # KST를 UTC로 변환 (UTC = KST-9)
     yesterday_6pm_utc = yesterday_6pm_kst - timedelta(hours=9)
     today_6pm_utc = today_6pm_kst - timedelta(hours=9)
 
-    # 쿼리 실행: 어제 오후 6시 ~ 오늘 오후 6시 데이터 가져오기
+    # 쿼리 실행: 어제 오후 6시 ~ 오늘 오후 6시 사이에 업로드 된 동영상 가져오기
+    # 조회수 기준 내림차순 정렬, 상위 10개 데이터 가져오기
     top_news = YouTubeData.objects.filter(
-        upload_date__gte=yesterday_6pm_utc,
-        upload_date__lte=today_6pm_utc
+        upload_date__gte=yesterday_6pm_utc, # 어제 오후 6시 이후 데이터
+        upload_date__lte=today_6pm_utc  # 오늘 오후 6시 이전 데이터
     ).order_by('-views')[:10]
 
     # 템플릿에 데이터 전달
     return render(request, 'analysis/chart.html', {'top_news': top_news})
 
-@csrf_exempt
+# 동영상 세부 정보 조회 API
+@csrf_exempt # CSRF 검사 비활성화(POST 요청 허용)
 def video_details(request):
     if request.method == 'POST':
-        data = json.loads(request.body)
-        video_url = data.get('url')
+        data = json.loads(request.body) # 요청 본문에서 JSON 데이터 로드
+        video_url = data.get('url') # JSON 데이터에서 URL 추출
 
-        # URL로 데이터 검색
+        # 데이터베이스에서 URL로 YouTubeData 검색
         video = YouTubeData.objects.filter(url=video_url).first()
 
+        # 검색된 데이터가 없을 경우 에러 응답
         if not video:
             return JsonResponse({"error": "Video not found."}, status=404)
 
+        # 검색된 데이터가 있을 경우 URL 정보를 JSON 응답으로 반환
         return JsonResponse({"video_url": video.url})
-
+    
+    # 요청이 POST 방식이 아닐 경우 에러 응답
     return JsonResponse({"error": "Invalid request method."}, status=400)
 
 # @login_required

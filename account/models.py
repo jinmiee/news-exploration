@@ -1,24 +1,24 @@
 from djongo import models
 
-class YouTubeComment(models.Model):
+class YouTubeComment(models.Model): # 유튜브 댓글 모델
     author = models.CharField(max_length=255, null=True, blank=True)  # 댓글 작성자
     comment = models.TextField(null=True, blank=True)  # 댓글 내용
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs): #초기화 메서드
         try:
-            if args and isinstance(args[0], str):
-                kwargs['author'] = "Unknown"
-                kwargs['comment'] = args[0]
+            if args and isinstance(args[0], str): #첫번째 인자가 문자열일 경우
+                kwargs['author'] = "Unknown" # 작성자를 "Unknown" 으로 설정
+                kwargs['comment'] = args[0] # 댓글 내용을 해당 문자열로 설정
         except Exception as e:
-            print(f"Error initializing YouTubeComment: {e}")
+            print(f"Error initializing YouTubeComment: {e}") #오류 메시지 출력
         super().__init__(*args, **kwargs)
 
     class Meta:
-        abstract = True
+        abstract = True # 이 모델은 추상 모델로 데이터베이스에 직접 생성되지 않음.
 
 
 class YouTubeData(models.Model):
-    id = models.ObjectIdField(primary_key=True)  # MongoDB ObjectId
+    id = models.ObjectIdField(primary_key=True)  # MongoDB ObjectId를 기본 키로 설정
     channel_name = models.CharField(max_length=255)  # 채널 이름
     title = models.TextField()  # 동영상 제목
     views = models.BigIntegerField()  # 조회수 (큰 숫자 처리)
@@ -28,7 +28,7 @@ class YouTubeData(models.Model):
     desc = models.TextField(blank=True, null=True)  # 동영상 설명 (옵션)
     likes = models.BigIntegerField(blank=True, null=True)  # 좋아요 수
     comments = models.ArrayField(
-        model_container=YouTubeComment,  # 댓글 배열
+        model_container=YouTubeComment,  # 댓글 모델 지정
         blank=True,
         null=True
     )
