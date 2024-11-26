@@ -30,6 +30,9 @@
                 <li {% if section == "weekly_issues" %}class="selected"{% endif %}>
                     <a href="{% url 'account:weekly_issues' %}">주간이슈</a>
                 </li>
+                <li {% if section == "detail" %}class="selected"{% endif %}>
+                    <a href="{% url 'account:detail' %}">상세분석</a>
+                </li>
             </ul>
         {% comment %} {% endif %} {% endcomment %}
         <span class="user">
