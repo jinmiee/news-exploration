@@ -61,7 +61,8 @@ class YouTubeDataCollector:
                 for item in comment_threads["items"]:
                     # 댓글 내용을 리스트에 추가
                     comment = item["snippet"]["topLevelComment"]["snippet"]["textDisplay"]
-                    comments.append(comment)
+                    author = item["snippet"]["topLevelComment"]["snippet"]["authorDisplayName"]
+                    comments.append({"author": author, "comment": comment})
                     
                     if len(comments) >= 100:  # 100개를 초과하면 종료
                         break
@@ -82,85 +83,84 @@ class YouTubeDataCollector:
         return comments
 
     def collect_channel_data(self, channel_name, channel_id):
-        """
-        특정 채널의 최근 24시간 동안의 YouTube 데이터를 수집하는 메서드.
-
-        Args:
-            channel_name (str): 채널 이름.
-            channel_id (str): YouTube 채널 ID.
-        """
-        # KST(한국 표준시) 기준으로 현재 시간과 24시간 전 시간 계산
-        now_kst = datetime.now(self.KST)
-        yesterday_kst = now_kst - timedelta(hours=24)
-        yesterday_utc = yesterday_kst.astimezone(pytz.utc)  # UTC로 변환
-        start_time = yesterday_utc.strftime('%Y-%m-%dT%H:%M:%SZ')  # ISO 형식으로 변환
+        # 현재 한국 시간(KST)과 어제 시간을 계산
+        now_kst = datetime.now(self.KST)  # 현재 시간 (KST)
+        yesterday_kst = now_kst - timedelta(hours=24)  # 24시간 전 (KST)
+        yesterday_utc = yesterday_kst.astimezone(pytz.utc)  # UTC 시간으로 변환
+        start_time = yesterday_utc.strftime('%Y-%m-%dT%H:%M:%SZ')  # YouTube API에 필요한 ISO 8601 형식
 
         videos = []  # 수집된 동영상 데이터를 저장할 리스트
-        page_token = None
+        page_token = None  # YouTube API의 페이지 토큰 (다음 페이지로 이동 시 필요)
 
         try:
             while True:
-                # YouTube API를 통해 동영상 검색
+                # YouTube API 호출: 지정된 채널의 동영상 목록을 가져옴
                 search_response = self.youtube.search().list(
-                    order='date',  # 최신순으로 정렬
-                    part='snippet',
-                    channelId=channel_id,
-                    maxResults=50,  # 한 번에 최대 50개 검색
-                    publishedAfter=start_time,  # 24시간 이내의 데이터만 가져옴
-                    type='video',
-                    pageToken=page_token  # 페이지 토큰으로 다음 페이지 검색
+                    order='date',  # 최신 순으로 정렬
+                    part='snippet',  # 메타데이터 정보 가져오기
+                    channelId=channel_id,  # 채널 ID
+                    maxResults=50,  # 한 번에 가져올 최대 동영상 수
+                    publishedAfter=start_time,  # 24시간 이전 동영상은 제외
+                    type='video',  # 동영상만 필터링
+                    pageToken=page_token  # 페이지 토큰
                 ).execute()
 
-                # 동영상 ID 리스트 추출
+                # 각 동영상의 ID를 추출
                 video_ids = [item['id']['videoId'] for item in search_response['items']]
 
-                # 동영상 세부 정보 요청
+                # 동영상 상세 정보 가져오기
                 videos_response = self.youtube.videos().list(
-                    part='snippet,statistics',  # 메타데이터와 통계 포함
-                    id=','.join(video_ids)
+                    part='snippet,statistics',  # 제목, 설명, 통계 정보 등 포함
+                    id=','.join(video_ids)  # 여러 동영상 ID를 쉼표로 구분하여 요청
                 ).execute()
 
+                # 각 동영상 데이터 처리
                 for video in videos_response['items']:
-                    # 실시간 방송은 제외
+                    # 실시간 동영상(liveBroadcastContent)이 아닌 경우만 처리
                     if video['snippet'].get('liveBroadcastContent') == 'none':
+                        # 동영상 업로드 시간을 UTC 기준으로 파싱 후 KST로 변환
                         published_at = video['snippet']['publishedAt']
                         published_at_kst = datetime.strptime(
                             published_at, '%Y-%m-%dT%H:%M:%SZ'
-                        ).replace(tzinfo=timezone.utc).astimezone(self.KST)  # UTC -> KST 변환
+                        ).replace(tzinfo=timezone.utc).astimezone(self.KST)
 
+                        # 업로드 시간이 어제 이후인 동영상만 처리
                         if published_at_kst >= yesterday_kst:
+                            # 동영상 데이터 생성
                             video_data = {
-                                'channel_name': channel_name,
-                                'title': video['snippet'].get('title'),
-                                'views': video['statistics'].get('viewCount', '0'),
-                                'upload_date': published_at_kst.strftime('%Y-%m-%d %H:%M:%S %Z'),
-                                'url': f"https://www.youtube.com/watch?v={video['id']}",
-                                'channel': video['snippet'].get('channelTitle'),
-                                'desc': video['snippet'].get('description', ''),
-                                'likes': video['statistics'].get('likeCount', '0'),
-                                'comments': self.get_video_comments(video['id'])  # 댓글 수집
+                                'channel_name': channel_name,  # 채널 이름
+                                'title': video['snippet'].get('title'),  # 동영상 제목
+                                'views': video['statistics'].get('viewCount', '0'),  # 조회수
+                                'upload_date': published_at_kst,  # 업로드 날짜 (datetime 객체)
+                                'url': f"https://www.youtube.com/watch?v={video['id']}",  # 동영상 URL
+                                'channel': video['snippet'].get('channelTitle'),  # 채널 제목
+                                'desc': video['snippet'].get('description', ''),  # 동영상 설명
+                                'likes': video['statistics'].get('likeCount', '0'),  # 좋아요 수
+                                'comments': self.get_video_comments(video['id'])  # 댓글 목록
                             }
-                            videos.append(video_data)
+                            videos.append(video_data)  # 리스트에 추가
 
-                # 다음 페이지가 있으면 계속 검색, 최대 100개까지만 수집
+                # 다음 페이지가 있으면 페이지 토큰 갱신, 없으면 종료
                 if 'nextPageToken' in search_response and len(videos) < 100:
                     page_token = search_response['nextPageToken']
                 else:
                     break
 
-            # 조회수 기준으로 정렬하여 상위 20개만 저장
+            # 조회수 기준으로 정렬 후 상위 20개 선택
             videos.sort(key=lambda x: int(x['views']), reverse=True)
             videos = videos[:20]
 
+            # MongoDB에 데이터 저장
             if videos:
                 mongo_client = self.mongo_hook.get_conn()  # MongoDB 연결
                 db = mongo_client['youtube_data']  # 데이터베이스 선택
                 collection = db['youtube_datas']  # 컬렉션 선택
-                collection.insert_many(videos)  # 데이터 저장
+                collection.insert_many(videos)  # 동영상 데이터 저장
                 print(f"{channel_name} 데이터 저장 완료 (상위 20개)")
 
         except Exception as e:
-            print(f"{channel_name} 데이터 수집 오류: {e}")  # 오류 발생 시 출력
+            # 예외 처리: 에러 발생 시 로그 출력
+            print(f"{channel_name} 데이터 수집 오류: {e}")
 
     def collect_all_channel_data(self):
         """
@@ -199,7 +199,7 @@ with DAG(
     # PythonOperator로 DAG 작업 정의
     collect_youtube_data = PythonOperator(
         task_id='collect_youtube_data',
-        python_callable=lambda: run_youtube_data_collection('Your_YouTube_API_Key'),  # API 키 전달
+        python_callable=lambda: run_youtube_data_collection('AIzaSyC9_BEfIDVhNZgeoAkVAV2P5YgEGQW7YTs'),  # API 키 전달
         dag=dag
     )
     collect_youtube_data

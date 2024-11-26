@@ -1,16 +1,89 @@
 {% extends "base.html" %}
-{% load youtube_extras %}
-{% block title %}Chart{% endblock %}
+{% block title %}YouTube News Chart{% endblock %}
+
 {% block content %}
-    <h1>News Chart</h1>
-    <p>Welcome {{ user.username }}!</p>
-    {% for video in videos %}
-        <div class="video">
-            <h2>{{ video.title }}</h2>
-            <!-- 새로운 필터로 유튜브 ID를 추출하여 썸네일 표시 -->
-            <a href="{{ video.url }}" target="_blank">
-                <img src="https://img.youtube.com/vi/{{ video.url|youtube_id }}/hqdefault.jpg" alt="{{ video.title }}" />
-            </a>
+    <h1>YouTube Top 10 News Chart</h1>
+    <p>Welcome, {{ user.username }}!</p>
+
+    <!-- 뉴스 리스트 -->
+    <ul style="list-style-type: none; padding: 0;">
+        {% for item in top_news %}
+            <li style="margin-bottom: 20px;">
+                <!-- 제목 클릭 이벤트 -->
+                <a href="#" onclick="loadVideo('{{ item.url }}'); return false;" style="text-decoration: none; font-size: 18px; font-weight: bold;">
+                    {{ forloop.counter }}. {{ item.title }}
+                </a>
+                <p style="margin: 5px 0; color: #555;">
+                    조회수: <strong>{{ item.views }}</strong> | 좋아요: <strong>{{ item.likes }}</strong> | 업로드 날짜: <strong>{{ item.upload_date|date:"Y-m-d H:i:s" }}</strong>
+                </p>
+            </li>
+        {% empty %}
+            <li>데이터가 없습니다.</li>
+        {% endfor %}
+    </ul>
+
+    <!-- 사이드바 -->
+    <div id="sidebar" style="border: 1px solid #ccc; padding: 20px; margin-top: 20px; display: none;">
+        <div id="video-container" style="margin-bottom: 20px;">
+            <iframe id="video-frame" width="560" height="315" frameborder="0" allowfullscreen></iframe>
         </div>
-    {% endfor %}
+        <div id="comments-container">
+            <h4>댓글</h4>
+            <ul id="comments-list" style="list-style-type: none; padding: 0;"></ul>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        function loadVideo(videoUrl) {
+            if (!videoUrl) {
+                alert('Invalid video URL.');
+                return;
+            }
+
+            // 기존 사이드바 콘텐츠 초기화
+            document.getElementById('video-frame').src = '';
+            document.getElementById('comments-list').innerHTML = '';
+
+            fetch('/account/video-details/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ url: videoUrl }),
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                // 사이드바 표시
+                document.getElementById('sidebar').style.display = 'block';
+
+                // 동영상 업데이트
+                document.getElementById('video-frame').src = videoUrl.replace("watch?v=", "embed/");
+
+                // 댓글 업데이트
+                const commentsList = document.getElementById('comments-list');
+                commentsList.innerHTML = '';
+                if (data.comments && data.comments.length > 0) {
+                    data.comments.forEach(comment => {
+                        const li = document.createElement('li');
+                        li.textContent = `${comment.author}: ${comment.comment}`;
+                        commentsList.appendChild(li);
+                    });
+                } else {
+                    const li = document.createElement('li');
+                    li.textContent = '댓글이 없습니다.';
+                    commentsList.appendChild(li);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error loading video details.');
+            });
+        }
+    </script>
 {% endblock %}
