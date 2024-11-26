@@ -7,7 +7,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'css/base.css' %}">
+<<<<<<< HEAD
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
+=======
+    {% block head %}{% endblock %}
+>>>>>>> 3c78d531bf4f4147553b8eecb5e721211fc47592
 </head>
 <body>
     <div id="header">
@@ -24,7 +28,9 @@
                 <li {% if section == "relate" %}class="selected"{% endif %}>
                     <a href="{% url 'account:relate' %}">연관어분석</a>
                 </li>
-                
+                <li {% if section == "weekly_issues" %}class="selected"{% endif %}>
+                    <a href="{% url 'account:weekly_issues' %}">주간이슈</a>
+                </li>
             </ul>
         {% comment %} {% endif %} {% endcomment %}
         <span class="user">

@@ -1,0 +1,84 @@
+/* 컨테이너 스타일 */
+.weekly-issues-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: Arial, sans-serif;
+}
+
+/* 카드 그리드 */
+.weekly-issues-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+/* 개별 카드 */
+.issue-card {
+    background-color: #ffffff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 15px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+/* 날짜 스타일 */
+.issue-date {
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #333;
+    border-bottom: 2px solid #ccc;
+    padding-bottom: 5px;
+}
+
+/* 뉴스 목록 */
+.issue-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+/* 개별 뉴스 */
+.issue-item {
+    text-align: left;
+    margin-bottom: 10px;
+    border-bottom: 1px dashed #ddd;
+    padding-bottom: 10px;
+}
+
+.issue-item:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+/* 뉴스 순위 */
+.issue-rank {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #007BFF;
+    margin-right: 10px;
+}
+
+/* 뉴스 내용 */
+.issue-content {
+    margin-left: 10px;
+}
+
+.issue-title {
+    font-size: 1rem;
+    font-weight: bold;
+    margin: 0 0 5px;
+}
+
+.issue-link {
+    color: #007BFF;
+    text-decoration: none;
+}
+
+.issue-link:hover {
+    text-decoration: underline;
+}

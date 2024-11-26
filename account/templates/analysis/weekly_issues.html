@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% load static %}
+
+{% block head %}
+<link rel="stylesheet" href="{% static 'css/weekly_issues.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="weekly-issues-container">
+    <header>
+        <h1>주간 이슈</h1>
+        <p>지난 7일간 주요 뉴스를 날짜별로 확인하세요.</p>
+    </header>
+    <main class="weekly-issues-grid">
+        {% for date, issues in sorted_issues %}
+            <section class="issue-card">
+                <h2 class="issue-date">{{ date|date:"Y년 m월 d일" }}</h2>
+                <ul class="issue-list">
+                    {% for issue in issues %}
+                        <li class="issue-item">
+                            <span class="issue-rank">{{ forloop.counter }}</span>
+                            <div class="issue-content">
+                                <h3 class="issue-title">{{ issue.title }}</h3>
+                                <p><strong>조회수:</strong> {{ issue.views }}</p>
+                                <a href="{{ issue.url }}" target="_blank" class="issue-link">자세히 보기</a>
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </section>
+        {% endfor %}
+    </main>
+</div>
+{% endblock %}

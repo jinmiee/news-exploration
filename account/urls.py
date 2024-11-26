@@ -31,7 +31,11 @@ urlpatterns = [
     
     path('', views.chart, name='chart'),
     path('video-details/', views.video_details, name='video_details'),
+<<<<<<< HEAD
     path('detail/', views.detail, name='detail'),
+=======
+    path('weekly-issues/', views.weekly_issues, name='weekly_issues'),
+>>>>>>> 3c78d531bf4f4147553b8eecb5e721211fc47592
     path('emotion/', views.emotion, name='emotion'),
     path('relate/', views.relate, name='relate'),
     path('register/', views.register, name='register'),

@@ -1,18 +1,19 @@
-from airflow import DAG 
-from airflow.operators.python import PythonOperator 
-from airflow.providers.mongo.hooks.mongo import MongoHook 
-from googleapiclient.discovery import build  
-from datetime import datetime, timezone, timedelta  
-import pytz 
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+from airflow.providers.mongo.hooks.mongo import MongoHook
+from googleapiclient.discovery import build
+from datetime import datetime, timezone, timedelta
+import pytz
 
 
 class YouTubeDataCollector:
     """
     YouTube 데이터를 수집하고 MongoDB에 저장하는 클래스
-    
+
     YouTube API를 통해 동영상 데이터 및 댓글 데이터를 수집,
     수집된 데이터를 MongoDB에 저장하는 역할을 수행
     """
+
     def __init__(self,
                  api_key,
                  mongo_conn_id='mongoid'):
@@ -63,7 +64,7 @@ class YouTubeDataCollector:
                     comment = item["snippet"]["topLevelComment"]["snippet"]["textDisplay"]
                     author = item["snippet"]["topLevelComment"]["snippet"]["authorDisplayName"]
                     comments.append({"author": author, "comment": comment})
-                    
+
                     if len(comments) >= 100:  # 100개를 초과하면 종료
                         break
 
@@ -79,7 +80,11 @@ class YouTubeDataCollector:
                 else:
                     break
         except Exception as e:
-            print(f"댓글 수집 오류: {e}")  # 오류 발생 시 출력
+            # 댓글 비활성화 에러 처리
+            if "commentsDisabled" in str(e):
+                print(f"댓글 비활성화된 동영상: {video_id}")
+            else:
+                print(f"댓글 수집 오류: {e}")
         return comments
 
     def collect_channel_data(self, channel_name, channel_id):
@@ -126,6 +131,11 @@ class YouTubeDataCollector:
 
                         # 업로드 시간이 어제 이후인 동영상만 처리
                         if published_at_kst >= yesterday_kst:
+                            # 댓글 수집 시 비활성화된 동영상 건너뛰기
+                            comments = self.get_video_comments(video['id'])
+                            if comments == []:  # 댓글 비활성화인 경우
+                                continue
+
                             # 동영상 데이터 생성
                             video_data = {
                                 'channel_name': channel_name,  # 채널 이름
@@ -155,11 +165,19 @@ class YouTubeDataCollector:
                 mongo_client = self.mongo_hook.get_conn()  # MongoDB 연결
                 db = mongo_client['youtube_data']  # 데이터베이스 선택
                 collection = db['youtube_datas']  # 컬렉션 선택
-                collection.insert_many(videos)  # 동영상 데이터 저장
+
+                for video in videos:
+                    # 중복 확인: URL 기준
+                    if not collection.find_one({'url': video['url']}):
+                        collection.insert_one(video)
+                        print(f"{channel_name} - 새 데이터 저장: {video['title']}")
+                    else:
+                        print(f"{channel_name} - 중복 데이터 건너뜀: {video['title']}")
+
+                    # 데이터 저장 완료 메시지 추가
                 print(f"{channel_name} 데이터 저장 완료 (상위 20개)")
 
         except Exception as e:
-            # 예외 처리: 에러 발생 시 로그 출력
             print(f"{channel_name} 데이터 수집 오류: {e}")
 
     def collect_all_channel_data(self):
@@ -180,11 +198,12 @@ default_args = {
 }
 
 with DAG(
-        'youtube_data_collection_dag',  # DAG 이름
-        default_args=default_args,  # 기본 설정
-        description='YouTube Data Collection DAG',
-        schedule_interval='0 18 * * *',  # 매일 18:00(KST)에 실행
-        catchup=False  # 이전 날짜의 DAG 실행 방지
+    'youtube_data_collection_dag',  # DAG 이름
+    default_args=default_args,  # 기본 설정
+    description='YouTube Data Collection DAG',
+    schedule_interval='0 18 * * *',  # 매일 18:00(KST)에 실행
+    catchup=False,  # 이전 날짜의 DAG 실행 방지
+    max_active_runs=1  # 병렬 실행 방지
 ) as dag:
     def run_youtube_data_collection(api_key):
         """
@@ -199,7 +218,7 @@ with DAG(
     # PythonOperator로 DAG 작업 정의
     collect_youtube_data = PythonOperator(
         task_id='collect_youtube_data',
-        python_callable=lambda: run_youtube_data_collection('AIzaSyC9_BEfIDVhNZgeoAkVAV2P5YgEGQW7YTs'),  # API 키 전달
+        python_callable=lambda: run_youtube_data_collection('api-key넣기'),  # API 키 전달
         dag=dag
     )
     collect_youtube_data
