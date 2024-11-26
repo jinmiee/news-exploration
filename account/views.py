@@ -8,6 +8,7 @@ import json
 
 from .forms import UserRegistrationForm
 from .models import YouTubeData
+from urllib.parse import urlparse, parse_qs
 
 # @login_required
 def chart(request):
@@ -25,6 +26,7 @@ def chart(request):
         upload_date__gte=yesterday_6pm_utc,
         upload_date__lte=today_6pm_utc
     ).order_by('-views')[:10]
+
 
     # 템플릿에 데이터 전달
     return render(request, 'analysis/chart.html', {'top_news': top_news})
@@ -44,6 +46,46 @@ def video_details(request):
         return JsonResponse({"video_url": video.url})
 
     return JsonResponse({"error": "Invalid request method."}, status=400)
+
+
+#상세분석
+# @login_required
+def detail(request):
+    # 현재 시간과 어제 오후 6시 및 오늘 오후 6시 계산
+    now = timezone.now()
+    today_6pm_kst = timezone.localtime().replace(hour=18, minute=0, second=0, microsecond=0)
+    yesterday_6pm_kst = today_6pm_kst - timedelta(days=1)
+
+    # KST를 UTC로 변환
+    yesterday_6pm_utc = yesterday_6pm_kst - timedelta(hours=9)
+    today_6pm_utc = today_6pm_kst - timedelta(hours=9)
+
+    # 쿼리 실행: 어제 오후 6시 ~ 오늘 오후 6시 데이터 가져오기
+    top_news = YouTubeData.objects.filter(
+        upload_date__gte=yesterday_6pm_utc,
+        upload_date__lte=today_6pm_utc
+    ).order_by('-views')[:10]
+
+    first_item = top_news[1]
+
+    # URL 파싱
+    parsed_url = urlparse(first_item.url)
+
+    # 쿼리 파라미터 추출
+    query_params = parse_qs(parsed_url.query)
+
+    # video_id 추출
+    video_id = query_params.get('v', [None])[0]
+
+    context = {
+        'news': first_item,
+        'section': 'detail',
+        'video_id': video_id
+    }
+
+    return render(request, 'analysis/detail.html', context)
+
+
 
 # @login_required
 def emotion(request):
