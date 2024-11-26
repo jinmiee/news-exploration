@@ -59,27 +59,33 @@ def video_details(request):
 
 
 def weekly_issues(request):
-    # 현재 날짜와 시간 가져오기
+    # 현재 날짜 가져오기
     today = localtime().date()
+    # 오늘로부터 7일 전 날짜 계산
     week_ago = today - timedelta(days=7)
 
-    # 7일 동안 업로드된 동영상을 가져오기
+    # 데이터베이스에서 7일 동안 업로드된 동영상을 조회
+    # 조건: 업로드 날짜가 7일 전 이후(>=)이고 오늘 이전(<=)
+    # 정렬: 업로드 날짜 역순(-upload_date) 및 조회수 높은 순(-views)
     weekly_videos = YouTubeData.objects.filter(
-        upload_date__gte=week_ago,
-        upload_date__lte=today
-    ).order_by('-upload_date', '-views')  # 최신순 및 조회수 높은 순 정렬
+        upload_date__gte=week_ago,  # 업로드 날짜가 7일 전 이후
+        upload_date__lte=today      # 업로드 날짜가 오늘 이전
+    ).order_by('-upload_date', '-views')  # 최신순 및 조회수 높은 순으로 정렬
 
-    # 날짜별로 데이터를 그룹화
-    grouped_issues = defaultdict(list)
-    for video in weekly_videos:
-        date_key = video.upload_date.date()
-        if len(grouped_issues[date_key]) < 10:  # 날짜별 최대 10개로 제한
-            grouped_issues[date_key].append(video)
+    # 데이터를 날짜별로 그룹화
+    grouped_issues = defaultdict(list)  # 기본값이 빈 리스트인 딕셔너리 생성
+    for video in weekly_videos:  # weekly_videos 쿼리셋의 각 동영상에 대해 반복
+        date_key = video.upload_date.date()  # 업로드 날짜(연-월-일) 추출
+        # 날짜별로 최대 10개 동영상만 추가
+        if len(grouped_issues[date_key]) < 10:
+            grouped_issues[date_key].append(video)  # 날짜 키에 해당하는 리스트에 동영상 추가
 
-    # 날짜별 데이터 정렬
+    # grouped_issues 딕셔너리를 날짜 순서로 정렬
+    # 정렬 기준: 날짜 (x[0]), 내림차순(reverse=True)
     sorted_issues = sorted(grouped_issues.items(), key=lambda x: x[0], reverse=True)
 
-    # 템플릿에 데이터 전달
+    # 정렬된 데이터를 템플릿에 전달
+    # sorted_issues는 (날짜, [동영상 리스트]) 형태의 리스트
     return render(request, 'analysis/weekly_issues.html', {'sorted_issues': sorted_issues})
 
 
