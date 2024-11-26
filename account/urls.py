@@ -31,6 +31,7 @@ urlpatterns = [
     
     path('', views.chart, name='chart'),
     path('video-details/', views.video_details, name='video_details'),
+    path('detail/', views.detail, name='detail'),
     path('weekly-issues/', views.weekly_issues, name='weekly_issues'),
     path('emotion/', views.emotion, name='emotion'),
     path('relate/', views.relate, name='relate'),
