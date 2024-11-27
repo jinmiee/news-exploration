@@ -189,8 +189,12 @@ def generate_wordcloud(comments, analyzed_comments):
     # 댓글 텍스트를 하나의 문자열로 합침
     text = " ".join(comments)
 
-    # 한글 폰트 경로 지정 (예: NanumGothic)
-    font_path = "/usr/share/fonts/truetype/nanum/NanumGothic.ttf"  # 시스템에 설치된 경로 예시
+    # 텍스트가 비어 있는지 확인
+    if not text.strip():
+        raise ValueError("No words available to generate WordCloud.")
+
+    # 한글 폰트 경로 지정 (예: Malgun Gothic)
+    font_path = "C:\Windows\Fonts\malgun.ttf"  # 시스템에 설치된 경로 예시
 
     # 감정에 따른 색상 설정 함수
     def color_func(word, font_size, position, orientation, random_state=None, **kwargs):
@@ -221,6 +225,7 @@ def generate_wordcloud(comments, analyzed_comments):
     img_base64 = base64.b64encode(img.getvalue()).decode('utf-8')
 
     return img_base64
+
 
 def generate_pie_chart(analyzed_comments):
     # 긍정적, 부정적 댓글 수 계산
@@ -264,11 +269,18 @@ def emotion(request):
             if isinstance(comment, dict):
                 video_comments.append(comment.get('comment'))
 
+    # 댓글이 비어 있는지 확인
+    if not video_comments:
+        video_comments = ["No comments available"]  # 기본 값 설정
+
     # 감정 분석 수행
     analyzed_comments = analyze_sentiment(video_comments)
 
     # 워드클라우드 이미지 생성
-    wordcloud_image = generate_wordcloud(video_comments, analyzed_comments)
+    try:
+        wordcloud_image = generate_wordcloud(video_comments, analyzed_comments)
+    except ValueError as e:
+        wordcloud_image = None  # 워드클라우드 생성 실패 시 None 처리
 
     # 파이차트 생성
     pie_chart_image = generate_pie_chart(analyzed_comments)
