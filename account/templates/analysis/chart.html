@@ -31,24 +31,26 @@
         </div>
 
         <!-- 오른쪽 사이드바 -->
-<div id="sidebar" class="video-sidebar" style="display: none;">
-    <h2>동영상 보기</h2>
-    <div id="video-container" style="margin-bottom: 20px;">
-        <iframe id="video-frame" width="100%" height="315" frameborder="0" allowfullscreen></iframe>
-    </div>
-
-    <!-- 분석 버튼들 -->
-    <div class="analysis-buttons">
+        <div id="sidebar" class="video-sidebar" style="display: none;">
+            <h2>동영상 보기</h2>
+            <div id="video-container" style="margin-bottom: 20px;">
+                <iframe id="video-frame" width="100%" height="315" frameborder="0" allowfullscreen></iframe>
+            </div>
         
-        <a id="analysis-detail-btn" href="#" class="btn-analysis">상세 분석 보기</a>
-
+            <!-- 분석 버튼들 -->
+            <div class="analysis-buttons" style="display: flex; flex-direction: column; gap: 15px; margin-top: 20px;">
+                <a id="analysis-detail-btn" href="#" class="btn-analysis" style="display: block; text-align: center; padding: 12px 30px; background-color: #007BFF; color: white; border-radius: 5px; text-decoration: none; font-weight: bold; transition: background-color 0.3s ease; width: fit-content;">상세 분석 보기</a>
+                <a id="analysis-emotion-btn" href="#" class="btn-analysis" style="display: block; text-align: center; padding: 12px 30px; background-color: #007BFF; color: white; border-radius: 5px; text-decoration: none; font-weight: bold; transition: background-color 0.3s ease; width: fit-content;">감정 분석 보기</a>
+                <a id="analysis-relate-btn" href="#" class="btn-analysis" style="display: block; text-align: center; padding: 12px 30px; background-color: #007BFF; color: white; border-radius: 5px; text-decoration: none; font-weight: bold; transition: background-color 0.3s ease; width: fit-content;">연관어 분석 보기</a>
+            </div>
+        </div>
         
-        <a id="analysis-emotion-btn" href="#" class="btn-analysis">감정 분석 보기</a>
-
-        
-        <a id="analysis-relate-btn" href="#" class="btn-analysis">연관어 분석 보기</a>
-    </div>
-</div>
+        <!-- 마우스를 올렸을 때 버튼 배경색이 바뀌도록 하는 스타일을 추가 -->
+        <style>
+            .btn-analysis:hover {
+                background-color: #0056b3; /* 버튼에 마우스를 올렸을 때 배경색 변화 */
+            }
+        </style>
 
 <!-- JavaScript -->
 <script>

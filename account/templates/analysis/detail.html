@@ -6,31 +6,47 @@
     <h1>YouTube News Detail</h1>
   
     <h2>{{ video_title }}</h2>
-    <!-- video-container를 flex로 설정하여 영상과 정보를 나란히 배치 -->
-    <div id="video-container" style="display: flex; align-items: center; justify-content: space-between; margin-top: 20px;">
-        <!-- 영상 임베드 -->
-        <iframe id="video-frame" width="560" height="315" src="https://www.youtube.com/embed/{{ video_id }}" frameborder="0" allowfullscreen></iframe>
-        
-        <!-- 오른쪽에 표시될 views와 likes -->
-        <div style="margin-left: 20px;">
-            <!-- Views -->
-            <p style="font-size: 20px; font-weight: bold; color: #FF5733;">
-                <i class="fas fa-eye" style="color: #FF5733; margin-right: 10px;"></i>
-                Views: <span style="font-size: 24px; color: #FF5733;">{{ video_views }}</span>
-            </p>
 
-            <!-- Likes -->
-            <p style="font-size: 20px; font-weight: bold; color: #FF9800;">
-                <i class="fas fa-thumbs-up" style="color: #FF9800; margin-right: 10px;"></i>
-                Likes: <span style="font-size: 24px; color: #FF9800;">{{ video_likes }}</span>
-            </p>
+    <!-- video-container를 flex로 설정하여 영상과 정보를 나란히 배치 -->
+    <div id="video-container" style="display: flex; justify-content: space-between; margin-top: 20px;">
+        <!-- 왼쪽: 영상과 views, likes -->
+        <div style="flex: 0 0 60%; padding-right: 20px;">
+            <!-- 영상 임베드 -->
+            <iframe id="video-frame" width="100%" height="500" src="https://www.youtube.com/embed/{{ video_id }}" frameborder="0" allowfullscreen></iframe>
+
+            <!-- 오른쪽에 표시될 views와 likes -->
+            <div style="margin-top: 20px;">
+                <!-- Views -->
+                <p style="font-size: 20px; font-weight: bold; color: #FF5733;">
+                    <i class="fas fa-eye" style="color: #FF5733; margin-right: 10px;"></i>
+                    Views: <span style="font-size: 24px; color: #FF5733;">{{ video_views }}</span>
+                </p>
+
+                <!-- Likes -->
+                <p style="font-size: 20px; font-weight: bold; color: #FF9800;">
+                    <i class="fas fa-thumbs-up" style="color: #FF9800; margin-right: 10px;"></i>
+                    Likes: <span style="font-size: 24px; color: #FF9800;">{{ video_likes }}</span>
+                </p>
+            </div>
+        </div>
+
+        <!-- 오른쪽: 댓글 -->
+        <div style="flex: 0 0 35%; padding-left: 20px; border-left: 2px solid #ddd; padding-left: 20px;">
+            <div style="font-size: 20px; font-weight: bold; color: #4CAF50;">
+                <i class="fas fa-comments" style="color: #4CAF50; margin-right: 10px;"></i>
+                <span>Comments:</span>
+                <ul style="list-style-type: none; padding: 0;">
+                    {% for comment in video_comments %}
+                        <li style="margin-bottom: 10px; color: #4CAF50;">{{ comment.comment }}</li>
+                    {% empty %}
+                        <li>No comments available.</li>
+                    {% endfor %}
+                </ul>
+            </div>
         </div>
     </div>
-
-    
 
     <p style="margin-top: 20px;">
         <a href="{% url 'account:chart' %}">Back to Chart</a>
     </p>
-
 {% endblock %}
