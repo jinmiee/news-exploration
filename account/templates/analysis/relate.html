@@ -1,7 +1,49 @@
 {% extends "base.html" %}
-{% block title %}relate{% endblock %}
+{% block title %}연관어 분석{% endblock %}
+
 {% block content %}
-    <h1>relate</h1>
-    <p>Welcome {{ user.username }} !</p>
-    
+<div class="relate-container">
+    {% if video %}
+        <h1>{{ video_title }} - 연관어 분석</h1>
+        
+        <!-- 네트워크 그래프 표시 -->
+        <div class="network-graph">
+            <h2>연관어 네트워크</h2>
+            <img src="data:image/png;base64,{{ network_graph }}" alt="연관어 네트워크 그래프">
+        </div>
+        
+        <!-- 상위 연관어 쌍 표시 -->
+        <div class="word-pairs">
+            <h2>상위 연관어 쌍</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>순위</th>
+                        <th>단어1</th>
+                        <th>단어2</th>
+                        <th>빈도수</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pair, count in top_pairs %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td>{{ pair.0 }}</td>
+                            <td>{{ pair.1 }}</td>
+                            <td>{{ count }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- 원문 표시 -->
+        <div class="original-text">
+            <h2>원문</h2>
+            <p>{{ video.desc }}</p>
+        </div>
+    {% else %}
+        <p class="error-message">{{ error_message }}</p>
+    {% endif %}
+</div>
 {% endblock %}

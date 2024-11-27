@@ -1,3 +1,6 @@
+'''
+pip install konlpy networkx matplotlib pandas
+'''
 from collections import defaultdict
 from datetime import timedelta
 
@@ -20,6 +23,13 @@ import matplotlib.pyplot as plt
 from io import BytesIO
 import base64
 from transformers import pipeline
+
+from konlpy.tag import Okt
+from collections import Counter
+import networkx as nx
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.font_manager
 
 
 def clean_title(title):
@@ -87,7 +97,7 @@ def video_details(request):
     if request.method == 'POST':
         data = json.loads(request.body) # 요청 본문에서 JSON 데이터 로드
         video_url = data.get('url') # JSON 데이터에서 URL 추출
-        video_title = data.get('title') # JSON 데이터에서 제목 추출
+        video_title = data.get('title') # JSON 데이터에서 목 추출
         video_id = parse_qs(urlparse(video_url).query)['v'][0] # 동영상 ID 추출
 
         # 데이터베이스에서 URL로 YouTubeData 검색
@@ -306,17 +316,107 @@ def emotion(request):
     return render(request, 'analysis/emotion.html', context)
 
 
-# @login_required
+def analyze_related_words(text):
+    okt = Okt()
+    
+    # 명사 추출
+    nouns = okt.nouns(text)
+    
+    # 2글자 이상의 명사만 선택
+    words = [word for word in nouns if len(word) > 1]
+    
+    # 단어 쌍 생성
+    word_pairs = []
+    for i in range(len(words)-1):
+        for j in range(i+1, min(i+5, len(words))):
+            word_pairs.append(tuple(sorted([words[i], words[j]])))
+    
+    # 단어 쌍 빈도수 계산
+    pair_counts = Counter(word_pairs)
+    
+    # 네트워크 그래프 생성
+    G = nx.Graph()
+    
+    # 상위 30개의 연관 관계만 사용
+    for (word1, word2), count in pair_counts.most_common(30):
+        G.add_edge(word1, word2, weight=count)
+    
+    return G, pair_counts.most_common(30)
+
+def generate_network_graph(G):
+    # matplotlib 백엔드 설정
+    matplotlib.use('Agg')
+    
+    # 한글 폰트 설정
+    font_path = "C:/Windows/Fonts/malgun.ttf"  # Windows 환경
+    font_name = matplotlib.font_manager.FontProperties(fname=font_path).get_name()
+    matplotlib.rc('font', family=font_name)
+    
+    # 그래프 크기 조절 (더 작게 설정)
+    plt.figure(figsize=(8, 6))  # 원래 (12, 8)에서 변경
+    
+    # 노드 크기 설정 (더 작게 조절)
+    node_size = [G.degree(node) * 200 for node in G.nodes()]  # 300에서 200으로 변경
+    
+    # 엣지 굵기 설정 (더 얇게 조절)
+    edge_width = [G[u][v]['weight'] * 0.3 for u, v in G.edges()]  # 0.5에서 0.3으로 변경
+    
+    # 그래프 레이아웃 설정 (노드 간격 조절)
+    pos = nx.spring_layout(G, k=0.8, iterations=50)  # k값을 1에서 0.8로 변경
+    
+    # 그래프 그리기
+    nx.draw_networkx_nodes(G, pos, node_size=node_size, node_color='lightblue', alpha=0.7)
+    nx.draw_networkx_edges(G, pos, width=edge_width, alpha=0.4)
+    
+    # 한글 레이블 설정 (폰트 크기 조절)
+    labels = {node: node for node in G.nodes()}
+    nx.draw_networkx_labels(G, pos, labels, font_family=font_name, font_size=8)  # 10에서 8로 변경
+    
+    plt.title('연관어 네트워크', fontdict={'family': font_name, 'size': 12}, pad=20)
+    plt.axis('off')
+    
+    # 그래프를 이미지로 변환
+    buffer = BytesIO()
+    plt.savefig(buffer, format='png', bbox_inches='tight', dpi=200, facecolor='white')  # dpi 300에서 200으로 변경
+    buffer.seek(0)
+    image_png = buffer.getvalue()
+    buffer.close()
+    
+    # base64로 인코딩
+    graphic = base64.b64encode(image_png).decode('utf-8')
+    
+    plt.close()
+    
+    return graphic
+
 def relate(request):
     video_url = request.GET.get('url')
-    video_title = request.GET.get('title')
     video_id = request.GET.get('id')
-
-    # 데이터베이스에서 값 가져오기
+    
+    # 데이터베이스에서 비디오 정보 가져오기
     video = YouTubeData.objects.filter(url=video_url).first()
-    context = {
-        'section': 'relate'
-    }
+    
+    if video and video.desc:
+        # 연관어 분석 수행
+        graph, top_pairs = analyze_related_words(video.desc)
+        
+        # 네트워크 그래프 생성
+        network_graph = generate_network_graph(graph)
+        
+        context = {
+            'section': 'relate',
+            'video': video,
+            'video_id': video_id,
+            'network_graph': network_graph,
+            'top_pairs': top_pairs,
+            'video_title': video.title
+        }
+    else:
+        context = {
+            'section': 'relate',
+            'error_message': '비디오 설명이 없거나 비디오를 찾을 수 없습니다.'
+        }
+    
     return render(request, 'analysis/relate.html', context)
 
 
