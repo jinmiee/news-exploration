@@ -17,7 +17,7 @@
         <ul>
             {% for item in top_news %}
             <li>
-                <a href="#" onclick="loadVideo('{{ item.url }}'); return false;" class="news-title">
+                <a href="#" class="news-title" data-video-url="{{ item.url }}">
                     {{ forloop.counter }}. {{ item.title }}
                 </a>
                 <p class="news-info">
@@ -32,12 +32,9 @@
     </div>
 
     <!-- 오른쪽 사이드바 -->
-    <div id="sidebar" class="video-sidebar">
+    <div id="sidebar" class="video-sidebar" style="display: none;">
         <h2>동영상 보기</h2>
-        <div id="player-container">
-            <!-- YouTube 플레이어를 렌더링할 div -->
-            <div id="youtube-player"></div>
-        </div>
+        <div id="youtube-player"></div>
 
         <!-- 분석 버튼들 -->
         <div class="analysis-buttons">
@@ -54,18 +51,11 @@
 <script>
     let player;
 
-    // YouTube API 로드 상태 확인 및 Player 초기화
+    // YouTube API 로드 및 Player 초기화
     function onYouTubeIframeAPIReady() {
-        if (typeof YT === "undefined" || typeof YT.Player === "undefined") {
-            console.error("YouTube API가 로드되지 않았습니다.");
-        } else {
-            console.log("YouTube API가 정상적으로 로드되었습니다.");
-        }
-
-        // Player 초기화
         player = new YT.Player('youtube-player', {
             height: '315',
-            width: '100%',
+            width: '560',
             events: {
                 'onReady': onPlayerReady,
                 'onError': onPlayerError
@@ -73,43 +63,47 @@
         });
     }
 
-    // Player가 준비되었을 때 호출
+    // Player 준비 상태 처리
     function onPlayerReady(event) {
         console.log("YouTube Player가 준비되었습니다.");
     }
 
-    // 오류 발생 시 호출
+    // 오류 처리
     function onPlayerError(event) {
         console.error("YouTube Player 오류:", event.data);
-        let errorMessage = "알 수 없는 오류가 발생했습니다.";
-        switch (event.data) {
-            case 2:
-                errorMessage = "유효하지 않은 Video ID입니다.";
-                break;
-            case 5:
-                errorMessage = "HTML5 플레이어에서 지원되지 않는 동영상입니다.";
-                break;
-            case 100:
-                errorMessage = "동영상을 찾을 수 없습니다. (삭제되었거나 비공개)";
-                break;
-            case 101:
-            case 150:
-                errorMessage = "이 동영상은 임베드가 허용되지 않습니다.";
-                break;
-        }
-        alert(errorMessage);
+        alert("동영상을 재생할 수 없습니다.");
     }
 
-    // 동영상 로드 (재생 대기 상태)
+    // 동영상 로드 (Video ID)
     function loadVideo(videoUrl) {
-        const videoId = extractVideoId(videoUrl);
-        if (!videoId) {
-            alert('유효하지 않은 YouTube 동영상 URL입니다.');
-            return;
-        }
+    const videoId = extractVideoId(videoUrl);
+    if (!videoId) {
+        alert('유효하지 않은 YouTube 동영상 URL입니다.');
+        return;
+    }
 
-        document.getElementById('sidebar').style.display = 'block';
-        player.cueVideoById(videoId); // Player에 동영상을 로드 (자동 재생되지 않음)
+    // 사이드바 표시
+    const sidebar = document.getElementById('sidebar');
+    sidebar.style.display = 'block';
+
+    // 플레이어가 이미 초기화되어 있는지 확인
+    if (player && typeof player.cueVideoById === "function") {
+        // 기존 플레이어에 새로운 동영상을 큐에 추가
+        player.cueVideoById(videoId);
+    } else {
+        // 플레이어를 초기화 (YouTube IFrame API Player)
+        player = new YT.Player('youtube-player', {
+            height: '315',
+            width: '560',
+            videoId: videoId,
+            events: {
+                'onReady': function(event) {
+                    player.cueVideoById(videoId); // 큐에 동영상을 추가 (재생하지 않음)
+                },
+                'onError': onPlayerError
+            }
+        });
+    }
 
         // 분석 버튼 URL 업데이트
         document.getElementById('analysis-detail-btn').href = "{% url 'account:detail' %}?url=" + encodeURIComponent(videoUrl) + "&id=" + encodeURIComponent(videoId);
@@ -117,14 +111,20 @@
         document.getElementById('analysis-relate-btn').href = "{% url 'account:relate' %}?url=" + encodeURIComponent(videoUrl) + "&id=" + encodeURIComponent(videoId);
     }
 
-    // YouTube URL에서 Video ID 추출
+    // URL에서 Video ID 추출
     function extractVideoId(url) {
-        console.log("Input URL: ", url); // URL 로그 확인
-        const regExp = /^.*(?:youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=)([^#\&\?]*).*/;
+        const regExp = /^.*(?:youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=)([^#&?]*).*/;
         const match = url.match(regExp);
-        const videoId = match && match[1] ? match[1] : null;
-        console.log("Extracted Video ID: ", videoId); // 추출된 Video ID 출력
-        return videoId;
+        return match && match[1] ? match[1] : null;
     }
+
+    // 차트 제목 클릭 이벤트 등록
+    document.querySelectorAll('.news-title').forEach(title => {
+        title.addEventListener('click', function(event) {
+            event.preventDefault();
+            const videoUrl = this.getAttribute('data-video-url');
+            loadVideo(videoUrl);
+        });
+    });
 </script>
 {% endblock %}
