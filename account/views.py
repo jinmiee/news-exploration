@@ -17,17 +17,25 @@ import re
 
 def clean_title(title):
     """
-    뉴스 제목에서 불필요한 단어 (방송사 이름, 태그 등)를 제거하는 함수
+    뉴스 제목에서 불필요한 단어 (방송사 이름, 태그, 해시태그, 괄호 등)를 제거하는 함수
     """
-    # 제거할 패턴 리스트
-    patterns = [
-        r'\[.*?\]',  # 대괄호로 감싸인 텍스트 제거 (예: [자막뉴스])
-        r'/.*$',  # 슬래시 이후 텍스트 제거 (예: /YTN, /JTBC)
-        r'#.*$',  # 해시태그 제거 (예: #뉴스다)
-    ]
-    for pattern in patterns:
-        title = re.sub(pattern, '', title).strip()
-    return title
+    # 대괄호 안의 내용 제거 (예: [이슈])
+    title = re.sub(r'\[.*?\]', '', title)
+
+    # 슬래시(/)로 분리된 내용 중 불필요한 부분 제거
+    title = re.sub(r'/.*$', '', title)
+
+    # 괄호와 그 안의 내용 제거 (예: (2024.11.27))
+    title = re.sub(r'\(.*?\)', '', title)
+
+    # 해시태그 제거 (예: #뉴스다)
+    title = re.sub(r'#\S+', '', title)
+
+    # 다중 공백 제거 (괄호 제거 후 남을 수 있는 공백 처리)
+    title = re.sub(r'\s+', ' ', title)
+
+    # 앞뒤 공백 제거
+    return title.strip()
 
 # @login_required
 def chart(request): # 차트 뷰
