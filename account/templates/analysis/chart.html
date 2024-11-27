@@ -18,7 +18,8 @@
             <ul style="list-style-type: none; padding: 0;">
                 {% for item in top_news %}
                     <li style="margin-bottom: 20px;">
-                        <a href="#" onclick="loadVideo('{{ item.url }}'); return false;" style="text-decoration: none; font-size: 18px; font-weight: bold;">
+                        <!-- 클릭 시 영상 및 분석 링크 처리 -->
+                        <a href="#" onclick="loadVideo('{{ item.url }}', '{{ item.id }}'); return false;" style="text-decoration: none; font-size: 18px; font-weight: bold;">
                             {{ forloop.counter }}. {{ item.title }}
                         </a>
                         <p style="margin: 5px 0; color: #555;">
@@ -40,16 +41,18 @@
 
             <!-- 추가된 버튼 -->
             <div class="analysis-buttons">
-                <a href="{% url 'account:emotion' %}" class="btn-analysis">감정 분석 보기</a><br>
-                <a href="{% url 'account:relate' %}" class="btn-analysis">연관어 분석 보기</a>
+                <!-- 감정 분석 페이지 링크 -->
+                <a id="emotion-link" href="#" class="btn-analysis" onclick="alert('감정 분석 페이지는 아직 준비되지 않았습니다.'); return false;">감정 분석 보기</a><br>
+                <!-- 연관어 분석 페이지 링크 -->
+                <a id="relate-link" href="#" class="btn-analysis" onclick="alert('연관어 분석 페이지는 아직 준비되지 않았습니다.'); return false;">연관어 분석 보기</a>
             </div>
         </div>
     </div>
 
- 
     <!-- JavaScript -->
     <script>
-        function loadVideo(videoUrl) {
+        // 영상 및 분석 페이지 링크 동적 처리
+        function loadVideo(videoUrl, articleId) {
             if (!videoUrl) {
                 alert('Invalid video URL.');
                 return;
@@ -73,6 +76,12 @@
             .then(data => {
                 document.getElementById('sidebar').style.display = 'block';
                 document.getElementById('video-frame').src = videoUrl.replace("watch?v=", "embed/");
+
+                // 감정 분석 페이지 링크 업데이트 (페이지가 없으면 링크를 클릭해도 오류 없이 알림을 띄움)
+                document.getElementById('emotion-link').href = `/emotion?articleId=${articleId}`;
+
+                // 연관어 분석 페이지 링크 업데이트 (페이지가 없으면 링크를 클릭해도 오류 없이 알림을 띄움)
+                document.getElementById('relate-link').href = `/relate?articleId=${articleId}`;
             })
             .catch(error => {
                 console.error('Error:', error);
