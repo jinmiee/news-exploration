@@ -16,6 +16,26 @@
     <h2>Sentiment Distribution</h2>
     <img src="data:image/png;base64,{{ pie_chart_image }}" alt="Sentiment Pie Chart">
 
+
+    <!-- 형태소 분석을 통한 댓글 빈도수 표 -->
+    <h2>Top 10 Most Frequent Words (Morphemes)</h2>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>Word</th>
+                <th>Frequency</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for word, count in rank_table_by_morpheme %}
+                <tr>
+                    <td>{{ word }}</td>
+                    <td>{{ count }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
     <!-- 댓글 리스트 및 감정 분석 결과 -->
     <h2>Comments</h2>
     <ul>

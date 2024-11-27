@@ -163,16 +163,18 @@ def weekly_issues(request):
 
 
 
-from transformers import pipeline
-from django.shortcuts import render
-from .models import YouTubeData
 import matplotlib.pyplot as plt
-import numpy as np
 from io import BytesIO
 import base64
+from wordcloud import WordCloud
+from transformers import pipeline
+from django.shortcuts import render
+from collections import Counter
+from konlpy.tag import Okt
+from .models import YouTubeData
 
 # 감정 분석 파이프라인 설정
-sentiment_analysis_pipeline = pipeline("sentiment-analysis")
+sentiment_analysis_pipeline = pipeline("sentiment-analysis",truncation=True, padding=True, max_length=512)
 
 def analyze_sentiment(comments):
     sentiment_results = []
@@ -186,19 +188,14 @@ def analyze_sentiment(comments):
     return sentiment_results
 
 def generate_wordcloud(comments, analyzed_comments):
-    # 댓글 텍스트를 하나의 문자열로 합침
     text = " ".join(comments)
 
-    # 텍스트가 비어 있는지 확인
     if not text.strip():
         raise ValueError("No words available to generate WordCloud.")
 
-    # 한글 폰트 경로 지정 (예: Malgun Gothic)
-    font_path = "C:\Windows\Fonts\malgun.ttf"  # 시스템에 설치된 경로 예시
+    font_path = "C:/Windows/Fonts/malgun.ttf"  # Windows 시스템에 설치된 경로 예시
 
-    # 감정에 따른 색상 설정 함수
     def color_func(word, font_size, position, orientation, random_state=None, **kwargs):
-        # 해당 단어가 포함된 댓글을 찾고, 그 댓글의 감정을 평가
         for sentiment in analyzed_comments:
             if sentiment['comment'] and word in sentiment['comment']:
                 if sentiment['sentiment'] == 'POSITIVE':
@@ -207,97 +204,103 @@ def generate_wordcloud(comments, analyzed_comments):
                     return 'rgb(255, 0, 0)'  # 빨간색 (부정)
         return 'rgb(0, 0, 0)'  # 기본 색상 (검정)
 
-    # 워드클라우드 생성
     wordcloud = WordCloud(
         width=800,
         height=400,
         background_color="white",
-        font_path=font_path,  # 폰트 경로 지정
-        color_func=color_func  # 색상 함수 적용
+        font_path=font_path,  # 한글 폰트 경로
+        color_func=color_func
     ).generate(text)
 
-    # 워드클라우드를 이미지로 변환
     img = BytesIO()
     wordcloud.to_image().save(img, format='PNG')
     img.seek(0)
 
-    # 이미지를 base64로 인코딩하여 템플릿에서 사용할 수 있도록 변환
     img_base64 = base64.b64encode(img.getvalue()).decode('utf-8')
 
     return img_base64
 
-
 def generate_pie_chart(analyzed_comments):
-    # 긍정적, 부정적 댓글 수 계산
     positive_count = sum(1 for comment in analyzed_comments if comment['sentiment'] == 'POSITIVE')
     negative_count = sum(1 for comment in analyzed_comments if comment['sentiment'] == 'NEGATIVE')
 
-    # 파이차트 데이터
     labels = ['Positive', 'Negative']
     sizes = [positive_count, negative_count]
-    colors = ['#66b3ff', '#ff6666']  # 파란색(긍정)과 빨간색(부정)
-    explode = (0.1, 0)  # 'Positive' 부분을 살짝 떼어내어 강조
+    colors = ['#66b3ff', '#ff6666']
+    explode = (0.1, 0)
 
-    # 파이차트 그리기
     fig, ax = plt.subplots()
     ax.pie(sizes, explode=explode, labels=labels, colors=colors, autopct='%1.1f%%', shadow=True, startangle=140)
-    ax.axis('equal')  # 원형으로 유지
+    ax.axis('equal')
 
-    # 파이차트를 이미지로 저장
     img = BytesIO()
     plt.savefig(img, format='png')
     img.seek(0)
-    plt.close(fig)  # 그래프 닫기
+    plt.close(fig)
 
-    # 이미지를 base64로 인코딩
     img_base64 = base64.b64encode(img.getvalue()).decode('utf-8')
 
     return img_base64
+
+def generate_rank_table_by_morpheme(analyzed_comments):
+    okt = Okt()
+
+    # 댓글에서 형태소 분석을 통해 명사만 추출
+    words = []
+    for comment in analyzed_comments:
+        morphemes = okt.nouns(comment['comment'])
+        words.extend(morphemes)
+
+    # 단어 빈도수 계산
+    word_counts = Counter(words)
+
+    # 빈도수가 높은 순으로 정렬된 상위 10개의 단어 추출
+    sorted_words = word_counts.most_common(10)
+
+    # 표 형식으로 반환
+    return sorted_words
+
 
 def emotion(request):
     video_url = request.GET.get('url')
     video_title = request.GET.get('title')
     video_id = request.GET.get('id')
 
-    # 데이터베이스에서 해당 동영상 데이터 가져오기
     video = YouTubeData.objects.filter(url=video_url).first()
 
-    # 댓글 데이터에서 'comment' 값만 추출
     video_comments = []
     if video and isinstance(video.comments, list):
         for comment in video.comments:
             if isinstance(comment, dict):
                 video_comments.append(comment.get('comment'))
 
-    # 댓글이 비어 있는지 확인
     if not video_comments:
-        video_comments = ["No comments available"]  # 기본 값 설정
+        video_comments = ["No comments available"]
 
-    # 감정 분석 수행
     analyzed_comments = analyze_sentiment(video_comments)
 
-    # 워드클라우드 이미지 생성
     try:
         wordcloud_image = generate_wordcloud(video_comments, analyzed_comments)
     except ValueError as e:
-        wordcloud_image = None  # 워드클라우드 생성 실패 시 None 처리
+        wordcloud_image = None
 
-    # 파이차트 생성
     pie_chart_image = generate_pie_chart(analyzed_comments)
 
-    # 가져온 동영상 데이터에서 제목 추출
+    # 형태소 분석을 통한 빈도수 차트 생성 (표 형식)
+    rank_table_by_morpheme = generate_rank_table_by_morpheme(analyzed_comments)
+
     video_title = video.title if video else video_title
 
-    # 컨텍스트 구성
     context = {
         'section': 'emotion',
         'video_title': video_title,
         'video_comments': video_comments,
-        'analyzed_comments': analyzed_comments,  # 감정 분석된 댓글
+        'analyzed_comments': analyzed_comments,
         'video_url': video_url,
         'video_id': video_id,
-        'wordcloud_image': wordcloud_image,  # 워드클라우드 이미지 추가
-        'pie_chart_image': pie_chart_image,  # 파이차트 이미지 추가
+        'wordcloud_image': wordcloud_image,
+        'pie_chart_image': pie_chart_image,
+        'rank_table_by_morpheme': rank_table_by_morpheme,  # 형태소 분석을 통한 표 추가
     }
 
     return render(request, 'analysis/emotion.html', context)
@@ -314,7 +317,7 @@ def relate(request):
     context = {
         'section': 'relate'
     }
-    return render(request, 'analysis/relate.html', context) 
+    return render(request, 'analysis/relate.html', context)
 
 
 # @login_required
