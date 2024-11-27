@@ -155,16 +155,33 @@ def weekly_issues(request):
 
 # @login_required
 def emotion(request):
-    video_url = request.GET.get('url')
-    video_title = request.GET.get('title')
-    video_id = request.GET.get('id')
+    video_url = request.GET.get('url')  # URL에서 동영상 URL 가져오기
+    video_title = request.GET.get('title')  # URL에서 동영상 제목 가져오기
+    video_id = request.GET.get('id')  # URL에서 동영상 ID 가져오기
 
-    # 데이터베이스에서 값 가져오기
+    # 데이터베이스에서 해당 동영상 데이터 가져오기
     video = YouTubeData.objects.filter(url=video_url).first()
+
+    # 댓글 데이터에서 'comment' 값만 추출
+    video_comments = []
+    if video and isinstance(video.comments, list):  # 댓글 데이터가 리스트인지 확인
+        for comment in video.comments:
+            if isinstance(comment, dict):  # 각 항목이 딕셔너리인지 확인
+                video_comments.append(comment.get('comment'))  # 'comment' 키의 값 추가
+
+    # 가져온 동영상 데이터에서 제목 추출
+    video_title = video.title if video else video_title
+
+    # 컨텍스트 구성
     context = {
-        'section': 'emotion'
+        'section': 'emotion',
+        'video_title': video_title,  # 동영상 제목
+        'video_comments': video_comments,  # 댓글 내용만
+        'video_url': video_url,
+        'video_id': video_id,
     }
-    return render(request, 'analysis/emotion.html', context) 
+
+    return render(request, 'analysis/emotion.html', context)
 
 # @login_required
 def relate(request):

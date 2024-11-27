@@ -2,6 +2,19 @@
 {% block title %}emotion{% endblock %}
 {% block content %}
     <h1>emotion</h1>
-    <p>Welcome {{ user.username }} !</p>
-    
+    <p>Welcome {{ user.username }}!</p>
+
+    <!-- 동영상 제목 -->
+    <h2>Video Title</h2>
+    <p>{{ video_title }}</p>
+
+    <!-- 댓글 리스트 -->
+    <h2>Comments</h2>
+    <ul>
+        {% for comment in video_comments %}
+            <li>{{ comment }}</li>
+        {% empty %}
+            <li>No comments available.</li>
+        {% endfor %}
+    </ul>
 {% endblock %}
