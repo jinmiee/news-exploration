@@ -28,8 +28,11 @@ def clean_title(title):
     # 괄호와 그 안의 내용 제거 (예: (2024.11.27))
     title = re.sub(r'\(.*?\)', '', title)
 
-    # 특정 단어 제거 (예: TV, News, 8뉴스)
-    title = re.sub(r'\b(TV|News|8뉴스)\b', '', title, flags=re.IGNORECASE)
+    # 특정 단어 제거 (예: TV, News, 8뉴스, 오대영 라이브)
+    title = re.sub(r'\b(TV|News|8뉴스|오대영 라이브)\b', '', title, flags=re.IGNORECASE)
+
+    # 특정 단어 제거 (예: TV)
+    title = re.sub(r'\bTV\b', '', title, flags=re.IGNORECASE)
 
     # /방송사 이름 제거 (예: /YTN, /JTBC, /KBS)
     title = re.sub(r'/\s*(YTN|JTBC|KBS|MBC|연합뉴스|SBS)\s*', '', title, flags=re.IGNORECASE)
