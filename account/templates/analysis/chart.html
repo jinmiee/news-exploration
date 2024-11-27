@@ -32,16 +32,13 @@
         </div>
 
         <!-- 오른쪽 사이드바 -->
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> 5416cf33c07a8568146e77f09e091aa50977f762
+
         <div id="sidebar" class="video-sidebar" style="display: none;">
             <h2>동영상 보기</h2>
             <div id="video-container" style="margin-bottom: 20px;">
                 <iframe id="video-frame" width="100%" height="315" frameborder="0" allowfullscreen></iframe>
             </div>
-<<<<<<< HEAD
+
         
             <!-- 분석 버튼들 -->
             <div class="analysis-buttons" style="display: flex; flex-direction: column; gap: 15px; margin-top: 20px;">
@@ -49,83 +46,10 @@
                 <a id="analysis-emotion-btn" href="#" class="btn-analysis" style="display: block; text-align: center; padding: 12px 30px; background-color: #007BFF; color: white; border-radius: 5px; text-decoration: none; font-weight: bold; transition: background-color 0.3s ease; width: fit-content;">감정 분석 보기</a>
                 <a id="analysis-relate-btn" href="#" class="btn-analysis" style="display: block; text-align: center; padding: 12px 30px; background-color: #007BFF; color: white; border-radius: 5px; text-decoration: none; font-weight: bold; transition: background-color 0.3s ease; width: fit-content;">연관어 분석 보기</a>
             </div>
-        </div>
-        
-        <!-- 마우스를 올렸을 때 버튼 배경색이 바뀌도록 하는 스타일을 추가 -->
-        <style>
-            .btn-analysis:hover {
-                background-color: #0056b3; /* 버튼에 마우스를 올렸을 때 배경색 변화 */
-            }
-        </style>
-=======
-
-            <!-- 추가된 버튼 -->
-            <div class="analysis-buttons">
-                <!-- 감정 분석 페이지 링크 -->
-                <a id="emotion-link" href="#" class="btn-analysis" onclick="alert('감정 분석 페이지는 아직 준비되지 않았습니다.'); return false;">감정 분석 보기</a><br>
-                <!-- 연관어 분석 페이지 링크 -->
-                <a id="relate-link" href="#" class="btn-analysis" onclick="alert('연관어 분석 페이지는 아직 준비되지 않았습니다.'); return false;">연관어 분석 보기</a>
-            </div>
+       
         </div>
     </div>
 
-    <!-- JavaScript -->
-    <script>
-        // 영상 및 분석 페이지 링크 동적 처리
-        function loadVideo(videoUrl, articleId) {
-            if (!videoUrl) {
-                alert('Invalid video URL.');
-                return;
-            }
-=======
-<div id="sidebar" class="video-sidebar" style="display: none;">
-    <h2>동영상 보기</h2>
-    <div id="video-container" style="margin-bottom: 20px;">
-        <iframe id="video-frame" width="100%" height="315" frameborder="0" allowfullscreen></iframe>
-    </div>
-
-    <!-- 분석 버튼들 -->
-    <div class="analysis-buttons">
-        
-        <a id="analysis-detail-btn" href="#" class="btn-analysis">상세 분석 보기</a>
->>>>>>> b62ba1151af902631fca83fbea4049f823fb869e
-
-        
-        <a id="analysis-emotion-btn" href="#" class="btn-analysis">감정 분석 보기</a>
-
-<<<<<<< HEAD
-            // 서버에 요청을 보내거나 URL을 바로 처리
-            fetch('/account/video-details/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ url: videoUrl }),
-            })
-            .then(response => {
-                if (!response.ok) throw new Error('Network response was not ok');
-                return response.json();
-            })
-            .then(data => {
-                document.getElementById('sidebar').style.display = 'block';
-                document.getElementById('video-frame').src = videoUrl.replace("watch?v=", "embed/");
-
-                // 감정 분석 페이지 링크 업데이트 (페이지가 없으면 링크를 클릭해도 오류 없이 알림을 띄움)
-                document.getElementById('emotion-link').href = `/emotion?articleId=${articleId}`;
-
-                // 연관어 분석 페이지 링크 업데이트 (페이지가 없으면 링크를 클릭해도 오류 없이 알림을 띄움)
-                document.getElementById('relate-link').href = `/relate?articleId=${articleId}`;
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Error loading video.');
-            });
-=======
-        
-        <a id="analysis-relate-btn" href="#" class="btn-analysis">연관어 분석 보기</a>
-    </div>
-</div>
->>>>>>> 5416cf33c07a8568146e77f09e091aa50977f762
 
 <!-- JavaScript -->
 <script>
@@ -133,7 +57,7 @@
         if (!videoUrl) {
             alert('Invalid video URL.');
             return;
->>>>>>> b62ba1151af902631fca83fbea4049f823fb869e
+
         }
 
         // 기존 iframe URL 초기화
