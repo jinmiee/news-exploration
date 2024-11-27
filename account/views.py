@@ -13,7 +13,21 @@ from datetime import date
 from .forms import UserRegistrationForm
 from .models import YouTubeData
 from urllib.parse import urlparse, parse_qs
+import re
 
+def clean_title(title):
+    """
+    뉴스 제목에서 불필요한 단어 (방송사 이름, 태그 등)를 제거하는 함수
+    """
+    # 제거할 패턴 리스트
+    patterns = [
+        r'\[.*?\]',  # 대괄호로 감싸인 텍스트 제거 (예: [자막뉴스])
+        r'/.*$',  # 슬래시 이후 텍스트 제거 (예: /YTN, /JTBC)
+        r'#.*$',  # 해시태그 제거 (예: #뉴스다)
+    ]
+    for pattern in patterns:
+        title = re.sub(pattern, '', title).strip()
+    return title
 
 # @login_required
 def chart(request): # 차트 뷰
@@ -34,6 +48,10 @@ def chart(request): # 차트 뷰
         upload_date__gte=yesterday_6pm_utc, # 어제 오후 6시 이후 데이터
         upload_date__lte=today_6pm_utc  # 오늘 오후 6시 이전 데이터
     ).order_by('-views')[:10]
+
+    # 제목 필터링 적용
+    for news in top_news:
+        news.title = clean_title(news.title)
 
 
     # 템플릿에 데이터 전달

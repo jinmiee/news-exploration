@@ -14,13 +14,13 @@
 <div class="content-container">
     <!-- 메인 뉴스 리스트 -->
     <div class="news-list">
-        <ul style="list-style-type: none; padding: 0;">
+        <ul>
             {% for item in top_news %}
-            <li style="margin-bottom: 20px;">
-                <a href="#" onclick="loadVideo('{{ item.url }}'); return false;" style="text-decoration: none; font-size: 18px; font-weight: bold;">
+            <li>
+                <a href="#" onclick="loadVideo('{{ item.url }}'); return false;" class="news-title">
                     {{ forloop.counter }}. {{ item.title }}
                 </a>
-                <p style="margin: 5px 0; color: #555;">
+                <p class="news-info">
                     조회수: <strong>{{ item.views }}</strong> | 좋아요: <strong>{{ item.likes }}</strong> | 업로드 날짜:
                     <strong>{{ item.upload_date|date:"Y-m-d H:i:s" }}</strong>
                 </p>
@@ -32,24 +32,18 @@
     </div>
 
     <!-- 오른쪽 사이드바 -->
-    <div id="sidebar" class="video-sidebar" style="display: none;">
+    <div id="sidebar" class="video-sidebar">
         <h2>동영상 보기</h2>
-        <div id="player-container" style="margin-bottom: 20px;">
+        <div id="player-container">
             <!-- YouTube 플레이어를 렌더링할 div -->
             <div id="youtube-player"></div>
         </div>
 
         <!-- 분석 버튼들 -->
-        <div class="analysis-buttons" style="display: flex; flex-direction: column; gap: 15px; margin-top: 20px;">
-            <a id="analysis-detail-btn" href="#" class="btn-analysis"
-                style="display: block; text-align: center; padding: 12px 30px; background-color: #007BFF; color: white; border-radius: 5px; text-decoration: none; font-weight: bold; transition: background-color 0.3s ease; width: fit-content;">상세
-                분석 보기</a>
-            <a id="analysis-emotion-btn" href="#" class="btn-analysis"
-                style="display: block; text-align: center; padding: 12px 30px; background-color: #007BFF; color: white; border-radius: 5px; text-decoration: none; font-weight: bold; transition: background-color 0.3s ease; width: fit-content;">감정
-                분석 보기</a>
-            <a id="analysis-relate-btn" href="#" class="btn-analysis"
-                style="display: block; text-align: center; padding: 12px 30px; background-color: #007BFF; color: white; border-radius: 5px; text-decoration: none; font-weight: bold; transition: background-color 0.3s ease; width: fit-content;">연관어
-                분석 보기</a>
+        <div class="analysis-buttons">
+            <a id="analysis-detail-btn" href="#" class="btn-analysis">상세 분석 보기</a>
+            <a id="analysis-emotion-btn" href="#" class="btn-analysis">감정 분석 보기</a>
+            <a id="analysis-relate-btn" href="#" class="btn-analysis">연관어 분석 보기</a>
         </div>
     </div>
 </div>
@@ -106,7 +100,7 @@
         alert(errorMessage);
     }
 
-    // 동영상 로드
+    // 동영상 로드 (재생 대기 상태)
     function loadVideo(videoUrl) {
         const videoId = extractVideoId(videoUrl);
         if (!videoId) {
@@ -115,7 +109,7 @@
         }
 
         document.getElementById('sidebar').style.display = 'block';
-         player.cueVideoById(videoId); // Player에 동영상을 로드 (자동 재생되지 않음)
+        player.cueVideoById(videoId); // Player에 동영상을 로드 (자동 재생되지 않음)
 
         // 분석 버튼 URL 업데이트
         document.getElementById('analysis-detail-btn').href = "{% url 'account:detail' %}?url=" + encodeURIComponent(videoUrl) + "&id=" + encodeURIComponent(videoId);
