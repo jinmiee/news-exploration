@@ -163,9 +163,17 @@ def weekly_issues(request):
 
 
 
-# @login_required
+from transformers import pipeline
+from django.shortcuts import render
+from .models import YouTubeData
+import matplotlib.pyplot as plt
+import numpy as np
+from io import BytesIO
+import base64
+
 # 감정 분석 파이프라인 설정
 sentiment_analysis_pipeline = pipeline("sentiment-analysis")
+
 def analyze_sentiment(comments):
     sentiment_results = []
     for comment in comments:
@@ -176,7 +184,6 @@ def analyze_sentiment(comments):
             'confidence': result['score']
         })
     return sentiment_results
-
 
 def generate_wordcloud(comments, analyzed_comments):
     # 댓글 텍스트를 하나의 문자열로 합침
@@ -215,6 +222,32 @@ def generate_wordcloud(comments, analyzed_comments):
 
     return img_base64
 
+def generate_pie_chart(analyzed_comments):
+    # 긍정적, 부정적 댓글 수 계산
+    positive_count = sum(1 for comment in analyzed_comments if comment['sentiment'] == 'POSITIVE')
+    negative_count = sum(1 for comment in analyzed_comments if comment['sentiment'] == 'NEGATIVE')
+
+    # 파이차트 데이터
+    labels = ['Positive', 'Negative']
+    sizes = [positive_count, negative_count]
+    colors = ['#66b3ff', '#ff6666']  # 파란색(긍정)과 빨간색(부정)
+    explode = (0.1, 0)  # 'Positive' 부분을 살짝 떼어내어 강조
+
+    # 파이차트 그리기
+    fig, ax = plt.subplots()
+    ax.pie(sizes, explode=explode, labels=labels, colors=colors, autopct='%1.1f%%', shadow=True, startangle=140)
+    ax.axis('equal')  # 원형으로 유지
+
+    # 파이차트를 이미지로 저장
+    img = BytesIO()
+    plt.savefig(img, format='png')
+    img.seek(0)
+    plt.close(fig)  # 그래프 닫기
+
+    # 이미지를 base64로 인코딩
+    img_base64 = base64.b64encode(img.getvalue()).decode('utf-8')
+
+    return img_base64
 
 def emotion(request):
     video_url = request.GET.get('url')
@@ -237,6 +270,9 @@ def emotion(request):
     # 워드클라우드 이미지 생성
     wordcloud_image = generate_wordcloud(video_comments, analyzed_comments)
 
+    # 파이차트 생성
+    pie_chart_image = generate_pie_chart(analyzed_comments)
+
     # 가져온 동영상 데이터에서 제목 추출
     video_title = video.title if video else video_title
 
@@ -249,6 +285,7 @@ def emotion(request):
         'video_url': video_url,
         'video_id': video_id,
         'wordcloud_image': wordcloud_image,  # 워드클라우드 이미지 추가
+        'pie_chart_image': pie_chart_image,  # 파이차트 이미지 추가
     }
 
     return render(request, 'analysis/emotion.html', context)
