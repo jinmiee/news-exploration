@@ -17,16 +17,22 @@ import re
 
 def clean_title(title):
     """
-    뉴스 제목에서 불필요한 단어 (방송사 이름, 태그, 해시태그, 괄호 등)를 제거하는 함수
+    뉴스 제목에서 /방송사이름만 제거하고 나머지 텍스트는 유지하는 함수
     """
     # 대괄호 안의 내용 제거 (예: [이슈])
     title = re.sub(r'\[.*?\]', '', title)
 
-    # 슬래시(/)로 분리된 내용 중 불필요한 부분 제거
-    title = re.sub(r'/.*$', '', title)
+    # 슬래시(/)로 시작하는 날짜 제거 (예: /2024년 11월 26일)
+    title = re.sub(r'/\s*\d{4}년\s*\d{1,2}월\s*\d{1,2}일', '', title)
 
     # 괄호와 그 안의 내용 제거 (예: (2024.11.27))
     title = re.sub(r'\(.*?\)', '', title)
+
+    # 특정 단어 제거 (예: TV, News, 8뉴스)
+    title = re.sub(r'\b(TV|News|8뉴스)\b', '', title, flags=re.IGNORECASE)
+
+    # /방송사 이름 제거 (예: /YTN, /JTBC, /KBS)
+    title = re.sub(r'/\s*(YTN|JTBC|KBS|MBC|연합뉴스|SBS)\s*', '', title, flags=re.IGNORECASE)
 
     # 해시태그 제거 (예: #뉴스다)
     title = re.sub(r'#\S+', '', title)
