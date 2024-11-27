@@ -66,16 +66,14 @@ def video_details(request):
 # @login_required
 def detail(request):
     video_url = request.GET.get('url')
-    video_title = request.GET.get('title')
     video_id = request.GET.get('id')
 
     # 데이터베이스에서 값 가져오기
     video = YouTubeData.objects.filter(url=video_url).first()
     video_views = video.views if video else None  # 조회수
     video_likes = video.likes if video else None  # 좋아요 수
-
-    
-
+    video_comments = video.comments if video else None  # 댓글 수
+    video_title = video.title if video else None  # 동영상 제목
     # 컨텍스트 구성
     context = {
         'video': video,
@@ -84,6 +82,7 @@ def detail(request):
         'video_title': video_title,
         'video_views': video_views,
         'video_likes': video_likes,
+        'video_comments': video_comments,
     }
 
     return render(request, 'analysis/detail.html', context)
