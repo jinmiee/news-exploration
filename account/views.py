@@ -15,6 +15,13 @@ from .models import YouTubeData
 from urllib.parse import urlparse, parse_qs
 import re
 
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
+from io import BytesIO
+import base64
+from transformers import pipeline
+
+
 def clean_title(title):
     """
     뉴스 제목에서 /방송사이름만 제거하고 나머지 텍스트는 유지하는 함수
@@ -82,7 +89,7 @@ def video_details(request):
         video_url = data.get('url') # JSON 데이터에서 URL 추출
         video_title = data.get('title') # JSON 데이터에서 제목 추출
         video_id = parse_qs(urlparse(video_url).query)['v'][0] # 동영상 ID 추출
-        
+
         # 데이터베이스에서 URL로 YouTubeData 검색
         video = YouTubeData.objects.filter(url=video_url).first()
 
@@ -92,7 +99,7 @@ def video_details(request):
 
         # 검색된 데이터가 있을 경우 URL 정보를 JSON 응답으로 반환
         return JsonResponse({"video_url": video_url, 'video_title': video_title, 'video_id': video_id})
-    
+
     # 요청이 POST 방식이 아닐 경우 에러 응답
     return JsonResponse({"error": "Invalid request method."}, status=400)
 
@@ -157,20 +164,78 @@ def weekly_issues(request):
 
 
 # @login_required
+# 감정 분석 파이프라인 설정
+sentiment_analysis_pipeline = pipeline("sentiment-analysis")
+def analyze_sentiment(comments):
+    sentiment_results = []
+    for comment in comments:
+        result = sentiment_analysis_pipeline(comment)[0]
+        sentiment_results.append({
+            'comment': comment,
+            'sentiment': result['label'],  # 'POSITIVE' 또는 'NEGATIVE'
+            'confidence': result['score']
+        })
+    return sentiment_results
+
+
+def generate_wordcloud(comments, analyzed_comments):
+    # 댓글 텍스트를 하나의 문자열로 합침
+    text = " ".join(comments)
+
+    # 한글 폰트 경로 지정 (예: NanumGothic)
+    font_path = "/usr/share/fonts/truetype/nanum/NanumGothic.ttf"  # 시스템에 설치된 경로 예시
+
+    # 감정에 따른 색상 설정 함수
+    def color_func(word, font_size, position, orientation, random_state=None, **kwargs):
+        # 해당 단어가 포함된 댓글을 찾고, 그 댓글의 감정을 평가
+        for sentiment in analyzed_comments:
+            if sentiment['comment'] and word in sentiment['comment']:
+                if sentiment['sentiment'] == 'POSITIVE':
+                    return 'rgb(0, 0, 255)'  # 파란색 (긍정)
+                else:
+                    return 'rgb(255, 0, 0)'  # 빨간색 (부정)
+        return 'rgb(0, 0, 0)'  # 기본 색상 (검정)
+
+    # 워드클라우드 생성
+    wordcloud = WordCloud(
+        width=800,
+        height=400,
+        background_color="white",
+        font_path=font_path,  # 폰트 경로 지정
+        color_func=color_func  # 색상 함수 적용
+    ).generate(text)
+
+    # 워드클라우드를 이미지로 변환
+    img = BytesIO()
+    wordcloud.to_image().save(img, format='PNG')
+    img.seek(0)
+
+    # 이미지를 base64로 인코딩하여 템플릿에서 사용할 수 있도록 변환
+    img_base64 = base64.b64encode(img.getvalue()).decode('utf-8')
+
+    return img_base64
+
+
 def emotion(request):
-    video_url = request.GET.get('url')  # URL에서 동영상 URL 가져오기
-    video_title = request.GET.get('title')  # URL에서 동영상 제목 가져오기
-    video_id = request.GET.get('id')  # URL에서 동영상 ID 가져오기
+    video_url = request.GET.get('url')
+    video_title = request.GET.get('title')
+    video_id = request.GET.get('id')
 
     # 데이터베이스에서 해당 동영상 데이터 가져오기
     video = YouTubeData.objects.filter(url=video_url).first()
 
     # 댓글 데이터에서 'comment' 값만 추출
     video_comments = []
-    if video and isinstance(video.comments, list):  # 댓글 데이터가 리스트인지 확인
+    if video and isinstance(video.comments, list):
         for comment in video.comments:
-            if isinstance(comment, dict):  # 각 항목이 딕셔너리인지 확인
-                video_comments.append(comment.get('comment'))  # 'comment' 키의 값 추가
+            if isinstance(comment, dict):
+                video_comments.append(comment.get('comment'))
+
+    # 감정 분석 수행
+    analyzed_comments = analyze_sentiment(video_comments)
+
+    # 워드클라우드 이미지 생성
+    wordcloud_image = generate_wordcloud(video_comments, analyzed_comments)
 
     # 가져온 동영상 데이터에서 제목 추출
     video_title = video.title if video else video_title
@@ -178,13 +243,16 @@ def emotion(request):
     # 컨텍스트 구성
     context = {
         'section': 'emotion',
-        'video_title': video_title,  # 동영상 제목
-        'video_comments': video_comments,  # 댓글 내용만
+        'video_title': video_title,
+        'video_comments': video_comments,
+        'analyzed_comments': analyzed_comments,  # 감정 분석된 댓글
         'video_url': video_url,
         'video_id': video_id,
+        'wordcloud_image': wordcloud_image,  # 워드클라우드 이미지 추가
     }
 
     return render(request, 'analysis/emotion.html', context)
+
 
 # @login_required
 def relate(request):
