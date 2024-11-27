@@ -45,7 +45,9 @@ def video_details(request):
     if request.method == 'POST':
         data = json.loads(request.body) # 요청 본문에서 JSON 데이터 로드
         video_url = data.get('url') # JSON 데이터에서 URL 추출
-
+        video_title = data.get('title') # JSON 데이터에서 제목 추출
+        video_id = parse_qs(urlparse(video_url).query)['v'][0] # 동영상 ID 추출
+        
         # 데이터베이스에서 URL로 YouTubeData 검색
         video = YouTubeData.objects.filter(url=video_url).first()
 
@@ -54,7 +56,7 @@ def video_details(request):
             return JsonResponse({"error": "Video not found."}, status=404)
 
         # 검색된 데이터가 있을 경우 URL 정보를 JSON 응답으로 반환
-        return JsonResponse({"video_url": video.url})
+        return JsonResponse({"video_url": video_url, 'video_title': video_title, 'video_id': video_id})
     
     # 요청이 POST 방식이 아닐 경우 에러 응답
     return JsonResponse({"error": "Invalid request method."}, status=400)
@@ -63,39 +65,29 @@ def video_details(request):
 #상세분석
 # @login_required
 def detail(request):
-    # 현재 시간과 어제 오후 6시 및 오늘 오후 6시 계산
-    now = timezone.now()
-    today_6pm_kst = timezone.localtime().replace(hour=18, minute=0, second=0, microsecond=0)
-    yesterday_6pm_kst = today_6pm_kst - timedelta(days=1)
+    video_url = request.GET.get('url')
+    video_title = request.GET.get('title')
+    video_id = request.GET.get('id')
 
-    # KST를 UTC로 변환
-    yesterday_6pm_utc = yesterday_6pm_kst - timedelta(hours=9)
-    today_6pm_utc = today_6pm_kst - timedelta(hours=9)
+    # 데이터베이스에서 값 가져오기
+    video = YouTubeData.objects.filter(url=video_url).first()
+    video_views = video.views if video else None  # 조회수
+    video_likes = video.likes if video else None  # 좋아요 수
 
-    # 쿼리 실행: 어제 오후 6시 ~ 오늘 오후 6시 데이터 가져오기
-    top_news = YouTubeData.objects.filter(
-        upload_date__gte=yesterday_6pm_utc,
-        upload_date__lte=today_6pm_utc
-    ).order_by('-views')[:10]
+    
 
-    first_item = top_news[1]
-
-    # URL 파싱
-    parsed_url = urlparse(first_item.url)
-
-    # 쿼리 파라미터 추출
-    query_params = parse_qs(parsed_url.query)
-
-    # video_id 추출
-    video_id = query_params.get('v', [None])[0]
-
+    # 컨텍스트 구성
     context = {
-        'news': first_item,
-        'section': 'detail',
-        'video_id': video_id
+        'video': video,
+        'video_id': video_id,
+        'video_url': video_url,
+        'video_title': video_title,
+        'video_views': video_views,
+        'video_likes': video_likes,
     }
 
     return render(request, 'analysis/detail.html', context)
+
 
 
 def weekly_issues(request):
@@ -132,11 +124,30 @@ def weekly_issues(request):
 
 # @login_required
 def emotion(request):
-    return render(request, 'analysis/emotion.html', {'section': 'emotion'}) 
+    video_url = request.GET.get('url')
+    video_title = request.GET.get('title')
+    video_id = request.GET.get('id')
+
+    # 데이터베이스에서 값 가져오기
+    video = YouTubeData.objects.filter(url=video_url).first()
+    context = {
+        'section': 'emotion'
+    }
+    return render(request, 'analysis/emotion.html', context) 
 
 # @login_required
 def relate(request):
-    return render(request, 'analysis/relate.html', {'section': 'relate'}) 
+    video_url = request.GET.get('url')
+    video_title = request.GET.get('title')
+    video_id = request.GET.get('id')
+
+    # 데이터베이스에서 값 가져오기
+    video = YouTubeData.objects.filter(url=video_url).first()
+    context = {
+        'section': 'relate'
+    }
+    return render(request, 'analysis/relate.html', context) 
+
 
 # @login_required
 def mypage(request):
