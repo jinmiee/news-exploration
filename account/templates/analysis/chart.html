@@ -38,16 +38,17 @@
             <div id="video-container" style="margin-bottom: 20px;">
                 <iframe id="video-frame" width="100%" height="315" frameborder="0" allowfullscreen></iframe>
             </div>
-<<<<<<< HEAD
-
-            <!-- 추가된 버튼 -->
-            <div class="analysis-buttons">
-                <!-- 감정 분석 페이지 링크 -->
-                <a id="emotion-link" href="#" class="btn-analysis" onclick="alert('감정 분석 페이지는 아직 준비되지 않았습니다.'); return false;">감정 분석 보기</a><br>
-                <!-- 연관어 분석 페이지 링크 -->
-                <a id="relate-link" href="#" class="btn-analysis" onclick="alert('연관어 분석 페이지는 아직 준비되지 않았습니다.'); return false;">연관어 분석 보기</a>
+            
+            <!-- 분석 버튼들 -->
+            <div class="analysis-buttons" style="display: flex; flex-direction: column; gap: 15px; margin-top: 20px;">
+                <a id="analysis-detail-btn" href="#" class="btn-analysis" style="display: block; text-align: center; padding: 12px 30px; background-color: #007BFF; color: white; border-radius: 5px; text-decoration: none; font-weight: bold; transition: background-color 0.3s ease; width: fit-content;">상세 분석 보기</a>
+                <a id="analysis-emotion-btn" href="#" class="btn-analysis" style="display: block; text-align: center; padding: 12px 30px; background-color: #007BFF; color: white; border-radius: 5px; text-decoration: none; font-weight: bold; transition: background-color 0.3s ease; width: fit-content;">감정 분석 보기</a>
+                <a id="analysis-relate-btn" href="#" class="btn-analysis" style="display: block; text-align: center; padding: 12px 30px; background-color: #007BFF; color: white; border-radius: 5px; text-decoration: none; font-weight: bold; transition: background-color 0.3s ease; width: fit-content;">연관어 분석 보기</a>
             </div>
         </div>
+        
+    
+        
     </div>
 
     <!-- JavaScript -->
@@ -77,23 +78,8 @@
             .then(data => {
                 document.getElementById('sidebar').style.display = 'block';
                 document.getElementById('video-frame').src = videoUrl.replace("watch?v=", "embed/");
-=======
         
-            <!-- 분석 버튼들 -->
-            <div class="analysis-buttons" style="display: flex; flex-direction: column; gap: 15px; margin-top: 20px;">
-                <a id="analysis-detail-btn" href="#" class="btn-analysis" style="display: block; text-align: center; padding: 12px 30px; background-color: #007BFF; color: white; border-radius: 5px; text-decoration: none; font-weight: bold; transition: background-color 0.3s ease; width: fit-content;">상세 분석 보기</a>
-                <a id="analysis-emotion-btn" href="#" class="btn-analysis" style="display: block; text-align: center; padding: 12px 30px; background-color: #007BFF; color: white; border-radius: 5px; text-decoration: none; font-weight: bold; transition: background-color 0.3s ease; width: fit-content;">감정 분석 보기</a>
-                <a id="analysis-relate-btn" href="#" class="btn-analysis" style="display: block; text-align: center; padding: 12px 30px; background-color: #007BFF; color: white; border-radius: 5px; text-decoration: none; font-weight: bold; transition: background-color 0.3s ease; width: fit-content;">연관어 분석 보기</a>
-            </div>
-        </div>
-        
-        <!-- 마우스를 올렸을 때 버튼 배경색이 바뀌도록 하는 스타일을 추가 -->
-        <style>
-            .btn-analysis:hover {
-                background-color: #0056b3; /* 버튼에 마우스를 올렸을 때 배경색 변화 */
-            }
-        </style>
->>>>>>> 8b5e102 (상세분석에 댓글 추가)
+            
 
                 // 감정 분석 페이지 링크 업데이트 (페이지가 없으면 링크를 클릭해도 오류 없이 알림을 띄움)
                 document.getElementById('emotion-link').href = `/emotion?articleId=${articleId}`;
