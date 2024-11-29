@@ -71,20 +71,20 @@ def clean_title(title):
 def chart(request): # 차트 뷰
     # 현재 시간 가져오기
     now = timezone.now()
-    # 오늘 오후 6시 (KST) 계산
-    today_6pm_kst = timezone.localtime().replace(hour=18, minute=0, second=0, microsecond=0)
-    # 어제 오후 6시 (KST) 계산
-    yesterday_6pm_kst = today_6pm_kst - timedelta(days=1)
+    # 오늘 오후 6시 10분 (KST) 계산
+    today_615pm_kst = timezone.localtime().replace(hour=18, minute=15, second=0, microsecond=0)
+    # 어제 오후 6시 10분 (KST) 계산
+    yesterday_610pm_kst = today_615pm_kst - timedelta(days=1)
 
     # KST를 UTC로 변환 (UTC = KST-9)
-    yesterday_6pm_utc = yesterday_6pm_kst - timedelta(hours=9)
-    today_6pm_utc = today_6pm_kst - timedelta(hours=9)
+    yesterday_610pm_utc = yesterday_610pm_kst - timedelta(hours=9)
+    today_610pm_utc = today_615pm_kst - timedelta(hours=9)
 
-    # 쿼리 실행: 어제 오후 6시 ~ 오늘 오후 6시 사이에 업로드 된 동영상 가져오기
+    # 쿼리 실행: 어제 오후 6시 15분 ~ 오늘 오후 6시 15분 사이에 업로드된 동영상 가져오기
     # 조회수 기준 내림차순 정렬, 상위 10개 데이터 가져오기
     top_news = YouTubeData.objects.filter(
-        upload_date__gte=yesterday_6pm_utc, # 어제 오후 6시 이후 데이터
-        upload_date__lte=today_6pm_utc  # 오늘 오후 6시 이전 데이터
+        upload_date__gte=yesterday_610pm_utc, # 어제 오후 6시 15분 이후 데이터
+        upload_date__lte=today_610pm_utc  # 오늘 오후 6시 15분 이전 데이터
     ).order_by('-views')[:10]
 
     # 제목 필터링 적용
@@ -99,11 +99,9 @@ def chart(request): # 차트 뷰
         print(type(item.id))
         print(item.is_liked_by_user)
         
-        
     context = {
                'top_news': top_news,
                'section': 'chart',
-               
                }
 
     # 템플릿에 데이터 전달
