@@ -21,16 +21,16 @@
                     {{ forloop.counter }}. {{ item.title }}
                 </a>
                 
-                <a href="{% url 'account:like_video' item.id %}">
-                    {% if item.is_liked_by_user %}
-                        ❤️ 
-                    {% else %}
-                        ♡ 
-                    {% endif %}
-                </a>
                 <p class="news-info">
                     조회수: <strong>{{ item.views }}</strong> | 좋아요: <strong>{{ item.likes }}</strong> | 업로드 날짜:
                     <strong>{{ item.upload_date|date:"Y-m-d H:i:s" }}</strong>
+                    <a href="{% url 'account:like_video' item.id %}">
+                        {% if item.is_liked_by_user %}
+                            ❤️ 
+                        {% else %}
+                            ♡ 
+                        {% endif %}
+                    </a>
                 </p>
             </li>
             {% empty %}
