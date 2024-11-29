@@ -1,4 +1,5 @@
 from djongo import models
+from django.contrib.auth.models import User
 
 class YouTubeComment(models.Model): # 유튜브 댓글 모델
     author = models.CharField(max_length=255, null=True, blank=True)  # 댓글 작성자
@@ -18,7 +19,7 @@ class YouTubeComment(models.Model): # 유튜브 댓글 모델
 
 
 class YouTubeData(models.Model):
-    id = models.ObjectIdField(primary_key=True)  # MongoDB ObjectId를 기본 키로 설정
+    _id = models.ObjectIdField(primary_key=True)  # MongoDB ObjectId를 기본 키로 설정
     channel_name = models.CharField(max_length=255)  # 채널 이름
     title = models.TextField()  # 동영상 제목
     views = models.BigIntegerField()  # 조회수 (큰 숫자 처리)
@@ -35,3 +36,14 @@ class YouTubeData(models.Model):
 
     class Meta:
         db_table = "youtube_datas"  # MongoDB 컬렉션 이름
+
+
+class like(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)  # 유저 모델과 외래키로 연결
+    youtube_data = models.ForeignKey(YouTubeData, on_delete=models.CASCADE)  # 유튜브 데이터 모델과 외래키로 연결
+
+    class Meta:
+        unique_together = ('user', 'youtube_data')  # 유저와 유튜브 데이터의 조합이 고유해야 함
+
+    def __str__(self):
+        return f"{self.user.username} likes {self.youtube_data.title}"

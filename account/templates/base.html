@@ -13,7 +13,8 @@
 <body>
     <div id="header">
         <span class="logo">NEWS</span>
-        {% comment %} {% if request.user.is_authenticated %} {% endcomment %}
+
+            
             <ul class="menu">
                 
                 <li {% if section == "chart" %}class="selected"{% endif %}>
@@ -32,7 +33,7 @@
                     <a href="{% url 'account:detail' %}">상세분석</a>
                 </li>
             </ul>
-        {% comment %} {% endif %} {% endcomment %}
+            
         <span class="user">
             {% comment %} {% if request.user.is_authenticated %} {% endcomment %}
             <form method="post" action="{% url 'account:logout' %}">

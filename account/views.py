@@ -7,14 +7,18 @@ from datetime import timedelta
 from django.db.models.functions import TruncDate
 from django.http import JsonResponse
 from django.utils import timezone
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.utils.timezone import localtime
 from django.views.decorators.csrf import csrf_exempt
 import json
 from datetime import date
+from django.contrib.auth.decorators import login_required
+from django.http import HttpResponseBadRequest
+from bson import ObjectId
+
 
 from .forms import UserRegistrationForm
-from .models import YouTubeData
+from .models import YouTubeData, like
 from urllib.parse import urlparse, parse_qs
 import re
 
@@ -87,9 +91,23 @@ def chart(request): # 차트 뷰
     for news in top_news:
         news.title = clean_title(news.title)
 
+    for item in top_news:
+        # 각 item에 사용자가 찜했는지 여부를 속성으로 추가
+        item.id = item._id
+        item.is_liked_by_user = item.like_set.filter(user=request.user).exists()
+        print(request.user)
+        print(type(item.id))
+        print(item.is_liked_by_user)
+        
+        
+    context = {
+               'top_news': top_news,
+               'section': 'chart',
+               
+               }
 
     # 템플릿에 데이터 전달
-    return render(request, 'analysis/chart.html', {'top_news': top_news})
+    return render(request, 'analysis/chart.html', context)
 
 # 동영상 세부 정보 조회 API
 @csrf_exempt # CSRF 검사 비활성화(POST 요청 허용)
@@ -270,7 +288,6 @@ def generate_rank_table_by_morpheme(analyzed_comments):
     # 표 형식으로 반환
     return sorted_words
 
-
 def emotion(request):
     video_url = request.GET.get('url')
     video_title = request.GET.get('title')
@@ -314,7 +331,6 @@ def emotion(request):
     }
 
     return render(request, 'analysis/emotion.html', context)
-
 
 def analyze_related_words(text):
     okt = Okt()
@@ -423,6 +439,40 @@ def relate(request):
 # @login_required
 def mypage(request):
     return render(request, 'analysis/mypage/mypage.html', {'section': 'mypage'}) 
+
+
+# @login_required
+def like_video(request, id):
+    # 문자열을 ObjectId로 변환
+    print(id)
+    print(type(id))
+    try:
+        object_id = ObjectId(id)
+    except Exception as e:
+        return HttpResponseBadRequest(f"Invalid ID format: {id}")
+    
+    print(object_id)
+    print(type(object_id))
+
+    # ObjectId로 YouTubeData 객체를 찾음
+    video = get_object_or_404(YouTubeData, _id=object_id)
+    like_instance, created = like.objects.get_or_create(user=request.user, youtube_data=video)
+
+
+    if not created:
+        like_instance.delete()
+
+    return redirect('account:chart')
+        
+# @login_required
+def my_liked_videos(request):
+    liked_videos = YouTubeData.objects.filter(like__user=request.user)  
+    
+    context = {
+        'liked_videos': liked_videos,
+        'section': 'mypage'
+    } 
+    return render(request, 'analysis/mypage/my_liked_videos.html', context)
 
 
 def register(request):
