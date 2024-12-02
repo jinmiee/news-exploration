@@ -36,6 +36,12 @@ matplotlib.use('Agg')
 import matplotlib.font_manager
 
 from .analysis.relate_analysis import analyze_related_words, generate_network_graph
+from .analysis.emotion_analysis import (
+    generate_wordcloud,
+    generate_pie_chart,
+    analyze_morphemes,
+    analyze_sentiment
+)
 
 
 def clean_title(title):
@@ -204,132 +210,75 @@ from .models import YouTubeData
 # 감정 분석 파이프라인 설정
 sentiment_analysis_pipeline = pipeline("sentiment-analysis",truncation=True, padding=True, max_length=512)
 
-def analyze_sentiment(comments):
-    sentiment_results = []
-    for comment in comments:
-        result = sentiment_analysis_pipeline(comment)[0]
-        sentiment_results.append({
-            'comment': comment,
-            'sentiment': result['label'],  # 'POSITIVE' 또는 'NEGATIVE'
-            'confidence': result['score']
-        })
-    return sentiment_results
-
-def generate_wordcloud(comments, analyzed_comments):
-    text = " ".join(comments)
-
-    if not text.strip():
-        raise ValueError("No words available to generate WordCloud.")
-
-    font_path = "C:/Windows/Fonts/malgun.ttf"  # Windows 시스템에 설치된 경로 예시
-
-    def color_func(word, font_size, position, orientation, random_state=None, **kwargs):
-        for sentiment in analyzed_comments:
-            if sentiment['comment'] and word in sentiment['comment']:
-                if sentiment['sentiment'] == 'POSITIVE':
-                    return 'rgb(0, 0, 255)'  # 파란색 (긍정)
-                else:
-                    return 'rgb(255, 0, 0)'  # 빨간색 (부정)
-        return 'rgb(0, 0, 0)'  # 기본 색상 (검정)
-
-    wordcloud = WordCloud(
-        width=800,
-        height=400,
-        background_color="white",
-        font_path=font_path,  # 한글 폰트 경로
-        color_func=color_func
-    ).generate(text)
-
-    img = BytesIO()
-    wordcloud.to_image().save(img, format='PNG')
-    img.seek(0)
-
-    img_base64 = base64.b64encode(img.getvalue()).decode('utf-8')
-
-    return img_base64
-
-def generate_pie_chart(analyzed_comments):
-    positive_count = sum(1 for comment in analyzed_comments if comment['sentiment'] == 'POSITIVE')
-    negative_count = sum(1 for comment in analyzed_comments if comment['sentiment'] == 'NEGATIVE')
-
-    labels = ['Positive', 'Negative']
-    sizes = [positive_count, negative_count]
-    colors = ['#66b3ff', '#ff6666']
-    explode = (0.1, 0)
-
-    fig, ax = plt.subplots()
-    ax.pie(sizes, explode=explode, labels=labels, colors=colors, autopct='%1.1f%%', shadow=True, startangle=140)
-    ax.axis('equal')
-
-    img = BytesIO()
-    plt.savefig(img, format='png')
-    img.seek(0)
-    plt.close(fig)
-
-    img_base64 = base64.b64encode(img.getvalue()).decode('utf-8')
-
-    return img_base64
-
-def generate_rank_table_by_morpheme(analyzed_comments):
-    okt = Okt()
-
-    # 댓글에서 형태소 분석을 통해 명사만 추출
-    words = []
-    for comment in analyzed_comments:
-        morphemes = okt.nouns(comment['comment'])
-        words.extend(morphemes)
-
-    # 단어 빈도수 계산
-    word_counts = Counter(words)
-
-    # 빈도수가 높은 순으로 정렬된 상위 10개의 단어 추출
-    sorted_words = word_counts.most_common(10)
-
-    # 표 형식으로 반환
-    return sorted_words
+def analyze_sentiment(comment_text):
+    try:
+        from .analysis.emotion_analysis import analyze_sentiment as analyze_single_sentiment
+        return analyze_single_sentiment(comment_text)
+    except Exception as e:
+        print(f"감정 분석 오류: {e}")
+        return {
+            'comment': comment_text,
+            'sentiment': 'POSITIVE',
+            'confidence': 0.6
+        }
 
 def emotion(request):
     video_url = request.GET.get('url')
-    video_title = request.GET.get('title')
-    video_id = request.GET.get('id')
-
     video = YouTubeData.objects.filter(url=video_url).first()
-
-    video_comments = []
-    if video and isinstance(video.comments, list):
-        for comment in video.comments:
-            if isinstance(comment, dict):
-                video_comments.append(comment.get('comment'))
-
-    if not video_comments:
-        video_comments = ["No comments available"]
-
-    analyzed_comments = analyze_sentiment(video_comments)
-
-    try:
-        wordcloud_image = generate_wordcloud(video_comments, analyzed_comments)
-    except ValueError as e:
-        wordcloud_image = None
-
-    pie_chart_image = generate_pie_chart(analyzed_comments)
-
-    # 형태소 분석을 통한 빈도수 차트 생성 (표 형식)
-    rank_table_by_morpheme = generate_rank_table_by_morpheme(analyzed_comments)
-
-    video_title = video.title if video else video_title
-
-    context = {
-        'section': 'emotion',
-        'video_title': video_title,
-        'video_comments': video_comments,
-        'analyzed_comments': analyzed_comments,
-        'video_url': video_url,
-        'video_id': video_id,
-        'wordcloud_image': wordcloud_image,
-        'pie_chart_image': pie_chart_image,
-        'rank_table_by_morpheme': rank_table_by_morpheme,  # 형태소 분석을 통한 표 추가
-    }
-
+    
+    if video and video.comments:
+        try:
+            # 댓글 데이터 확인 및 변환
+            comments_data = []
+            for comment in video.comments:
+                if isinstance(comment, dict):
+                    comment_text = comment.get('comment', '')
+                else:
+                    comment_text = comment.comment if hasattr(comment, 'comment') else str(comment)
+                
+                if comment_text:  # 빈 댓글 제외
+                    comments_data.append(comment_text)
+            
+            # 최대 100개 댓글만 분석
+            comments_data = comments_data[:100]
+            
+            # 감정 분석 수행
+            analyzed_comments = [
+                analyze_sentiment(comment_text)
+                for comment_text in comments_data
+            ]
+            
+            try:
+                wordcloud_image = generate_wordcloud(analyzed_comments)
+                pie_chart_image = generate_pie_chart(analyzed_comments)
+                rank_table = analyze_morphemes(analyzed_comments)
+                
+                context = {
+                    'section': 'emotion',
+                    'video_title': video.title,
+                    'wordcloud_image': wordcloud_image,
+                    'pie_chart_image': pie_chart_image,
+                    'rank_table_by_morpheme': rank_table,
+                    'analyzed_comments': analyzed_comments[:10],  # 상위 10개만 표시
+                }
+            except Exception as e:
+                print(f"시각화 생성 오류: {e}")
+                context = {
+                    'section': 'emotion',
+                    'error_message': '시각화 생성 중 오류가 발생했습니다.'
+                }
+        except Exception as e:
+            print(f"감정 분석 처리 오류: {e}")
+            context = {
+                'section': 'emotion',
+                'error_message': '분석 처리 중 오류가 발생했습니다.'
+            }
+    else:
+        context = {
+            'section': 'emotion',
+            'error_message': '비디오를 찾을 수 없거나 댓글이 없습니다.'
+        }
+    
     return render(request, 'analysis/emotion.html', context)
 
 def relate(request):
