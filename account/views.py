@@ -224,54 +224,84 @@ def analyze_sentiment(comment_text):
 
 def emotion(request):
     video_url = request.GET.get('url')
+    print(f"요청된 비디오 URL: {video_url}")  # 디버깅 로그
+    
     video = YouTubeData.objects.filter(url=video_url).first()
     
     if video and video.comments:
         try:
-            # 댓글 데이터 확인 및 변환
-            comments_data = []
-            for comment in video.comments:
+            print(f"댓글 데이터 타입: {type(video.comments)}")  # 디버깅 로그
+            print(f"첫 번째 댓글 샘플: {video.comments[0] if video.comments else 'No comments'}")  # 디버깅 로그
+            
+            # 댓글 데이터 추출 및 유효성 검사
+            video_comments = []
+            for comment in video.comments[:100]:
                 if isinstance(comment, dict):
                     comment_text = comment.get('comment', '')
+                elif isinstance(comment, str):
+                    comment_text = comment
                 else:
-                    comment_text = comment.comment if hasattr(comment, 'comment') else str(comment)
+                    comment_text = str(comment)
                 
-                if comment_text:  # 빈 댓글 제외
-                    comments_data.append(comment_text)
+                if comment_text.strip():  # 빈 댓글 제외
+                    video_comments.append(comment_text)
             
-            # 최대 100개 댓글만 분석
-            comments_data = comments_data[:100]
+            print(f"처리할 댓글 수: {len(video_comments)}")  # 디버깅 로그
             
-            # 감정 분석 수행
-            analyzed_comments = [
-                analyze_sentiment(comment_text)
-                for comment_text in comments_data
-            ]
+            if not video_comments:
+                raise ValueError("유효한 댓글이 없습니다.")
             
-            try:
-                wordcloud_image = generate_wordcloud(analyzed_comments)
-                pie_chart_image = generate_pie_chart(analyzed_comments)
-                rank_table = analyze_morphemes(analyzed_comments)
-                
-                context = {
-                    'section': 'emotion',
-                    'video_title': video.title,
-                    'wordcloud_image': wordcloud_image,
-                    'pie_chart_image': pie_chart_image,
-                    'rank_table_by_morpheme': rank_table,
-                    'analyzed_comments': analyzed_comments[:10],  # 상위 10개만 표시
-                }
-            except Exception as e:
-                print(f"시각화 생성 오류: {e}")
-                context = {
-                    'section': 'emotion',
-                    'error_message': '시각화 생성 중 오류가 발생했습니다.'
-                }
-        except Exception as e:
-            print(f"감정 분석 처리 오류: {e}")
+            # 감정 분석
+            analyzed_comments = []
+            for comment in video_comments:
+                try:
+                    result = analyze_sentiment(comment)
+                    analyzed_comments.append(result)
+                except Exception as e:
+                    print(f"개별 댓글 분석 오류: {e}")  # 디버깅 로그
+                    continue
+            
+            if not analyzed_comments:
+                raise ValueError("감정 분석 결과가 없습니다.")
+            
             context = {
                 'section': 'emotion',
-                'error_message': '분석 처리 중 오류가 발생했습니다.'
+                'video_title': video.title,
+                'video_id': request.GET.get('id'),  # video.video_id 대신 요청에서 가져옴
+                'analyzed_comments': analyzed_comments[:10],
+            }
+            
+            # 워드클라우드 생성
+            try:
+                wordcloud_image = generate_wordcloud(video_comments, analyzed_comments)
+                if wordcloud_image:
+                    context['wordcloud_image'] = wordcloud_image
+            except Exception as e:
+                print(f"워드클라우드 생성 오류: {e}")  # 디버깅 로그
+            
+            # 파이차트 생성
+            try:
+                pie_chart_image = generate_pie_chart(analyzed_comments)
+                if pie_chart_image:
+                    context['pie_chart_image'] = pie_chart_image
+            except Exception as e:
+                print(f"파이차트 생성 오류: {e}")  # 디버깅 로그
+            
+            # 형태소 분석
+            try:
+                rank_table = analyze_morphemes(analyzed_comments)
+                if rank_table:
+                    context['rank_table_by_morpheme'] = rank_table
+            except Exception as e:
+                print(f"형태소 분석 오류: {e}")  # 디버깅 로그
+            
+            return render(request, 'analysis/emotion.html', context)
+            
+        except Exception as e:
+            print(f"전체 처리 오류: {str(e)}")  # 디버깅 로그
+            context = {
+                'section': 'emotion',
+                'error_message': f'분석 처리 중 오류가 발생했습니다: {str(e)}'
             }
     else:
         context = {
