@@ -15,33 +15,47 @@
         <span class="logo">NEWS</span>
 
             
-            <ul class="menu">
-                
-                <li {% if section == "chart" %}class="selected"{% endif %}>
-                    <a href="{% url 'account:chart' %}">차트</a>
-                </li>
-                <li {% if section == "emotion" %}class="selected"{% endif %}>
-                    <a href="{% url 'account:emotion' %}">감정분석</a>
-                </li>
-                <li {% if section == "relate" %}class="selected"{% endif %}>
-                    <a href="{% url 'account:relate' %}">연관어분석</a>
-                </li>
-                <li {% if section == "weekly_issues" %}class="selected"{% endif %}>
-                    <a href="{% url 'account:weekly_issues' %}">주간이슈</a>
-                </li>
-                <li {% if section == "detail" %}class="selected"{% endif %}>
-                    <a href="{% url 'account:detail' %}">상세분석</a>
-                </li>
-            </ul>
+        <ul class="menu">
+            <li {% if section == "chart" %}class="selected"{% endif %}>
+                <a href="{% if user.is_authenticated %}{% url 'account:chart' %}{% else %}#{% endif %}" 
+                   {% if not user.is_authenticated %}class="disabled" onclick="return false;"{% endif %}>
+                    차트
+                </a>
+            </li>
+            <li {% if section == "emotion" %}class="selected"{% endif %}>
+                <a href="{% if user.is_authenticated %}{% url 'account:emotion' %}{% else %}#{% endif %}" 
+                   {% if not user.is_authenticated %}class="disabled" onclick="return false;"{% endif %}>
+                    감정분석
+                </a>
+            </li>
+            <li {% if section == "relate" %}class="selected"{% endif %}>
+                <a href="{% if user.is_authenticated %}{% url 'account:relate' %}{% else %}#{% endif %}" 
+                   {% if not user.is_authenticated %}class="disabled" onclick="return false;"{% endif %}>
+                    연관어분석
+                </a>
+            </li>
+            <li {% if section == "weekly_issues" %}class="selected"{% endif %}>
+                <a href="{% if user.is_authenticated %}{% url 'account:weekly_issues' %}{% else %}#{% endif %}" 
+                   {% if not user.is_authenticated %}class="disabled" onclick="return false;"{% endif %}>
+                    주간이슈
+                </a>
+            </li>
+            <li {% if section == "detail" %}class="selected"{% endif %}>
+                <a href="{% if user.is_authenticated %}{% url 'account:detail' %}{% else %}#{% endif %}" 
+                   {% if not user.is_authenticated %}class="disabled" onclick="return false;"{% endif %}>
+                    상세분석
+                </a>
+            </li>
+        </ul>
             
         <span class="user">
-            {% comment %} {% if request.user.is_authenticated %} {% endcomment %}
+            {% if request.user.is_authenticated %} 
             <form method="post" action="{% url 'account:logout' %}">
                 {% csrf_token %}
                 <button type="submit">Logout</button>
             </form>
             <a href="{% url 'account:mypage' %}"style="margin-right: 10px;">마이페이지</a>
-            {% comment %} {% endif %} {% endcomment %}
+            {% endif %}
             
         </span>
     </div>
