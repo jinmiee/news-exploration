@@ -3,79 +3,9 @@
 {% block title %}감정 분석{% endblock %}
 {% block content %}
 <meta charset="UTF-8">
-<style>
-    /* 컨테이너 가로 배치 */
-.wordcloud-ranking-section {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 2rem;
-    margin-bottom: 2rem;
-}
+<link rel="stylesheet" href="{% static 'css/emotion.css' %}">
+<meta charset="UTF-8">
 
-/* 워드클라우드 스타일 */
-.wordcloud {
-    width: 65%; /* 워드클라우드 영역을 더 크게 */
-    text-align: center;
-}
-
-.responsive-image {
-    width: 100%;
-    height: auto;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-}
-
-/* 단어 순위 테이블 스타일 */
-.ranking {
-    width: 30%; /* 단어 순위 영역을 더 작게 */
-}
-
-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 1rem;
-}
-
-th, td {
-    padding: 0.8rem;
-    border: 1px solid #ddd;
-    text-align: center;
-}
-
-th {
-    background-color: #f4f4f4;
-    font-weight: bold;
-}
-
-/* 별점 스타일 */
-.rating {
-    margin-top: 1rem;
-    text-align: center;
-}
-
-.stars {
-    font-size: 2rem;
-    color: gray;
-}
-
-.star {
-    cursor: pointer;
-    margin-right: 0.5rem;
-}
-
-.star:hover {
-    color: gold;
-}
-
-/* 공통 에러 메시지 스타일 */
-.error {
-    color: red;
-    font-weight: bold;
-    text-align: center;
-}
-
-</style>
 <div class="emotion-analysis-container">
     <header class="header">
         <h1>감정 분석</h1>
