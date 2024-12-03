@@ -1,62 +1,172 @@
 {% extends "base.html" %}
-{% block title %}emotion{% endblock %}
+{% load static %}
+{% block title %}감정 분석{% endblock %}
 {% block content %}
-    <h1>감정 분석</h1>
+<style>
+    /* 컨테이너 가로 배치 */
+.wordcloud-ranking-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+/* 워드클라우드 스타일 */
+.wordcloud {
+    width: 65%; /* 워드클라우드 영역을 더 크게 */
+    text-align: center;
+}
+
+.responsive-image {
+    width: 100%;
+    height: auto;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+/* 단어 순위 테이블 스타일 */
+.ranking {
+    width: 30%; /* 단어 순위 영역을 더 작게 */
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+th, td {
+    padding: 0.8rem;
+    border: 1px solid #ddd;
+    text-align: center;
+}
+
+th {
+    background-color: #f4f4f4;
+    font-weight: bold;
+}
+
+/* 별점 스타일 */
+.rating {
+    margin-top: 1rem;
+    text-align: center;
+}
+
+.stars {
+    font-size: 2rem;
+    color: gray;
+}
+
+.star {
+    cursor: pointer;
+    margin-right: 0.5rem;
+}
+
+.star:hover {
+    color: gold;
+}
+
+/* 공통 에러 메시지 스타일 */
+.error {
+    color: red;
+    font-weight: bold;
+    text-align: center;
+}
+
+</style>
+<div class="emotion-analysis-container">
+    <header class="header">
+        <h1>감정 분석</h1>
+    </header>
+
     {% if error_message %}
-        <p class="error">{{ error_message }}</p>
+        <div class="error-message">
+            <p>{{ error_message }}</p>
+        </div>
     {% else %}
-        <h2>{{ video_title }}</h2>
+        <div class="video-title">
+            <h2>{{ video_title }}</h2>
+        </div>
 
-        {% if not wordcloud_error %}
-            <h2>워드클라우드</h2>
-            <img src="data:image/png;base64,{{ wordcloud_image }}" alt="Word Cloud">
-        {% else %}
-            <p class="error">{{ wordcloud_error }}</p>
-        {% endif %}
+        <!-- 워드클라우드와 긍부정 단어 순위 섹션 -->
+        <div class="wordcloud-ranking-section">
+            <!-- 왼쪽: 워드클라우드 -->
+            <div class="wordcloud">
+                <h3>워드클라우드</h3>
+                {% if not wordcloud_error %}
+                    <img src="data:image/png;base64,{{ wordcloud_image }}" alt="Word Cloud" class="responsive-image">
+                {% else %}
+                    <p class="error">{{ wordcloud_error }}</p>
+                {% endif %}
 
-        {% if not piechart_error %}
-            <h2>감정 분포</h2>
-            <img src="data:image/png;base64,{{ pie_chart_image }}" alt="Sentiment Pie Chart">
-        {% else %}
-            <p class="error">{{ piechart_error }}</p>
-        {% endif %}
+                <!-- 별점 기능 추가 -->
+                <div class="rating">
+                    <h3>별점</h3>
+                    <div class="stars">
+                        <span class="star" data-value="1">&#9733;</span>
+                        <span class="star" data-value="2">&#9733;</span>
+                        <span class="star" data-value="3">&#9733;</span>
+                        <span class="star" data-value="4">&#9733;</span>
+                        <span class="star" data-value="5">&#9733;</span>
+                    </div>
+                    <p>선택된 별점: <span id="selected-rating">0</span></p>
+                </div>
+            </div>
 
-        {% if not morpheme_error %}
-            <h2>상위 10개 빈출 단어</h2>
-            <table border="1">
-                <thead>
-                    <tr>
-                        <th>단어</th>
-                        <th>빈도수</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for word, count in rank_table_by_morpheme %}
-                        <tr>
-                            <td>{{ word }}</td>
-                            <td>{{ count }}</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        {% else %}
-            <p class="error">{{ morpheme_error }}</p>
-        {% endif %}
+            <!-- 오른쪽: 긍부정 단어 순위 -->
+            <div class="ranking">
+                <h3>긍·부정 단어 순위</h3>
+                {% if not morpheme_error %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>단어</th>
+                                <th>빈도수</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for word, count in rank_table_by_morpheme %}
+                                <tr>
+                                    <td>{{ word }}</td>
+                                    <td>{{ count }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p class="error">{{ morpheme_error }}</p>
+                {% endif %}
 
-        {% if not sentiment_error %}
-            <h2>댓글 감정 분석 결과</h2>
-            <ul>
-                {% for comment in analyzed_comments %}
-                    <li>
-                        <p>{{ comment.comment }}</p>
-                        <p>감정: {{ comment.sentiment }} (신뢰도: {{ comment.confidence|floatformat:2 }})</p>
-                    </li>
-                {% empty %}
-                    <li>분석된 댓글이 없습니다.</li>
-                {% endfor %}
-            </ul>
-        {% else %}
-            <p class="error">{{ sentiment_error }}</p>
-        {% endif %}
+                <!-- 파이 그래프 -->
+                <h3>감정 분포</h3>
+                {% if not piechart_error %}
+                    <img src="data:image/png;base64,{{ pie_chart_image }}" alt="Sentiment Pie Chart" class="responsive-image">
+                {% else %}
+                    <p class="error">{{ piechart_error }}</p>
+                {% endif %}
+            </div>
+        </div>
     {% endif %}
+</div>
+
+<script>
+    // 별점 기능을 위한 JavaScript
+    const stars = document.querySelectorAll('.star');
+    const selectedRating = document.getElementById('selected-rating');
+
+    stars.forEach(star => {
+        star.addEventListener('click', () => {
+            const rating = star.getAttribute('data-value');
+            selectedRating.textContent = rating;
+
+            // 스타일을 변경하여 선택된 별점을 표시
+            stars.forEach(s => s.style.color = 'gray');
+            for (let i = 0; i < rating; i++) {
+                stars[i].style.color = 'gold';
+            }
+        });
+    });
+</script>
+
 {% endblock %}
