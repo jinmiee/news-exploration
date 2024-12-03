@@ -1,18 +1,21 @@
 {% extends "base.html" %}
+{% load static %}
+
 {% block title %}연관어 분석{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/relate.css' %}">
+{% endblock %}
 
 {% block content %}
 <div class="relate-container">
     {% if video %}
         <h1>{{ video_title }} - 연관어 분석</h1>
         
-        <!-- 네트워크 그래프 표시 -->
         <div class="network-graph">
-            <h2>연관어 네트워크</h2>
-            <img src="data:image/png;base64,{{ network_graph }}" alt="연관어 네트워크 그래프">
+            <img src="data:image/png;base64,{{ network_graph }}" alt="연관어 네트워크 그래프" class="responsive-image">
         </div>
         
-        <!-- 상위 연관어 쌍 표시 -->
         <div class="word-pairs">
             <h2>상위 연관어 쌍</h2>
             <table>
@@ -26,24 +29,56 @@
                 </thead>
                 <tbody>
                     {% for pair, count in top_pairs %}
-                        <tr>
-                            <td>{{ forloop.counter }}</td>
-                            <td>{{ pair.0 }}</td>
-                            <td>{{ pair.1 }}</td>
-                            <td>{{ count }}</td>
-                        </tr>
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ pair.0 }}</td>
+                        <td>{{ pair.1 }}</td>
+                        <td>{{ count }}</td>
+                    </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
         
-        <!-- 원문 표시 -->
         <div class="original-text">
             <h2>원문</h2>
             <p>{{ video.desc }}</p>
+        </div>
+
+        <div class="rating">
+            <h3>별점 평가</h3>
+            <div class="stars">
+                <span class="star" data-rating="1">★</span>
+                <span class="star" data-rating="2">★</span>
+                <span class="star" data-rating="3">★</span>
+                <span class="star" data-rating="4">★</span>
+                <span class="star" data-rating="5">★</span>
+            </div>
+            <p>선택된 별점: <span id="selected-rating">0</span></p>
         </div>
     {% else %}
         <p class="error-message">{{ error_message }}</p>
     {% endif %}
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const stars = document.querySelectorAll('.star');
+    const ratingDisplay = document.getElementById('selected-rating');
+    
+    stars.forEach(star => {
+        star.addEventListener('click', function() {
+            const rating = this.dataset.rating;
+            ratingDisplay.textContent = rating;
+            
+            stars.forEach(s => {
+                s.classList.remove('active');
+                if (s.dataset.rating <= rating) {
+                    s.classList.add('active');
+                }
+            });
+        });
+    });
+});
+</script>
 {% endblock %}

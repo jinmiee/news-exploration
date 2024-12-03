@@ -8,8 +8,10 @@
     <title>{% block title %}{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'css/base.css' %}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
+    {% block extra_css %}{% endblock %}  <!-- extra_css 블록 추가 -->
     {% block head %}{% endblock %}
 </head>
+
 <body>
     <div id="header">
         <span class="logo">NEWS</span>
