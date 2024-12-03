@@ -40,6 +40,12 @@ def analyze_sentiment(comment_text):
 
 
 def generate_wordcloud(comments, analyzed_comments, max_comments=100):
+
+    # 한글 폰트 설정
+    font_path = "C:/Windows/Fonts/malgun.ttf"  # Windows 환경
+    font_name = matplotlib.font_manager.FontProperties(fname=font_path).get_name()
+    matplotlib.rc('font', family=font_name)
+
     try:
         # 댓글 수 제한
         limited_comments = comments[:max_comments]
