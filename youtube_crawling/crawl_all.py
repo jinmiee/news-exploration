@@ -106,7 +106,8 @@ def set_video(channel_name, channel_id):
                             'channel': video['snippet'].get('channelTitle'),
                             'desc': video['snippet'].get('description', ''),
                             'likes': video['statistics'].get('likeCount', '0'),
-                            'comments': get_video_comments(video['id'])
+                            'comments': get_video_comments(video['id']),
+                            'thumbnail': video['snippet']['thumbnails']['high']['url']  # 썸네일 URL
                         }
                         videos.append(video_data)
 

@@ -146,7 +146,8 @@ class YouTubeDataCollector:
                                 'channel': video['snippet'].get('channelTitle'),  # 채널 제목
                                 'desc': video['snippet'].get('description', ''),  # 동영상 설명
                                 'likes': video['statistics'].get('likeCount', '0'),  # 좋아요 수
-                                'comments': self.get_video_comments(video['id'])  # 댓글 목록
+                                'comments': self.get_video_comments(video['id']),  # 댓글 목록
+                                'thumbnail': video['snippet']['thumbnails']['high']['url']  # 썸네일 URL
                             }
                             videos.append(video_data)  # 리스트에 추가
 
@@ -218,7 +219,7 @@ with DAG(
     # PythonOperator로 DAG 작업 정의
     collect_youtube_data = PythonOperator(
         task_id='collect_youtube_data',
-        python_callable=lambda: run_youtube_data_collection('api-key넣기'),  # API 키 전달
+        python_callable=lambda: run_youtube_data_collection('AIzaSyCDFmk4W1Z-hB3u5UXGDDgfngEb148ZgIc'),  # API 키 전달
         dag=dag
     )
     collect_youtube_data
