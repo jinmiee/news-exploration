@@ -28,6 +28,7 @@ class YouTubeData(models.Model):
     channel = models.CharField(max_length=255)  # 채널 제목
     desc = models.TextField(blank=True, null=True)  # 동영상 설명 (옵션)
     likes = models.BigIntegerField(blank=True, null=True)  # 좋아요 수
+    thumbnail = models.URLField(blank=True, null=True)  # 썸네일 URL 추가
     comments = models.ArrayField(
         model_container=YouTubeComment,  # 댓글 모델 지정
         blank=True,
