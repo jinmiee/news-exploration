@@ -1,18 +1,31 @@
 {% extends "base.html" %}
-{% block title %}mypage{% endblock %}
+{% load static %}
+
+{% block head %}
+<link rel="stylesheet" href="{% static 'css/mypage.css' %}">
+{% endblock %}
+
+{% block title %}마이페이지{% endblock %}
+
 {% block content %}
-<h1>{{ user.username }}님의 페이지</h1>
+<div class="mypage-container">
+    <header class="mypage-header">
+        <h1>{{ user.username }}님의 페이지</h1>
+    </header>
 
+    <section class="mypage-section">
+        <h2>회원정보수정</h2>
+        <a href="{% url 'account:password_change' %}" class="mypage-link">비밀번호 변경</a>
+    </section>
 
-<h1>회원정보수정</h1>
-<a href="{% url 'account:password_change' %}">비밀번호 변경</a>
-<br>
+    <section class="mypage-section">
+        <h2>찜 한 영상</h2>
+        <a href="{% url 'account:my_liked_video' %}" class="mypage-link">찜한 영상 보기</a>
+    </section>
 
-<h1>찜 한 영상</h1>
-<a href="{% url 'account:my_liked_video' %}">찜한 영상</a>
-<br>
-
-<h1>알림설정</h1>
-
-    
+    <section class="mypage-section">
+        <h2>알림설정</h2>
+        <!-- 알림설정 기능 추가 예정 -->
+    </section>
+</div>
 {% endblock %}

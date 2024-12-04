@@ -1,25 +1,32 @@
 {% extends "base.html" %}
-{% block title %}Login{% endblock %}
+{% load static %}
+
+{% block head %}
+<link href="{% static 'css/auth.css' %}" rel="stylesheet">
+{% endblock %}
+
+{% block title %}로그인{% endblock %}
+
 {% block content %}
-    <h1>Login</h1>
+<div class="auth-container">
+    <h1>로그인</h1>
     {% if form.errors %}
-        <p>Your username and password didn't match. Please try again.</p>
-
-
-    {% endif %}
-    <div class="Login-form">
-        <form method="post">
-            {% csrf_token %}
-            {{ form.as_p }}
-            <input type="hidden" name="next" value="{{ next }}" />
-            <p><input type="submit" value="Log-in"></p>
-
-        </form>
-        <p>
-            <a href="{% url 'account:password_reset' %}">Forgotten your password?</a>
-        </p>
-        <p>
-            If you don't have an account, you can <a href="{% url 'account:register' %}">register here</a>.
-        </p>
+    <div class="error-message">
+        아이디와 비밀번호가 일치하지 않습니다.
     </div>
+    {% endif %}
+    
+    <form method="post" class="auth-form">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <input type="hidden" name="next" value="{{ next }}" />
+        <input type="submit" value="로그인">
+    </form>
+
+    <div class="auth-links">
+        <p><a href="{% url 'account:password_reset' %}">비밀번호를 잊으셨나요?</a></p>
+        <div class="auth-divider"></div>
+        <p>계정이 없으신가요? <a href="{% url 'account:register' %}">회원가입</a></p>
+    </div>
+</div>
 {% endblock %}

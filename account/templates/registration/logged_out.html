@@ -1,6 +1,15 @@
 {% extends "base.html" %}
-{% block title %}Logged out{% endblock %}
+{% load static %}
+
+{% block head %}
+<link href="{% static 'css/auth.css' %}" rel="stylesheet">
+{% endblock %}
+
+{% block title %}로그아웃{% endblock %}
+
 {% block content %}
-    <h1>Logged out</h1>
-    <p>You have been successfully logged out. You can <a href="{% url 'account:login' %}">log-in again</a>.</p>
+<div class="auth-container">
+    <h1>로그아웃</h1>
+    <p>성공적으로 로그아웃되었습니다. <a href="{% url 'account:login' %}">다시 로그인</a>하실 수 있습니다.</p>
+</div>
 {% endblock %}

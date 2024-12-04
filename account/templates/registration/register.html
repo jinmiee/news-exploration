@@ -1,13 +1,20 @@
 {% extends "base.html" %}
+{% load static %}
 
-{% block title %}Create an account {% endblock title %}
+{% block head %}
+<link href="{% static 'css/auth.css' %}" rel="stylesheet">
+{% endblock %}
+
+{% block title %}회원가입{% endblock %}
 
 {% block content %}
-    <h1>Create an account</h1>
-    <p>Please, sign up using the following form:</p>    
-    <form method="post">
+<div class="auth-container">
+    <h1>회원가입</h1>
+    <p>아래 양식을 작성하여 회원가입을 완료해주세요:</p>    
+    <form method="post" class="auth-form">
         {% csrf_token %}
         {{ user_form.as_p }}
-        <p><input type="submit" value="create my acccount"></p>
+        <input type="submit" value="가입하기">
     </form>
-{% endblock content %}
+</div>
+{% endblock %}
