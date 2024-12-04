@@ -77,25 +77,34 @@ def clean_title(title):
 
 @login_required
 def chart(request): # 차트 뷰
+    """
+        오전 11시 10분과 오후 11시 10분을 기준으로 데이터를 가져오는 함수
+        """
     # 현재 시간 가져오기
     now = timezone.now()
-    # 오늘 오후 6시 10분 (KST) 계산
-    today_615pm_kst = timezone.localtime().replace(hour=18, minute=15, second=0, microsecond=0)
-    # 어제 오후 6시 10분 (KST) 계산
-    yesterday_610pm_kst = today_615pm_kst - timedelta(days=1)
+    # 현재 시간의 시(hour)를 가져오기
+    current_hour = timezone.localtime().hour
 
-    # KST를 UTC로 변환 (UTC = KST-9)
-    yesterday_610pm_utc = yesterday_610pm_kst - timedelta(hours=9)
-    today_610pm_utc = today_615pm_kst - timedelta(hours=9)
+    # 오전 11시 10분 이전인 경우: 어제 오후 11시 10분부터 오늘 오전 11시 10분까지 조회
+    if current_hour < 11 or (current_hour == 11 and timezone.localtime().minute < 10):
+        start_time = timezone.localtime().replace(hour=23, minute=10, second=0, microsecond=0) - timedelta(days=1)
+        end_time = timezone.localtime().replace(hour=11, minute=10, second=0, microsecond=0)
+    else:
+        # 오늘 오전 11시 10분부터 오늘 오후 11시 10분까지 조회
+        start_time = timezone.localtime().replace(hour=11, minute=10, second=0, microsecond=0)
+        end_time = timezone.localtime().replace(hour=23, minute=10, second=0, microsecond=0)
 
-    # 쿼리 실행: 어제 오후 6시 15분 ~ 오늘 오후 6시 15분 사이에 업로드된 동영상 가져오기
-    # 조회수 기준 내림차순 정렬, 상위 10개 데이터 가져오기
+    # UTC 변환
+    start_time_utc = start_time - timedelta(hours=9)
+    end_time_utc = end_time - timedelta(hours=9)
+
+    # 데이터베이스에서 해당 시간 범위의 데이터 가져오기
     top_news = YouTubeData.objects.filter(
-        upload_date__gte=yesterday_610pm_utc, # 어제 오후 6시 15분 이후 데이터
-        upload_date__lte=today_610pm_utc  # 오늘 오후 6시 15분 이전 데이터
+        upload_date__gte=start_time_utc,
+        upload_date__lte=end_time_utc
     ).order_by('-views')[:10]
 
-    # 제목 필터링 적용
+    # 제목 정리 및 찜 상태 확인
     for news in top_news:
         news.title = clean_title(news.title)
 
