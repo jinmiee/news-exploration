@@ -75,7 +75,7 @@ def clean_title(title):
     # 앞뒤 공백 제거
     return title.strip()
 
-# @login_required
+@login_required
 def chart(request): # 차트 뷰
     # 현재 시간 가져오기
     now = timezone.now()
@@ -100,17 +100,15 @@ def chart(request): # 차트 뷰
         news.title = clean_title(news.title)
 
     for item in top_news:
-        # 각 item에 사용자가 찜했는지 여부를 속성으로 추가
-        item.id = item._id
-        item.is_liked_by_user = item.like_set.filter(user=request.user).exists()
-        print(request.user)
-        print(type(item.id))
-        print(item.is_liked_by_user)
-        
+        if request.user.is_authenticated:  # 로그인한 사용자인 경우에만 확인
+            item.is_liked_by_user = item.like_set.filter(user=request.user).exists()
+        else:
+            item.is_liked_by_user = False
+            
     context = {
-               'top_news': top_news,
-               'section': 'chart',
-               }
+        'section': 'chart',
+        'top_news': top_news,
+    }
 
     # 템플릿에 데이터 전달
     return render(request, 'analysis/chart.html', context)
@@ -353,23 +351,17 @@ def like_video(request, id):
     print(id)
     print(type(id))
     try:
-        object_id = ObjectId(id)
-    except Exception as e:
-        return HttpResponseBadRequest(f"Invalid ID format: {id}")
-    
-    print(object_id)
-    print(type(object_id))
+        video = YouTubeData.objects.get(id=id)
+        if Like.objects.filter(user=request.user, video=video).exists():
+            Like.objects.filter(user=request.user, video=video).delete()
+            is_liked = False
+        else:
+            Like.objects.create(user=request.user, video=video)
+            is_liked = True
+        return JsonResponse({'status': 'success', 'is_liked': is_liked})
+    except YouTubeData.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': '동영상을 찾을 수 없습니다.'})
 
-    # ObjectId로 YouTubeData 객체를 찾음
-    video = get_object_or_404(YouTubeData, _id=object_id)
-    like_instance, created = like.objects.get_or_create(user=request.user, youtube_data=video)
-
-
-    if not created:
-        like_instance.delete()
-
-    return redirect('account:chart')
-        
 # @login_required
 def my_liked_videos(request):
     liked_videos = YouTubeData.objects.filter(like__user=request.user)  
@@ -385,11 +377,8 @@ def register(request):
     if request.method == 'POST':
         user_form = UserRegistrationForm(request.POST)
         if user_form.is_valid():
-            # Create a new user object but avoid saving it yet
             new_user = user_form.save(commit=False)
-            # Set the chosen password
             new_user.set_password(user_form.cleaned_data['password'])
-            # Save the User object
             new_user.save()
             return render(request, 'registration/register_done.html', {'new_user': new_user})
     else:
