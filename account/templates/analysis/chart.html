@@ -73,14 +73,14 @@
     let player;
 
     function onYouTubeIframeAPIReady() {
-        // 초기 빈 플레이어 생성
         player = new YT.Player('youtube-player', {
             height: '315',
             width: '560',
             playerVars: {
-                'autoplay': 0,
+                'autoplay': 1,
                 'controls': 1,
-                'rel': 0
+                'rel': 0,
+                'mute': 1
             },
             events: {
                 'onReady': onPlayerReady,
@@ -90,9 +90,16 @@
         });
     }
 
+    function onPlayerReady(event) {
+        console.log("YouTube Player가 준비되었습니다.");
+    }
+
     function onPlayerStateChange(event) {
-        // 플레이어 상태가 에러(5)인 경우 썸네일 모드로 전환
-        if (event.data === YT.PlayerState.ERROR) {
+        if (event.data === YT.PlayerState.PLAYING) {
+            document.getElementById('youtube-player').style.display = 'block';
+            document.getElementById('thumbnail-container').style.display = 'none';
+            player.unMute();
+        } else if (event.data === YT.PlayerState.ERROR) {
             handlePlayerError();
         }
     }
@@ -112,13 +119,11 @@
         const thumbnailImg = document.getElementById('thumbnail-img');
         const thumbnailLink = document.getElementById('thumbnail-link');
         
-        // 플레이어 숨기고 썸네일 표시
-        playerElement.style.display = 'none';
-        thumbnailContainer.style.display = 'block';
-        
-        // 썸네일 이미지와 링크 설정
         thumbnailImg.src = thumbnailUrl || `https://img.youtube.com/vi/${extractVideoId(videoUrl)}/maxresdefault.jpg`;
         thumbnailLink.href = videoUrl;
+        
+        playerElement.style.display = 'none';
+        thumbnailContainer.style.display = 'block';
     }
 
     function loadVideo(videoUrl, thumbnailUrl) {
@@ -126,38 +131,26 @@
         const sidebar = document.getElementById('sidebar');
         sidebar.style.display = 'block';
 
-        // 이전 활성 클래스 제거 및 새로운 활성 클래스 추가
         document.querySelectorAll('.news-title').forEach(title => {
             title.classList.remove('active');
         });
         event.target.classList.add('active');
 
+        document.getElementById('youtube-player').style.display = 'block';
+        document.getElementById('thumbnail-container').style.display = 'none';
+
         try {
-            // 플레이어 초기화
-            document.getElementById('youtube-player').style.display = 'block';
-            document.getElementById('thumbnail-container').style.display = 'none';
-            
-            // 영상 로드 시도
             player.loadVideoById({
                 videoId: videoId,
                 events: {
                     'onError': handlePlayerError
                 }
             });
-
-            // 5초 후에도 재생이 시작되지 않으면 썸네일 모드로 전환
-            setTimeout(() => {
-                if (player.getPlayerState() === -1 || player.getPlayerState() === 5) {
-                    showThumbnailMode(videoUrl, thumbnailUrl);
-                }
-            }, 5000);
-
         } catch (error) {
             console.error('동영상 로드 중 오류 발생:', error);
             showThumbnailMode(videoUrl, thumbnailUrl);
         }
 
-        // 분석 버튼 URL 업데이트
         updateAnalysisButtons(videoUrl, videoId);
     }
 
