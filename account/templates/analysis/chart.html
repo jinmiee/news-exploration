@@ -14,6 +14,10 @@
     <header class="chart-header">
         <h1>실시간 뉴스 차트</h1>
         <p class="subtitle">최신 뉴스 동향을 한눈에 확인하세요</p>
+        <p class="analysis-time">
+            <i class="fas fa-clock"></i>
+            분석기준 {{ analysis_start|date:"Y년 m월 d일 (D) H:i" }} ~ {{ analysis_end|date:"Y년 m월 d일 (D) H:i" }}
+        </p>
     </header>
 
     <div class="content-container">
@@ -297,7 +301,7 @@
     .content-container {
         flex-direction: column;
     }
-    
+
     .video-sidebar {
         width: 100%;
     }
@@ -307,25 +311,25 @@
     .chart-header h1 {
         font-size: 2rem;
     }
-    
+
     .news-item {
         padding: 1rem;
     }
-    
+
     .rank-badge {
         width: 28px;
         height: 28px;
         font-size: 0.9rem;
     }
-    
+
     .news-title {
         font-size: 1rem;
     }
-    
+
     .news-info {
         font-size: 0.8rem;
     }
-    
+
     .analysis-buttons {
         grid-template-columns: 1fr;
     }
@@ -335,7 +339,7 @@
     .chart-container {
         padding: 10px;
     }
-    
+
     .news-info {
         flex-direction: column;
         gap: 0.5rem;

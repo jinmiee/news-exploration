@@ -75,33 +75,28 @@ def clean_title(title):
     # 앞뒤 공백 제거
     return title.strip()
 
+
 @login_required
-def chart(request): # 차트 뷰
+def chart(request):
     """
-        오전 11시 10분과 오후 11시 10분을 기준으로 데이터를 가져오는 함수
-        """
-    # 현재 시간 가져오기
-    now = timezone.now()
-    # 현재 시간의 시(hour)를 가져오기
-    current_hour = timezone.localtime().hour
+    실시간 뉴스 차트 뷰: 전날 23시 ~ 오늘 11시 기준으로 데이터 조회
+    """
+    now = localtime()
 
-    # 오전 11시 10분 이전인 경우: 어제 오후 11시 10분부터 오늘 오전 11시 10분까지 조회
-    if current_hour < 11 or (current_hour == 11 and timezone.localtime().minute < 10):
-        start_time = timezone.localtime().replace(hour=23, minute=10, second=0, microsecond=0) - timedelta(days=1)
-        end_time = timezone.localtime().replace(hour=11, minute=10, second=0, microsecond=0)
+    # 현재 시간이 오전 11시 이전인지 확인
+    if now.hour < 11:
+        # 현재 시간이 오전 11시 이전이면, 어제 오후 11시부터 오늘 오전 11시까지
+        analysis_start = (now - timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)
+        analysis_end = now.replace(hour=11, minute=0, second=0, microsecond=0)
     else:
-        # 오늘 오전 11시 10분부터 오늘 오후 11시 10분까지 조회
-        start_time = timezone.localtime().replace(hour=11, minute=10, second=0, microsecond=0)
-        end_time = timezone.localtime().replace(hour=23, minute=10, second=0, microsecond=0)
+        # 현재 시간이 오전 11시 이후면, 오늘 오전 11시부터 내일 오전 11시까지
+        analysis_start = now.replace(hour=11, minute=0, second=0, microsecond=0)
+        analysis_end = now.replace(hour=23, minute=0, second=0, microsecond=0) + timedelta(hours=12)
 
-    # UTC 변환
-    start_time_utc = start_time - timedelta(hours=9)
-    end_time_utc = end_time - timedelta(hours=9)
-
-    # 데이터베이스에서 해당 시간 범위의 데이터 가져오기
+    # 데이터 가져오기
     top_news = YouTubeData.objects.filter(
-        upload_date__gte=start_time_utc,
-        upload_date__lte=end_time_utc
+        upload_date__gte=analysis_start,
+        upload_date__lt=analysis_end
     ).order_by('-views')[:10]
 
     # 제목 정리 및 찜 상태 확인
@@ -113,13 +108,14 @@ def chart(request): # 차트 뷰
             item.is_liked_by_user = item.like_set.filter(user=request.user).exists()
         else:
             item.is_liked_by_user = False
-            
+
+    # 컨텍스트에 데이터 전달
     context = {
-        'section': 'chart',
         'top_news': top_news,
+        'analysis_start': analysis_start,
+        'analysis_end': analysis_end,
     }
 
-    # 템플릿에 데이터 전달
     return render(request, 'analysis/chart.html', context)
 
 # 동영상 세부 정보 조회 API
