@@ -1,6 +1,6 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -16,51 +16,266 @@
     <div id="header">
         <span class="logo">NEWS</span>
 
-            
-        <ul class="menu">
-            <li {% if section == "chart" %}class="selected"{% endif %}>
-                <a href="{% if user.is_authenticated %}{% url 'account:chart' %}{% else %}#{% endif %}" 
-                   {% if not user.is_authenticated %}class="disabled" onclick="return false;"{% endif %}>
-                    차트
-                </a>
-            </li>
-            <li {% if section == "emotion" %}class="selected"{% endif %}>
-                <a href="{% if user.is_authenticated %}{% url 'account:emotion' %}{% else %}#{% endif %}" 
-                   {% if not user.is_authenticated %}class="disabled" onclick="return false;"{% endif %}>
-                    감정분석
-                </a>
-            </li>
-            <li {% if section == "relate" %}class="selected"{% endif %}>
-                <a href="{% if user.is_authenticated %}{% url 'account:relate' %}{% else %}#{% endif %}" 
-                   {% if not user.is_authenticated %}class="disabled" onclick="return false;"{% endif %}>
-                    연관어분석
-                </a>
-            </li>
-            <li {% if section == "weekly_issues" %}class="selected"{% endif %}>
-                <a href="{% if user.is_authenticated %}{% url 'account:weekly_issues' %}{% else %}#{% endif %}" 
-                   {% if not user.is_authenticated %}class="disabled" onclick="return false;"{% endif %}>
-                    주간이슈
-                </a>
-            </li>
-            <li {% if section == "detail" %}class="selected"{% endif %}>
-                <a href="{% if user.is_authenticated %}{% url 'account:detail' %}{% else %}#{% endif %}" 
-                   {% if not user.is_authenticated %}class="disabled" onclick="return false;"{% endif %}>
-                    상세분석
-                </a>
-            </li>
-        </ul>
-            
-        <span class="user">
-            {% if request.user.is_authenticated %} 
-            <form method="post" action="{% url 'account:logout' %}">
-                {% csrf_token %}
-                <button type="submit">Logout</button>
-            </form>
-            <a href="{% url 'account:mypage' %}"style="margin-right: 10px;">마이페이지</a>
-            {% endif %}
-            
-        </span>
-    </div>
+            <!-- 메뉴 토글 버튼 (모바일) -->
+            <button class="navbar-toggler" type="button">
+                <i class="fas fa-bars"></i>
+            </button>
+
+            <!-- 메인 메뉴 -->
+            <div class="navbar-menu">
+                <ul class="nav-links">
+                    <li><a href="{% url 'account:chart' %}" class="nav-link {% if request.resolver_match.url_name == 'chart' %}active{% endif %}">
+                        <i class="fas fa-chart-bar"></i>
+                        <span>실시간 차트</span>
+                    </a></li>
+                    <li><a href="{% url 'account:weekly_issues' %}" class="nav-link {% if request.resolver_match.url_name == 'weekly_issues' %}active{% endif %}">
+                        <i class="fas fa-calendar-week"></i>
+                        <span>주간 이슈</span>
+                    </a></li>
+                </ul>
+
+                <!-- 사용자 메뉴 -->
+                <div class="user-menu">
+                    {% if user.is_authenticated %}
+                        <div class="user-profile">
+                            <button class="profile-button">
+                                <i class="fas fa-user-circle"></i>
+                                <span>{{ user.username }}</span>
+                            </button>
+                            <div class="dropdown-menu">
+                                <a href="{% url 'account:logout' %}" class="dropdown-item">
+                                    <i class="fas fa-sign-out-alt"></i>
+                                    <span>로그아웃</span>
+                                </a>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="auth-buttons">
+                            <a href="{% url 'account:login' %}" class="btn-login">로그인</a>
+                            <a href="{% url 'account:signup' %}" class="btn-signup">회원가입</a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <style>
+    .navbar {
+        background: #fff;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+    }
+
+    .navbar-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 0.8rem 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .navbar-brand {
+        display: flex;
+        align-items: center;
+    }
+
+    .logo {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 1.4rem;
+        font-weight: bold;
+        color: #007bff;
+        text-decoration: none;
+        transition: color 0.3s;
+    }
+
+    .logo:hover {
+        color: #0056b3;
+    }
+
+    .navbar-menu {
+        display: flex;
+        align-items: center;
+        gap: 2rem;
+    }
+
+    .nav-links {
+        display: flex;
+        gap: 1.5rem;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+
+    .nav-link {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0.8rem;
+        color: #333;
+        text-decoration: none;
+        font-weight: 500;
+        border-radius: 8px;
+        transition: all 0.3s;
+    }
+
+    .nav-link:hover, .nav-link.active {
+        background: #f8f9fa;
+        color: #007bff;
+    }
+
+    .user-menu {
+        position: relative;
+    }
+
+    .profile-button {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        background: none;
+        border: none;
+        color: #333;
+        font-size: 1rem;
+        cursor: pointer;
+        border-radius: 8px;
+        transition: all 0.3s;
+    }
+
+    .profile-button:hover {
+        background: #f8f9fa;
+    }
+
+    .dropdown-menu {
+        position: absolute;
+        top: 100%;
+        right: 0;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        padding: 0.5rem;
+        min-width: 200px;
+        display: none;
+    }
+
+    .user-profile:hover .dropdown-menu {
+        display: block;
+    }
+
+    .dropdown-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.8rem 1rem;
+        color: #333;
+        text-decoration: none;
+        border-radius: 6px;
+        transition: all 0.3s;
+    }
+
+    .dropdown-item:hover {
+        background: #f8f9fa;
+        color: #007bff;
+    }
+
+    .auth-buttons {
+        display: flex;
+        gap: 1rem;
+    }
+
+    .btn-login, .btn-signup {
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        text-decoration: none;
+        transition: all 0.3s;
+    }
+
+    .btn-login {
+        color: #007bff;
+        background: transparent;
+    }
+
+    .btn-signup {
+        color: #fff;
+        background: #007bff;
+    }
+
+    .btn-login:hover {
+        background: #f8f9fa;
+    }
+
+    .btn-signup:hover {
+        background: #0056b3;
+    }
+
+    .navbar-toggler {
+        display: none;
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        color: #333;
+        cursor: pointer;
+        padding: 0.5rem;
+    }
+
+    /* 반응형 스타일 */
+    @media (max-width: 768px) {
+        .navbar-toggler {
+            display: block;
+        }
+
+        .navbar-menu {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: #fff;
+            padding: 1rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            flex-direction: column;
+            align-items: stretch;
+            gap: 1rem;
+        }
+
+        .navbar-menu.active {
+            display: flex;
+        }
+
+        .nav-links {
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .nav-link {
+            padding: 0.8rem;
+        }
+
+        .user-menu {
+            width: 100%;
+        }
+
+        .auth-buttons {
+            flex-direction: column;
+        }
+
+        .btn-login, .btn-signup {
+            text-align: center;
+        }
+    }
+    </style>
+
+    <script>
+    document.querySelector('.navbar-toggler').addEventListener('click', function() {
+        document.querySelector('.navbar-menu').classList.toggle('active');
+    });
+    </script>
+
     <div id="content">
         {% block content %}
         {% endblock %}

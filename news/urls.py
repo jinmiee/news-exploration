@@ -20,8 +20,10 @@ from django.conf import settings
 from django.conf.urls.static import static
 from . import views
 
+app_name = 'account'
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', views.main, name='main'),
-    path('account/', include('account.urls'))
+    path('account/', include('account.urls')),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

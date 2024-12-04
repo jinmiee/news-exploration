@@ -4,67 +4,344 @@
 
 {% block head %}
 <link rel="stylesheet" href="{% static 'css/chart.css' %}">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 {% endblock %}
 
 {% block title %}YouTube News Chart{% endblock %}
 
 {% block content %}
-<h1>YouTube Top 10 News Chart</h1>
+<div class="chart-container">
+    <header class="chart-header">
+        <h1>실시간 뉴스 차트</h1>
+        <p class="subtitle">최신 뉴스 동향을 한눈에 확인하세요</p>
+    </header>
 
-<div class="content-container">
-    <!-- 메인 뉴스 리스트 -->
-    <div class="news-list">
-        <ul>
-            {% for item in top_news %}
-            <li>
-                <a href="#" class="news-title" data-video-url="{{ item.url }}" data-thumbnail="{{ item.thumbnail }}">
-                    {{ forloop.counter }}. {{ item.title }}
-                </a>
-                
-                <p class="news-info">
-                    조회수: <strong>{{ item.views }}</strong> | 좋아요: <strong>{{ item.likes }}</strong> | 업로드 날짜:
-                    <strong>{{ item.upload_date|date:"Y-m-d H:i:s" }}</strong>
-                    <a href="{% url 'account:like_video' item.id %}">
-                        {% if item.is_liked_by_user %}
-                            ❤️ 
-                        {% else %}
-                            ♡ 
-                        {% endif %}
-                    </a>
-                </p>
-            </li>
-            {% empty %}
-            <li>데이터가 없습니다.</li>
-            {% endfor %}
-        </ul>
-    </div>
-
-    <!-- 오른쪽 사이드바 -->
-    <div id="sidebar" class="video-sidebar" style="display: none;">
-        <h2>동영상 보기</h2>
-        <div id="video-container">
-            <div id="player-wrapper">
-                <div id="youtube-player"></div>
-                <div id="thumbnail-container" style="display: none;">
-                    <a id="thumbnail-link" href="" target="_blank" class="thumbnail-wrapper">
-                        <img id="thumbnail-img" src="" alt="동영상 썸네일">
-                        <div class="play-button-overlay">
-                            <i class="fas fa-play-circle"></i>
-                            <span>YouTube에서 보기</span>
+    <div class="content-container">
+        <!-- 메인 뉴스 리스트 -->
+        <div class="news-list">
+            <ul>
+                {% for item in top_news %}
+                <li class="news-item">
+                    <div class="rank-badge">{{ forloop.counter }}</div>
+                    <div class="news-content">
+                        <a href="#" class="news-title" data-video-url="{{ item.url }}" data-thumbnail="{{ item.thumbnail }}">
+                            {{ item.title }}
+                        </a>
+                        <div class="news-info">
+                            <span class="info-item">
+                                <i class="fas fa-eye"></i>
+                                {{ item.views }}
+                            </span>
+                            <span class="info-item">
+                                <i class="fas fa-thumbs-up"></i>
+                                {{ item.likes }}
+                            </span>
+                            <span class="info-item">
+                                <i class="fas fa-calendar"></i>
+                                {{ item.upload_date|date:"Y-m-d H:i" }}
+                            </span>
+                            <a href="{% url 'account:like_video' item.id %}" class="like-button">
+                                {% if item.is_liked_by_user %}
+                                    <i class="fas fa-heart"></i>
+                                {% else %}
+                                    <i class="far fa-heart"></i>
+                                {% endif %}
+                            </a>
                         </div>
-                    </a>
-                </div>
-            </div>
+                    </div>
+                </li>
+                {% empty %}
+                <li class="no-data">데이터가 없습니다.</li>
+                {% endfor %}
+            </ul>
         </div>
 
-        <!-- 분석 버튼들 -->
-        <div class="analysis-buttons">
-            <a id="analysis-detail-btn" href="#" class="btn-analysis">상세 분석 보기</a>
-            <a id="analysis-emotion-btn" href="#" class="btn-analysis">감정 분석 보기</a>
-            <a id="analysis-relate-btn" href="#" class="btn-analysis">연관어 분석 보기</a>
+        <!-- 오른쪽 사이드바 -->
+        <div id="sidebar" class="video-sidebar" style="display: none;">
+            <div class="sidebar-header">
+                <h2>동영상 보기</h2>
+            </div>
+            <div id="video-container">
+                <div id="player-wrapper">
+                    <div id="youtube-player"></div>
+                    <div id="thumbnail-container" style="display: none;">
+                        <a id="thumbnail-link" href="" target="_blank" class="thumbnail-wrapper">
+                            <img id="thumbnail-img" src="" alt="동영상 썸네일">
+                            <div class="play-button-overlay">
+                                <i class="fas fa-play-circle"></i>
+                                <span>YouTube에서 보기</span>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="analysis-buttons">
+                <a id="analysis-detail-btn" href="#" class="btn-analysis">
+                    <i class="fas fa-chart-bar"></i>
+                    상세 분석
+                </a>
+                <a id="analysis-emotion-btn" href="#" class="btn-analysis">
+                    <i class="fas fa-smile"></i>
+                    감정 분석
+                </a>
+                <a id="analysis-relate-btn" href="#" class="btn-analysis">
+                    <i class="fas fa-project-diagram"></i>
+                    연관어 분석
+                </a>
+            </div>
         </div>
     </div>
 </div>
+
+<style>
+.chart-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.chart-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.chart-header h1 {
+    font-size: 2.5rem;
+    color: #333;
+    margin-bottom: 0.5rem;
+}
+
+.subtitle {
+    color: #666;
+    font-size: 1.1rem;
+}
+
+.content-container {
+    display: flex;
+    gap: 2rem;
+    align-items: flex-start;
+}
+
+.news-list {
+    flex: 1;
+    min-width: 0;
+}
+
+.news-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.news-item {
+    display: flex;
+    align-items: flex-start;
+    padding: 1.2rem;
+    margin-bottom: 1rem;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.news-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+}
+
+.rank-badge {
+    background: #007bff;
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    margin-right: 1rem;
+    flex-shrink: 0;
+}
+
+.news-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.news-title {
+    display: block;
+    font-size: 1.1rem;
+    color: #333;
+    text-decoration: none;
+    margin-bottom: 0.8rem;
+    line-height: 1.4;
+}
+
+.news-title:hover {
+    color: #007bff;
+}
+
+.news-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.info-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.like-button {
+    color: #ff4757;
+    text-decoration: none;
+}
+
+.video-sidebar {
+    width: 600px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    padding: 1.5rem;
+}
+
+.sidebar-header {
+    margin-bottom: 1rem;
+}
+
+.sidebar-header h2 {
+    font-size: 1.5rem;
+    color: #333;
+}
+
+#player-wrapper {
+    width: 100%;
+    position: relative;
+    padding-top: 56.25%; /* 16:9 비율 */
+    margin-bottom: 1.5rem;
+}
+
+#youtube-player,
+#thumbnail-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.thumbnail-wrapper {
+    display: block;
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+#thumbnail-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.play-button-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    transition: background-color 0.3s;
+}
+
+.play-button-overlay:hover {
+    background: rgba(0, 0, 0, 0.9);
+}
+
+.analysis-buttons {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+
+.btn-analysis {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.8rem;
+    background: #f8f9fa;
+    color: #333;
+    text-decoration: none;
+    border-radius: 8px;
+    transition: all 0.3s;
+}
+
+.btn-analysis:hover {
+    background: #007bff;
+    color: white;
+}
+
+/* 반응형 스타일 */
+@media (max-width: 1200px) {
+    .content-container {
+        flex-direction: column;
+    }
+    
+    .video-sidebar {
+        width: 100%;
+    }
+}
+
+@media (max-width: 768px) {
+    .chart-header h1 {
+        font-size: 2rem;
+    }
+    
+    .news-item {
+        padding: 1rem;
+    }
+    
+    .rank-badge {
+        width: 28px;
+        height: 28px;
+        font-size: 0.9rem;
+    }
+    
+    .news-title {
+        font-size: 1rem;
+    }
+    
+    .news-info {
+        font-size: 0.8rem;
+    }
+    
+    .analysis-buttons {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .chart-container {
+        padding: 10px;
+    }
+    
+    .news-info {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+}
+</style>
 
 <!-- YouTube API 로드 -->
 <script src="https://www.youtube.com/iframe_api"></script>
@@ -175,63 +452,4 @@
         });
     });
 </script>
-
-<style>
-#player-wrapper {
-    width: 560px;
-    height: 315px;
-    position: relative;
-}
-
-#youtube-player,
-#thumbnail-container {
-    width: 100%;
-    height: 100%;
-    position: absolute;
-    top: 0;
-    left: 0;
-}
-
-.thumbnail-wrapper {
-    display: block;
-    width: 100%;
-    height: 100%;
-    position: relative;
-    text-decoration: none;
-}
-
-#thumbnail-img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.play-button-overlay {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background-color: rgba(0, 0, 0, 0.7);
-    color: white;
-    padding: 15px 25px;
-    border-radius: 5px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    transition: background-color 0.3s ease;
-}
-
-.play-button-overlay i {
-    font-size: 24px;
-}
-
-.play-button-overlay:hover {
-    background-color: rgba(0, 0, 0, 0.9);
-}
-
-.news-title.active {
-    color: #007bff;
-    font-weight: bold;
-}
-</style>
 {% endblock %}
