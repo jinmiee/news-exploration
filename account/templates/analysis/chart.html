@@ -17,7 +17,7 @@
         <ul>
             {% for item in top_news %}
             <li>
-                <a href="#" class="news-title" data-video-url="{{ item.url }}">
+                <a href="#" class="news-title" data-video-url="{{ item.url }}" data-thumbnail="{{ item.thumbnail }}">
                     {{ forloop.counter }}. {{ item.title }}
                 </a>
                 
@@ -35,9 +35,6 @@
             </li>
             {% empty %}
             <li>데이터가 없습니다.</li>
-
-
-
             {% endfor %}
         </ul>
     </div>
@@ -45,7 +42,17 @@
     <!-- 오른쪽 사이드바 -->
     <div id="sidebar" class="video-sidebar" style="display: none;">
         <h2>동영상 보기</h2>
-        <div id="youtube-player"></div>
+        <div id="video-container">
+            <div id="youtube-player"></div>
+            <div id="thumbnail-container" style="display: none;">
+                <a id="thumbnail-link" href="" target="_blank">
+                    <img id="thumbnail-img" src="" alt="동영상 썸네일">
+                    <div class="play-button-overlay">
+                        <span>YouTube에서 보기</span>
+                    </div>
+                </a>
+            </div>
+        </div>
 
         <!-- 분석 버튼들 -->
         <div class="analysis-buttons">
@@ -62,59 +69,69 @@
 <script>
     let player;
 
-    // YouTube API 로드 및 Player 초기화
     function onYouTubeIframeAPIReady() {
         player = new YT.Player('youtube-player', {
             height: '315',
             width: '560',
+            playerVars: {
+                'autoplay': 0,
+                'controls': 1,
+                'rel': 0
+            },
             events: {
                 'onReady': onPlayerReady,
-                'onError': onPlayerError
+                'onError': handlePlayerError
             }
         });
     }
 
-    // Player 준비 상태 처리
     function onPlayerReady(event) {
         console.log("YouTube Player가 준비되었습니다.");
     }
 
-    // 오류 처리
-    function onPlayerError(event) {
-        console.error("YouTube Player 오류:", event.data);
-        // alert("동영상을 재생할 수 없습니다."); // 팝업 알림 제거
+    function handlePlayerError(event) {
+        const videoUrl = document.querySelector('.news-title.active')?.getAttribute('data-video-url');
+        const thumbnailUrl = document.querySelector('.news-title.active')?.getAttribute('data-thumbnail');
+        showThumbnailMode(videoUrl, thumbnailUrl);
     }
 
-    // 동영상 로드 (Video ID)
-    function loadVideo(videoUrl) {
-    const videoId = extractVideoId(videoUrl);
-    if (!videoId) {
-        alert('유효하지 않은 YouTube 동영상 URL입니다.');
-        return;
-    }
+    function loadVideo(videoUrl, thumbnailUrl) {
+        const videoId = extractVideoId(videoUrl);
+        const sidebar = document.getElementById('sidebar');
+        sidebar.style.display = 'block';
 
-    // 사이드바 표시
-    const sidebar = document.getElementById('sidebar');
-    sidebar.style.display = 'block';
-
-    // 플레이어가 이미 초기화되어 있는지 확인
-    if (player && typeof player.cueVideoById === "function") {
-        // 기존 플레이어에 새로운 동영상을 큐에 추가
-        player.cueVideoById(videoId);
-    } else {
-        // 플레이어를 초기화 (YouTube IFrame API Player)
-        player = new YT.Player('youtube-player', {
-            height: '315',
-            width: '560',
-            videoId: videoId,
-            events: {
-                'onReady': function(event) {
-                    player.cueVideoById(videoId); // 큐에 동영상을 추가 (재생하지 않음)
-                },
-                'onError': onPlayerError
-            }
+        // 이전 활성 클래스 제거
+        document.querySelectorAll('.news-title').forEach(title => {
+            title.classList.remove('active');
         });
-    }
+        event.target.classList.add('active');
+
+        try {
+            // 플레이어가 준비되지 않은 경우 새로 생성
+            if (!player || !player.loadVideoById) {
+                player = new YT.Player('youtube-player', {
+                    height: '315',
+                    width: '560',
+                    videoId: videoId,
+                    playerVars: {
+                        'autoplay': 0,
+                        'controls': 1,
+                        'rel': 0
+                    },
+                    events: {
+                        'onError': handlePlayerError
+                    }
+                });
+            } else {
+                // 기존 플레이어가 있는 경우 영상 로드
+                document.getElementById('youtube-player').style.display = 'block';
+                document.getElementById('thumbnail-container').style.display = 'none';
+                player.loadVideoById(videoId);
+            }
+        } catch (error) {
+            console.error('동영상 로드 중 오류 발생:', error);
+            showThumbnailMode(videoUrl, thumbnailUrl);
+        }
 
         // 분석 버튼 URL 업데이트
         document.getElementById('analysis-detail-btn').href = "{% url 'account:detail' %}?url=" + encodeURIComponent(videoUrl) + "&id=" + encodeURIComponent(videoId);
@@ -122,20 +139,64 @@
         document.getElementById('analysis-relate-btn').href = "{% url 'account:relate' %}?url=" + encodeURIComponent(videoUrl) + "&id=" + encodeURIComponent(videoId);
     }
 
-    // URL에서 Video ID 추출
     function extractVideoId(url) {
         const regExp = /^.*(?:youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=)([^#&?]*).*/;
         const match = url.match(regExp);
         return match && match[1] ? match[1] : null;
     }
 
-    // 차트 제목 클릭 이벤트 등록
     document.querySelectorAll('.news-title').forEach(title => {
         title.addEventListener('click', function(event) {
             event.preventDefault();
             const videoUrl = this.getAttribute('data-video-url');
-            loadVideo(videoUrl);
+            const thumbnailUrl = this.getAttribute('data-thumbnail');
+            loadVideo(videoUrl, thumbnailUrl);
         });
     });
 </script>
+
+<style>
+#youtube-player {
+    width: 560px;
+    height: 315px;
+}
+
+#thumbnail-container {
+    position: relative;
+    width: 560px;
+    height: 315px;
+    overflow: hidden;
+}
+
+#thumbnail-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.play-button-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.play-button-overlay:hover {
+    background-color: rgba(0, 0, 0, 0.9);
+}
+
+.news-title.active {
+    color: #007bff;
+    font-weight: bold;
+}
+
+#video-container {
+    margin-bottom: 20px;
+}
+</style>
 {% endblock %}
