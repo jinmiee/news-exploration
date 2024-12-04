@@ -78,22 +78,23 @@ def clean_title(title):
 
 @login_required
 def chart(request):
-    """
-    실시간 뉴스 차트 뷰: 전날 23시 ~ 오늘 11시 기준으로 데이터 조회
-    """
-    now = localtime()
+    now = localtime()  # 현재 시간 가져오기
 
-    # 현재 시간이 오전 11시 이전인지 확인
-    if now.hour < 11:
-        # 현재 시간이 오전 11시 이전이면, 어제 오후 11시부터 오늘 오전 11시까지
+    # 기준 시간 설정
+    if now.hour < 11:  # 현재 시간이 오전 11시 이전
+        # 전날 오전 11시 ~ 전날 오후 11시
+        analysis_start = (now - timedelta(days=1)).replace(hour=11, minute=0, second=0, microsecond=0)
+        analysis_end = (now - timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)
+    elif now.hour < 23:  # 현재 시간이 오전 11시 이후, 오늘 오후 11시 이전
+        # 전날 오후 11시 ~ 오늘 오전 11시
         analysis_start = (now - timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)
         analysis_end = now.replace(hour=11, minute=0, second=0, microsecond=0)
-    else:
-        # 현재 시간이 오전 11시 이후면, 오늘 오전 11시부터 내일 오전 11시까지
+    else:  # 현재 시간이 오후 11시 이후
+        # 오늘 오전 11시 ~ 오늘 오후 11시
         analysis_start = now.replace(hour=11, minute=0, second=0, microsecond=0)
-        analysis_end = now.replace(hour=23, minute=0, second=0, microsecond=0) + timedelta(hours=12)
+        analysis_end = now.replace(hour=23, minute=0, second=0, microsecond=0)
 
-    # 데이터 가져오기
+    # 데이터 필터링
     top_news = YouTubeData.objects.filter(
         upload_date__gte=analysis_start,
         upload_date__lt=analysis_end
@@ -115,7 +116,6 @@ def chart(request):
         'analysis_start': analysis_start,
         'analysis_end': analysis_end,
     }
-
     return render(request, 'analysis/chart.html', context)
 
 # 동영상 세부 정보 조회 API
