@@ -54,23 +54,38 @@ def clean_title(title):
     # 슬래시(/)로 시작하는 날짜 제거 (예: /2024년 11월 26일)
     title = re.sub(r'/\s*\d{4}년\s*\d{1,2}월\s*\d{1,2}일', '', title)
 
+    # 날짜 형식 제거 (예: 2024.12.05)
+    title = re.sub(r'\d{4}\.\d{2}\.\d{2}', '', title)
+
     # 괄호와 그 안의 내용 제거 (예: (2024.11.27))
     title = re.sub(r'\(.*?\)', '', title)
 
     # 특정 단어 제거 (예: TV, News, 8뉴스, 오대영 라이브)
     title = re.sub(r'\b(TV|News|8뉴스|오대영 라이브)\b', '', title, flags=re.IGNORECASE)
 
+    # '｜지금 이 뉴스' 또는 '| 지금 이 뉴스' 제거
+    title = re.sub(r'[｜|]\s*지금 이 뉴스', '', title)
+
     # 특정 단어 제거 (예: TV)
     title = re.sub(r'\bTV\b', '', title, flags=re.IGNORECASE)
 
     # /방송사 이름 제거 (예: /YTN, /JTBC, /KBS)
-    title = re.sub(r'/\s*(YTN|JTBC|KBS|MBC|연합뉴스|SBS)\s*', '', title, flags=re.IGNORECASE)
+    title = re.sub(r'/\s*(YTN|JTBC|KBS|MBC|연합뉴스TV|SBS)\s*', '', title, flags=re.IGNORECASE)
 
     # 해시태그 제거 (예: #뉴스다)
     title = re.sub(r'#\S+', '', title)
 
     # 다중 공백 제거 (괄호 제거 후 남을 수 있는 공백 처리)
     title = re.sub(r'\s+', ' ', title)
+
+    # 제목 끝의 마침표 제거
+    title = re.sub(r'\.\s*$', '', title)
+
+    # '-' 뒤에 "뉴스투데이"와 날짜 제거
+    title = re.sub(r'-\s*MBC\s*뉴스투데이\s*\d{4}년\s*\d{1,2}월\s*\d{1,2}일', '', title)
+
+    # '/ 모아보는 뉴스' 제거
+    title = re.sub(r'/\s*모아보는 뉴스|굿모닝연예|뉴스딱', '', title)
 
     # 앞뒤 공백 제거
     return title.strip()
@@ -187,12 +202,12 @@ def weekly_issues(request):
     ).order_by('-upload_date', '-views')  # 최신순 및 조회수 높은 순으로 정렬
 
     # 데이터를 날짜별로 그룹화
-    grouped_issues = defaultdict(list)  # 기본값이 빈 리스트인 딕셔너리 생성
-    for video in weekly_videos:  # weekly_videos 쿼리셋의 각 동영상에 대해 반복
-        date_key = video.upload_date.date()  # 업로드 날짜(연-월-일) 추출
+    grouped_issues = defaultdict(list)
+    for video in weekly_videos:
         # 날짜별로 최대 10개 동영상만 추가
+        date_key = video.upload_date.date()
         if len(grouped_issues[date_key]) < 10:
-            grouped_issues[date_key].append(video)  # 날짜 키에 해당하는 리스트에 동영상 추가
+            grouped_issues[date_key].append(video)
 
     # grouped_issues 딕셔너리를 날짜 순서로 정렬
     # 정렬 기준: 날짜 (x[0]), 내림차순(reverse=True)
