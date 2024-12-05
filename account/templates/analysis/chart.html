@@ -10,6 +10,7 @@
 {% block title %}YouTube News Chart{% endblock %}
 
 {% block content %}
+{% csrf_token %}
 <div class="chart-container">
     <header class="chart-header">
         <h1>실시간 뉴스 차트</h1>
@@ -45,7 +46,7 @@
                                 {{ item.upload_date|date:"Y-m-d H:i" }}
                             </span>
                             {% if user.is_authenticated %}
-                                <button class="like-button" data-id="{{ item.mongo_id|default:'' }}" onclick="likeVideo('{{ item.mongo_id|default:'' }}')">
+                                <button class="like-button" data-id="{{ item.id }}" onclick="likeVideo('{{ item.id }}')">
                                     {% if item.is_liked_by_user %}
                                         ❤️
                                     {% else %}
@@ -463,22 +464,33 @@
     });
 
     document.addEventListener('DOMContentLoaded', function() {
-        // CSRF 토큰 가져오기
-        const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        // CSRF 토큰을 가져오는 함수
+        function getCSRFToken() {
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'csrftoken') {
+                    return value;
+                }
+            }
+            return null;
+        }
 
         window.likeVideo = function(videoId) {
             if (!videoId) {
                 alert('동영상 ID를 찾을 수 없습니다.');
                 return;
             }
+
+            const csrftoken = getCSRFToken();
             
             fetch(`/account/like/${videoId}/`, {
                 method: 'POST',
                 headers: {
                     'X-CSRFToken': csrftoken,
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
                 },
-                credentials: 'same-origin'
+                credentials: 'include'
             })
             .then(response => {
                 if (!response.ok) {
@@ -489,26 +501,19 @@
             .then(data => {
                 if (data.status === 'success') {
                     const button = document.querySelector(`button[data-id="${videoId}"]`);
-                    const icon = button.querySelector('i');
                     if (data.is_liked) {
-                        icon.innerHTML = ' ❤️ ';
-                        icon.className = 'fas fa-heart';
+                        button.innerHTML = '❤️';
                     } else {
-                        icon.innerHTML = ' ♡ ';
-                        icon.className = 'far fa-heart';
+                        button.innerHTML = '♡';
                     }
+                    console.log('좋아요 상태 변경됨:', data.is_liked);  // 디버깅용
                 } else {
                     alert(data.message || '오류가 발생했습니다.');
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                if (error.message === 'Network response was not ok') {
-                    alert('로그인이 필요한 서비스입니��.');
-                    window.location.href = '{% url "account:login" %}';
-                } else {
-                    alert('오류가 발생했습니다.');
-                }
+                alert('오류가 발생했습니다. 다시 시도해주세요.');
             });
         };
     });

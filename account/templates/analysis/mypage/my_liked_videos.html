@@ -1,13 +1,28 @@
 {% extends "base.html" %}
-{% block content %} 
-<ul>
-    {% for video in liked_videos %}
-        <li>
-            <h3>{{ video.title }}</h3>
-            
-            
-        </li>
-    {% endfor %}
-</ul>
-{% endblock content %} 
+{% load static %}
+
+{% block content %}
+<div class="liked-videos-container">
+    <h1>찜한 동영상 목록</h1>
+    {% if liked_videos %}
+        <ul class="liked-videos-list">
+            {% for video in liked_videos %}
+                <li class="liked-video-item">
+                    <h3>{{ video.title }}</h3>
+                    <div class="video-info">
+                        <span>조회수: {{ video.views }}</span>
+                        <span>좋아요: {{ video.likes }}</span>
+                        <span>업로드: {{ video.upload_date|date:"Y-m-d H:i" }}</span>
+                    </div>
+                    <a href="{% url 'account:detail' %}?url={{ video.url }}&id={{ video.video_id }}" class="view-detail">
+                        자세히 보기
+                    </a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="no-videos">찜한 동영상이 없습니다.</p>
+    {% endif %}
+</div>
+{% endblock %}
 

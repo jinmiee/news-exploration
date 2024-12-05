@@ -18,7 +18,7 @@ from bson import ObjectId
 
 
 from .forms import UserRegistrationForm
-from .models import YouTubeData, like
+from .models import YouTubeData, Like
 from urllib.parse import urlparse, parse_qs
 import re
 
@@ -110,11 +110,15 @@ def chart(request):
         else:
             item.is_liked_by_user = False
 
-    # 컨텍스트에 데이터 전달
+    # top_news 리스트의 각 항목에 대해 id 필드 추가
+    for item in top_news:
+        item.id = str(item._id)  # 직접 _id 값을 id로 할당
+    
     context = {
+        'section': 'chart',
         'top_news': top_news,
         'analysis_start': analysis_start,
-        'analysis_end': analysis_end,
+        'analysis_end': analysis_end
     }
     return render(request, 'analysis/chart.html', context)
 
@@ -350,22 +354,31 @@ def mypage(request):
     return render(request, 'analysis/mypage/mypage.html', {'section': 'mypage'}) 
 
 
-# @login_required
-def like_video(request, id):
-    # 문자열을 ObjectId로 변환
-    print(id)
-    print(type(id))
+@login_required
+def like_video(request, video_id):
     try:
-        video = YouTubeData.objects.get(id=id)
-        if Like.objects.filter(user=request.user, video=video).exists():
-            Like.objects.filter(user=request.user, video=video).delete()
+        video = YouTubeData.objects.get(_id=ObjectId(video_id))
+        like_obj, created = Like.objects.get_or_create(
+            user=request.user,
+            youtube_data=video
+        )
+        
+        if not created:  # 이미 좋아요가 있으면 삭제
+            like_obj.delete()
             is_liked = False
-        else:
-            Like.objects.create(user=request.user, video=video)
+        else:  # 새로 생성된 경우
             is_liked = True
-        return JsonResponse({'status': 'success', 'is_liked': is_liked})
-    except YouTubeData.DoesNotExist:
-        return JsonResponse({'status': 'error', 'message': '동영상을 찾을 수 없습니다.'})
+            
+        return JsonResponse({
+            'status': 'success',
+            'is_liked': is_liked
+        })
+    except Exception as e:
+        print(f"Error: {str(e)}")  # 디버깅용
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
 
 # @login_required
 def my_liked_videos(request):

@@ -39,12 +39,12 @@ class YouTubeData(models.Model):
         db_table = "youtube_datas"  # MongoDB 컬렉션 이름
 
 
-class like(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)  # 유저 모델과 외래키로 연결
-    youtube_data = models.ForeignKey(YouTubeData, on_delete=models.CASCADE)  # 유튜브 데이터 모델과 외래키로 연결
+class Like(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    youtube_data = models.ForeignKey(YouTubeData, on_delete=models.CASCADE)
 
     class Meta:
-        unique_together = ('user', 'youtube_data')  # 유저와 유튜브 데이터의 조합이 고유해야 함
+        unique_together = ('user', 'youtube_data')
 
     def __str__(self):
         return f"{self.user.username} likes {self.youtube_data.title}"

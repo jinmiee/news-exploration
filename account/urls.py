@@ -37,7 +37,7 @@ urlpatterns = [
     path('relate/', views.relate, name='relate'),
     path('register/', views.register, name='register'),
     path('mypage/', views.mypage, name='mypage'),
-    path('like/<str:id>/', views.like_video, name='like_video'),
+    path('like/<str:video_id>/', views.like_video, name='like_video'),
     path('mypage/like/', views.my_liked_videos, name='my_liked_video'),
 
 
