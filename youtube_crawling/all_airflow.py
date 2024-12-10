@@ -4,7 +4,7 @@ from airflow.providers.mongo.hooks.mongo import MongoHook
 from googleapiclient.discovery import build
 from datetime import datetime, timezone, timedelta
 import pytz
-
+from youtube_transcript_api import YouTubeTranscriptApi
 
 class YouTubeDataCollector:
     """
@@ -37,6 +37,23 @@ class YouTubeDataCollector:
             "SBS": "UCkinYTS9IHqOEwR1Sze2JTw",
             "연합뉴스": "UCTHCOPwqNfZ0uiKOvFyhGwg"
         }
+
+    def get_video_transcript(self, video_id):
+        """
+        특정 동영상의 자막을 수집하는 메서드.
+
+        Args:
+            video_id (str): YouTube 동영상 ID.
+
+        Returns:
+            list: 자막 내용 포함. 비활성화된 경우 None 반환.
+        """
+        try:
+            transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=['ko'])
+            return [{"start": entry["start"], "text": entry["text"]} for entry in transcript]
+        except Exception as e:
+            print(f"{video_id}: 자막을 가져오는 데 실패했습니다 - {e}")
+            return None
 
     def get_video_comments(self, video_id):
         """
@@ -102,10 +119,10 @@ class YouTubeDataCollector:
             while True:
                 # YouTube API 호출: 지정된 채널의 동영상 목록을 가져옴
                 search_response = self.youtube.search().list(
-                    order='date',  # 최신순 정렬
+                    order='date',  #  최신순으로 정렬
                     part='snippet',  # 메타데이터 포함
                     channelId=channel_id,  # 채널 ID
-                    maxResults=50,  # 최대 50개 결과
+                    maxResults=50,  # 최대 20개 결과
                     publishedAfter=start_time,  # 12시간 전부터 데이터 가져오기
                     type='video',  # 동영상만 포함
                     pageToken=page_token
@@ -130,6 +147,11 @@ class YouTubeDataCollector:
                         print(f"댓글 비활성화된 동영상 건너뜀: {video['id']}")
                         continue
 
+                    transcript = self.get_video_transcript(video['id'])
+                    if not transcript:  # 자막이 없거나 가져오기 실패한 경우
+                        print(f"자막 비활성화된 동영상 건너뜀: {video['id']}")
+                        continue  # 자막이 없는 경우 건너뛰기
+
                     # 동영상 데이터 생성
                     published_at = video['snippet']['publishedAt']
                     published_at_kst = datetime.strptime(
@@ -146,6 +168,7 @@ class YouTubeDataCollector:
                         'desc': video['snippet'].get('description', ''),
                         'likes': video['statistics'].get('likeCount', '0'),
                         'comments': comments,
+                        'transcript': transcript,  # 자막 추가
                         'thumbnail': video['snippet']['thumbnails']['high']['url']
                     }
                     videos.append(video_data)
@@ -156,6 +179,10 @@ class YouTubeDataCollector:
                 else:
                     break
 
+            # 조회수 기준 상위 20개 동영상 선택
+            videos.sort(key=lambda x: int(x['views']), reverse=True)
+            videos = videos[:20]  # 상위 20개 동영상만 선택
+
             # MongoDB 저장
             if videos:
                 mongo_client = self.mongo_hook.get_conn()
@@ -163,16 +190,19 @@ class YouTubeDataCollector:
                 collection = db['youtube_datas']
 
                 for video in videos:
-                    collection.update_one(
+                    result = collection.update_one(
                         {'url': video['url']},
                         {'$set': video},
                         upsert=True
                     )
-                    print(f"{channel_name} - 데이터 저장 또는 업데이트: {video['title']}")
+                    if result.upserted_id:
+                        print(f"[{channel_name}] 새로운 데이터 삽입: {video['title']}")
+                    else:
+                        print(f"[{channel_name}] 기존 데이터 업데이트: {video['title']}")
 
         except Exception as e:
             print(f"{channel_name} 데이터 수집 오류: {e}")
-    
+
     def collect_all_channel_data(self):
         """
         모든 채널의 데이터를 순차적으로 수집하는 메서드.
@@ -194,8 +224,8 @@ with DAG(
     'youtube_data_collection_dag',  # DAG 이름
     default_args=default_args,  # 기본 설정
     description='YouTube Data Collection DAG',
-    schedule_interval='0 11,23 * * *',  # 매일 11:00, 23:00 실행 
-    catchup=False,  # 이전 날짜의 DAG 실행 
+    schedule_interval='0 11,23 * * *',  # 매일 11:00, 23:00 실행
+    catchup=False,  # 이전 날짜의 DAG 실행
     max_active_runs=1  # 병렬 실행 방지
 ) as dag:
     def run_youtube_data_collection(api_key):
