@@ -195,7 +195,7 @@ with DAG(
     default_args=default_args,  # 기본 설정
     description='YouTube Data Collection DAG',
     schedule_interval='0 11,23 * * *',  # 매일 11:00, 23:00 실행 
-    catchup=False,  # 이전 날짜의 DAG 실행 방지
+    catchup=False,  # 이전 날짜의 DAG 실행 
     max_active_runs=1  # 병렬 실행 방지
 ) as dag:
     def run_youtube_data_collection(api_key):
@@ -211,7 +211,7 @@ with DAG(
     # PythonOperator로 DAG 작업 정의
     collect_youtube_data = PythonOperator(
         task_id='collect_youtube_data',
-        python_callable=lambda: run_youtube_data_collection('AIzaSyCDFmk4W1Z-hB3u5UXGDDgfngEb148ZgIc'),  # API 키 전달
+        python_callable=lambda: run_youtube_data_collection('AIzaSyCvpCCZTXW5WR6rK83ztMUgCLbg_o8Hswo'),  # API 키 전달
         dag=dag
     )
     collect_youtube_data
