@@ -16,6 +16,17 @@
     {% if video %}
         <h1>{{ video_title }} - 연관어 분석</h1>
         
+        <div class="video-container">
+            <iframe 
+                width="100%" 
+                height="400" 
+                src="https://www.youtube.com/embed/{{ video_id }}" 
+                frameborder="0" 
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                allowfullscreen>
+            </iframe>
+        </div>
+        
         <div class="network-graph">
             <img src="data:image/png;base64,{{ network_graph }}" alt="연관어 네트워크 그래프" class="responsive-image">
         </div>
@@ -32,12 +43,12 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for pair, count in top_pairs %}
+                    {% for pair in top_pairs %}
                     <tr>
                         <td>{{ forloop.counter }}</td>
-                        <td>{{ pair.0 }}</td>
+                        <td>{{ pair.0.0 }}</td>
+                        <td>{{ pair.0.1 }}</td>
                         <td>{{ pair.1 }}</td>
-                        <td>{{ count }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -85,4 +96,135 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+
+{% if categorized_news %}
+<div class="related-news-section">
+    <h3>키워드별 관련 뉴스</h3>
+    <div class="keyword-tabs">
+        {% for keyword in important_keywords %}
+            <button class="keyword-tab" onclick="showCategory('{{ keyword }}')">{{ keyword }}</button>
+        {% endfor %}
+    </div>
+    
+    {% for keyword, news_list in categorized_news.items %}
+    <div id="category-{{ keyword }}" class="news-category">
+        <h4 class="keyword-title">'{{ keyword }}' 관련 뉴스</h4>
+        <div class="related-news-list">
+            {% for news in news_list %}
+            <div class="news-item">
+                <h4>{{ news.title }}</h4>
+                <div class="news-meta">
+                    <span>조회수: {{ news.views|default:"0" }}</span>
+                    <a href="{{ news.url }}" target="_blank" class="news-link">뉴스 보기</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<script>
+// 페이지 로드 시 첫 번째 카테고리 표시
+document.addEventListener('DOMContentLoaded', function() {
+    const firstKeyword = document.querySelector('.keyword-tab');
+    if (firstKeyword) {
+        firstKeyword.click();
+    }
+});
+
+// 카테고리 전환 함수
+function showCategory(keyword) {
+    // 모든 카테고리 숨기기
+    document.querySelectorAll('.news-category').forEach(cat => {
+        cat.style.display = 'none';
+    });
+    
+    // 선택된 카테고리만 표시
+    document.getElementById('category-' + keyword).style.display = 'block';
+    
+    // 탭 스타일 변경
+    document.querySelectorAll('.keyword-tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    event.target.classList.add('active');
+}
+</script>
+
+<style>
+/* 비디오 컨테이너 스타일 */
+.video-container {
+    margin: 20px 0;
+    position: relative;
+    padding-bottom: 56.25%; /* 16:9 비율 */
+    height: 0;
+    overflow: hidden;
+}
+
+.video-container iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+/* 키워드 탭 스타일 */
+.keyword-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.keyword-tab {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 20px;
+    background-color: #f0f0f0;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.keyword-tab:hover {
+    background-color: #e0e0e0;
+}
+
+.keyword-tab.active {
+    background-color: #007bff;
+    color: white;
+}
+
+/* 뉴스 카테고리 스타일 */
+.news-category {
+    display: none;
+}
+
+.keyword-title {
+    margin-bottom: 15px;
+    color: #007bff;
+    font-size: 1.2em;
+}
+
+/* 기존 스타일 유지 */
+.related-news-section {
+    margin-top: 2rem;
+    padding: 1rem;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+}
+
+.related-news-list {
+    margin-top: 1rem;
+}
+
+.news-item {
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background-color: white;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+</style>
+{% endif %}
 {% endblock %}

@@ -333,19 +333,33 @@ def emotion(request):
     
     return render(request, 'analysis/emotion.html', context)
 
+from django.db.models import Q
+from functools import reduce
+from operator import or_
+
 def relate(request):
     video_url = request.GET.get('url')
     video_id = request.GET.get('id')
     
-    # 데이터베이스에서 비디오 정보 가져오기
     video = YouTubeData.objects.filter(url=video_url).first()
     
     if video and video.desc:
-        # 연관어 분석 수행
-        graph, top_pairs = analyze_related_words(video.desc)
-        
-        # 네트워크 그래프 생성
+        graph, top_pairs, important_keywords = analyze_related_words(video.desc)
         network_graph = generate_network_graph(graph)
+        
+        # 키워드별 관련 뉴스 분류
+        categorized_news = {}
+        for keyword in important_keywords:
+            related_news = YouTubeData.objects.filter(
+                title__icontains=keyword
+            ).exclude(url=video_url)[:3]  # 각 키워드당 최대 3개 뉴스
+            
+            if related_news:  # 관련 뉴스가 있는 경우만 추가
+                cleaned_news = []
+                for news in related_news:
+                    news.title = clean_title(news.title)
+                    cleaned_news.append(news)
+                categorized_news[keyword] = cleaned_news
         
         context = {
             'section': 'relate',
@@ -353,7 +367,9 @@ def relate(request):
             'video_id': video_id,
             'network_graph': network_graph,
             'top_pairs': top_pairs,
-            'video_title': video.title
+            'video_title': video.title,
+            'categorized_news': categorized_news,
+            'important_keywords': important_keywords
         }
     else:
         context = {
