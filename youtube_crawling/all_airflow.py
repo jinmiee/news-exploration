@@ -5,6 +5,7 @@ from googleapiclient.discovery import build
 from datetime import datetime, timezone, timedelta
 import pytz
 from youtube_transcript_api import YouTubeTranscriptApi
+from isodate import parse_duration
 
 class YouTubeDataCollector:
     """
@@ -131,11 +132,22 @@ class YouTubeDataCollector:
                 video_ids = [item['id']['videoId'] for item in search_response['items']]
 
                 videos_response = self.youtube.videos().list(
-                    part='snippet,statistics',
+                    part='snippet,statistics,contentDetails',  # contentDetails 추가
                     id=','.join(video_ids)
                 ).execute()
 
                 for video in videos_response['items']:
+                    try:
+                        duration = parse_duration(video['contentDetails']['duration']).total_seconds()
+                    except Exception as e:
+                        print(f"동영상 길이 파싱 실패: {e}")
+                        continue
+
+                    # 10분(600초) 이상인 동영상은 건너뛰기
+                    if duration > 600:
+                        print(f"[필터] 10분 초과: {video['id']}, 길이: {duration // 60}분")
+                        continue
+
                     # 실시간 동영상 건너뛰기
                     if video['snippet'].get('liveBroadcastContent') != 'none':
                         print(f"라이브 동영상 건너뜀: {video['id']}")
@@ -169,7 +181,8 @@ class YouTubeDataCollector:
                         'likes': video['statistics'].get('likeCount', '0'),
                         'comments': comments,
                         'transcript': transcript,  # 자막 추가
-                        'thumbnail': video['snippet']['thumbnails']['high']['url']
+                        'thumbnail': video['snippet']['thumbnails']['high']['url'],
+                        'duration': duration  # 동영상 길이 저장
                     }
                     videos.append(video_data)
 
