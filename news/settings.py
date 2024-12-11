@@ -81,15 +81,21 @@ WSGI_APPLICATION = 'news.wsgi.application'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
 DATABASES = {
-        'default': {
-            'ENGINE': 'djongo',
-            'NAME': 'youtube_data',
-            'ENFORCE_SCHEMA': False,
-            'CLIENT': {
-                'host': "mongodb+srv://jinmiee:1234@cluster.ccru7.mongodb.net/?retryWrites=true&w=majority&appName=cluster"
-            }  
+    'default': {
+        'ENGINE': 'djongo',
+        'NAME': 'youtube_data',
+        'ENFORCE_SCHEMA': False,
+        'CLIENT': {
+            'host': 'mongodb://entks:entks@hello-news.site:27777/youtube_data',
+            'port': 27777,
+            'username': 'entks',
+            'password': 'entks',
+            'authSource': 'admin',  # 중요: 인증 소스를 'admin'으로 변경
+            'authMechanism': 'SCRAM-SHA-256'  # 최신 버전 메커니즘 
         }
+    }
 }
+
 
 
 # Password validation
