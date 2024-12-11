@@ -8,7 +8,7 @@
 
 <div class="relate-container">
     {% if video %}
-        <h1>{{ video_title }} - 연관어 분석</h1>
+        <h1>{{ video_title }}</h1>
         
         <div class="content-wrapper">
             <!-- 왼쪽 섹션: 네트워크 그래프와 연관어 쌍 -->
@@ -16,7 +16,30 @@
                 <div class="network-graph">
                     <img src="data:image/png;base64,{{ network_graph }}" alt="연관어 네트워크 그래프" class="responsive-image">
                 </div>
-                
+            </div>
+
+            <!-- 오른쪽 섹션: 영상 스크립트 -->
+            <div class="right-section">
+                <div class="transcript-container">
+                    <h3>영상 스크립트</h3>
+                    {% if transcript_segments %}
+                        {% for segment in transcript_segments %}
+                            <div class="transcript-segment">
+                                <span class="timestamp">{{ segment.time }}</span>
+                                <span class="text">{{ segment.text }}</span>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <p>자막이 없습니다.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 하단 섹션: 연관어 쌍과 관련 뉴스 -->
+        <div class="bottom-content-wrapper">
+            <!-- 왼쪽: 상위 연관어 쌍 -->
+            <div class="word-pairs-section">
                 <div class="word-pairs">
                     <h2>상위 연관어 쌍</h2>
                     <table>
@@ -42,9 +65,9 @@
                 </div>
             </div>
 
-            <!-- 오른쪽 섹션: 키워드별 관련 뉴스 -->
+            <!-- 오른쪽: 키워드별 관련 뉴스 -->
             {% if categorized_news %}
-            <div class="right-section">
+            <div class="related-news-wrapper">
                 <div class="related-news-section">
                     <h3>키워드별 관련 뉴스</h3>
                     <div class="keyword-tabs">
@@ -81,11 +104,6 @@
             {% endif %}
         </div>
 
-        <div class="original-text">
-            <h2>영상 스크립트</h2>
-            <p>{{ transcript_text }}</p>
-        </div>
-
         <div class="rating">
             <h3>별점 평가</h3>
             <div class="stars">
@@ -110,12 +128,12 @@
 }
 
 .left-section {
-    flex: 1;
-    min-width: 0; /* 자식 요소가 부모 너비를 초과하지 않도록 함 */
+    flex: 0.6;
+    min-width: 0;
 }
 
 .right-section {
-    flex: 1;
+    flex: 0.4;
     min-width: 0;
 }
 
@@ -128,11 +146,26 @@
     height: auto;
 }
 
+.related-news-wrapper {
+    flex: 0.4;
+    max-width: 600px;
+}
+
+.transcript-container {
+    margin: 20px 0;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 5px;
+    max-height: 550px;
+    overflow-y: auto;
+}
+
 .related-news-section {
     background-color: #f8f9fa;
     border-radius: 8px;
     padding: 1rem;
-    height: 100%;
+    max-width: 100%;
+    margin: 0 auto;
 }
 
 .keyword-tabs {
@@ -261,6 +294,67 @@
 .rating p {
     text-align: center;
     margin: 0.5rem 0;
+}
+
+.transcript-segment {
+    margin: 10px 0;
+    line-height: 1.5;
+    padding: 8px;
+    border-bottom: 1px solid #eee;
+    transition: background-color 0.2s;
+}
+
+.transcript-segment:hover {
+    background-color: #f0f0f0;
+}
+
+.timestamp {
+    font-weight: bold;
+    color: #666;
+    margin-right: 10px;
+    display: inline-block;
+    min-width: 60px;
+}
+
+.text {
+    color: #333;
+    display: inline-block;
+}
+
+.bottom-content-wrapper {
+    display: flex;
+    gap: 2rem;
+    margin: 2rem 0;
+    justify-content: center;
+}
+
+.word-pairs-section {
+    flex: 0.4;
+    min-width: 0;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.word-pairs {
+    width: 100%;
+}
+
+.word-pairs table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+.word-pairs th,
+.word-pairs td {
+    padding: 8px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.word-pairs th {
+    background-color: #f0f0f0;
 }
 </style>
 
