@@ -344,33 +344,45 @@ def relate(request):
     video = YouTubeData.objects.filter(url=video_url).first()
     
     if video and video.desc:
-        graph, top_pairs, important_keywords = analyze_related_words(video.desc)
-        network_graph = generate_network_graph(graph)
-        
-        # 키워드별 관련 뉴스 분류
-        categorized_news = {}
-        for keyword in important_keywords:
-            related_news = YouTubeData.objects.filter(
-                title__icontains=keyword
-            ).exclude(url=video_url)[:3]  # 각 키워드당 최대 3개 뉴스
+        try:
+            graph, top_pairs, important_keywords = analyze_related_words(video.desc)
+            network_graph = generate_network_graph(graph)
             
-            if related_news:  # 관련 뉴스가 있는 경우만 추가
-                cleaned_news = []
-                for news in related_news:
-                    news.title = clean_title(news.title)
-                    cleaned_news.append(news)
-                categorized_news[keyword] = cleaned_news
-        
-        context = {
-            'section': 'relate',
-            'video': video,
-            'video_id': video_id,
-            'network_graph': network_graph,
-            'top_pairs': top_pairs,
-            'video_title': video.title,
-            'categorized_news': categorized_news,
-            'important_keywords': important_keywords
-        }
+            # 키워드별 관련 뉴스 분류
+            categorized_news = {}
+            if important_keywords:
+                for keyword in important_keywords:
+                    related_news = YouTubeData.objects.filter(
+                        title__icontains=keyword
+                    ).exclude(url=video_url)[:3]
+                    
+                    if related_news:
+                        cleaned_news = []
+                        for news in related_news:
+                            news.title = clean_title(news.title)
+                            # video_id 추출
+                            try:
+                                news.video_id = news.url.split('v=')[1].split('&')[0]
+                            except:
+                                news.video_id = None
+                            cleaned_news.append(news)
+                        categorized_news[keyword] = cleaned_news
+            
+            context = {
+                'section': 'relate',
+                'video': video,
+                'video_title': video.title,
+                'network_graph': network_graph,
+                'top_pairs': top_pairs,
+                'categorized_news': categorized_news,
+                'important_keywords': important_keywords
+            }
+        except Exception as e:
+            print(f"분석 중 오류 발생: {str(e)}")
+            context = {
+                'section': 'relate',
+                'error_message': '분석 중 오류가 발생했습니다.'
+            }
     else:
         context = {
             'section': 'relate',
