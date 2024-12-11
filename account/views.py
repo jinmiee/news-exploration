@@ -343,9 +343,15 @@ def relate(request):
     
     video = YouTubeData.objects.filter(url=video_url).first()
     
-    if video and video.desc:
+    if video and video.transcript:
         try:
-            graph, top_pairs, important_keywords = analyze_related_words(video.desc)
+            # 제목 불용어 처리
+            cleaned_title = clean_title(video.title)
+            
+            # transcript 데이터를 텍스트로 변환
+            transcript_text = ' '.join([item['text'] for item in video.transcript])
+            
+            graph, top_pairs, important_keywords = analyze_related_words(transcript_text)
             network_graph = generate_network_graph(graph)
             
             # 키워드별 관련 뉴스 분류
@@ -360,7 +366,6 @@ def relate(request):
                         cleaned_news = []
                         for news in related_news:
                             news.title = clean_title(news.title)
-                            # video_id 추출
                             try:
                                 news.video_id = news.url.split('v=')[1].split('&')[0]
                             except:
@@ -371,11 +376,12 @@ def relate(request):
             context = {
                 'section': 'relate',
                 'video': video,
-                'video_title': video.title,
+                'video_title': cleaned_title,  # 불용어 처리된 제목 사용
                 'network_graph': network_graph,
                 'top_pairs': top_pairs,
                 'categorized_news': categorized_news,
-                'important_keywords': important_keywords
+                'important_keywords': important_keywords,
+                'transcript_text': transcript_text
             }
         except Exception as e:
             print(f"분석 중 오류 발생: {str(e)}")
@@ -386,7 +392,7 @@ def relate(request):
     else:
         context = {
             'section': 'relate',
-            'error_message': '비디오 설명이 없거나 비디오를 찾을 수 없습니다.'
+            'error_message': '비디오 자막이 없거나 비디오를 찾을 수 없습니다.'
         }
     
     return render(request, 'analysis/relate.html', context)
