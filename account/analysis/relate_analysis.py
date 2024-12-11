@@ -30,8 +30,7 @@ def load_pretrained_model():
     """
     model_path = 'account/static/ko.bin'
     if not os.path.exists(model_path):
-        # 모델 파일이 큰 편이라, 다운로드 시간 다소 소요됩니다!!
-        print("사전 학습된 모델 다운로드 중...")
+        print("사전 학습된 모델 다운로드 중... 시간 다소 소요됩니당")
         urllib.request.urlretrieve(
             'https://dl.fbaipublicfiles.com/fasttext/vectors-crawl/cc.ko.300.bin.gz',
             model_path
@@ -187,9 +186,9 @@ def analyze_related_words(video_desc):
             if word2vec_model is not None:
                 filtered_pairs = [(pair, score) for pair, score in word_pairs 
                                 if pair[0] in G.nodes and pair[1] in G.nodes]
-                top_pairs = [(pair[0], pair[1]) for pair in filtered_pairs[:30]]
+                top_pairs = [(pair[0], pair[1]) for pair in filtered_pairs[:20]]
             else:
-                top_pairs = [(pair[0], pair[1]) for pair in pair_counts.most_common(30)]
+                top_pairs = [(pair[0], pair[1]) for pair in pair_counts.most_common(20)]
             
             # 중요 키워드 추출
             important_keywords = get_important_keywords(G)

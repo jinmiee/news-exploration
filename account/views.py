@@ -354,7 +354,7 @@ def relate(request):
                 for keyword in important_keywords:
                     related_news = YouTubeData.objects.filter(
                         title__icontains=keyword
-                    ).exclude(url=video_url)[:3]
+                    ).exclude(url=video_url)[:6]
                     
                     if related_news:
                         cleaned_news = []
