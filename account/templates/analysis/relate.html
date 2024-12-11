@@ -16,17 +16,6 @@
     {% if video %}
         <h1>{{ video_title }} - 연관어 분석</h1>
         
-        <div class="video-container">
-            <iframe 
-                width="100%" 
-                height="400" 
-                src="https://www.youtube.com/embed/{{ video_id }}" 
-                frameborder="0" 
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                allowfullscreen>
-            </iframe>
-        </div>
-        
         <div class="network-graph">
             <img src="data:image/png;base64,{{ network_graph }}" alt="연관어 네트워크 그래프" class="responsive-image">
         </div>
@@ -112,10 +101,17 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="related-news-list">
             {% for news in news_list %}
             <div class="news-item">
-                <h4>{{ news.title }}</h4>
-                <div class="news-meta">
-                    <span>조회수: {{ news.views|default:"0" }}</span>
-                    <a href="{{ news.url }}" target="_blank" class="news-link">뉴스 보기</a>
+                <div class="news-thumbnail">
+                    {% if news.video_id %}
+                        <img src="https://img.youtube.com/vi/{{ news.video_id }}/mqdefault.jpg" alt="뉴스 썸네일">
+                    {% endif %}
+                </div>
+                <div class="news-content">
+                    <h4>{{ news.title }}</h4>
+                    <div class="news-meta">
+                        <span>조회수: {{ news.views|default:"0" }}</span>
+                        <a href="{{ news.url }}" target="_blank" class="news-link">뉴스 보기</a>
+                    </div>
                 </div>
             </div>
             {% endfor %}
@@ -219,11 +215,65 @@ function showCategory(keyword) {
 }
 
 .news-item {
+    display: flex;
     padding: 1rem;
     margin-bottom: 1rem;
     background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: transform 0.2s ease;
+}
+
+.news-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.news-thumbnail {
+    flex: 0 0 200px;
+    margin-right: 1rem;
+}
+
+.news-thumbnail img {
+    width: 100%;
+    height: 120px;
+    object-fit: cover;
     border-radius: 4px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.news-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.news-content h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.1em;
+    color: #333;
+    line-height: 1.4;
+}
+
+.news-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.news-link {
+    padding: 0.5rem 1rem;
+    background-color: #007bff;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+}
+
+.news-link:hover {
+    background-color: #0056b3;
 }
 </style>
 {% endif %}

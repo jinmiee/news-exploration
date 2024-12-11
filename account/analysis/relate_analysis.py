@@ -207,6 +207,24 @@ def analyze_related_words(video_desc):
 
 
 def generate_network_graph(G):
+    """네트워크 그래프를 생성하는 함수"""
+    if not G.nodes():
+        # 빈 그래프일 경우 빈 이미지 반환
+        plt.figure(figsize=(8, 6))
+        plt.text(0.5, 0.5, '연관어를 찾을 수 없습니다.', 
+                horizontalalignment='center',
+                verticalalignment='center')
+        plt.axis('off')
+        
+        buffer = BytesIO()
+        plt.savefig(buffer, format='png', bbox_inches='tight', dpi=200)
+        buffer.seek(0)
+        image_png = buffer.getvalue()
+        buffer.close()
+        plt.close()
+        
+        return base64.b64encode(image_png).decode('utf-8')
+    
     # matplotlib 백엔드 설정
     matplotlib.use('Agg')
     
@@ -218,14 +236,12 @@ def generate_network_graph(G):
     # 그래프 크기 조절
     plt.figure(figsize=(8, 6))
     
-    # 노드 크기 설정 개선
-    if 'importance' in G.nodes[list(G.nodes)[0]]:
-        node_size = [G.nodes[node]['importance'] * 500 for node in G.nodes()]
-    else:
-        node_size = [G.degree(node) * 200 for node in G.nodes()]
+    # 노드 크기 설정
+    degrees = dict(G.degree())
+    node_size = [v * 100 for v in degrees.values()]
     
     # 엣지 굵기 설정
-    edge_width = [G[u][v]['weight'] * 0.3 for u, v in G.edges()]
+    edge_width = [G[u][v].get('weight', 1.0) * 0.3 for u, v in G.edges()]
     
     # 그래프 레이아웃 설정
     pos = nx.spring_layout(G, k=0.8, iterations=50)
@@ -247,20 +263,30 @@ def generate_network_graph(G):
     buffer.seek(0)
     image_png = buffer.getvalue()
     buffer.close()
-    
-    # base64로 인코딩
-    graphic = base64.b64encode(image_png).decode('utf-8')
-    
     plt.close()
     
-    return graphic
+    return base64.b64encode(image_png).decode('utf-8')
 
 # 중요 키워드 추출 로직 추가
 def get_important_keywords(G, top_n=5):
+    """중요 키워드를 추출하는 함수"""
     if not G.nodes():
         return []
-            
-    # 중심성이 높은 노드 추출
-    centrality = nx.eigenvector_centrality_numpy(G, weight='weight')
-    important_keywords = sorted(centrality.items(), key=lambda x: x[1], reverse=True)[:top_n]
-    return [word for word, _ in important_keywords]
+    
+    try:
+        # 연결 요소가 여러 개인 경우를 처리
+        if nx.number_connected_components(G) > 1:
+            # 가장 큰 연결 요소만 선택
+            largest_cc = max(nx.connected_components(G), key=len)
+            G = G.subgraph(largest_cc).copy()
+        
+        # degree centrality 사용 (더 안정적인 방법)
+        centrality = nx.degree_centrality(G)
+        important_keywords = sorted(centrality.items(), key=lambda x: x[1], reverse=True)[:top_n]
+        return [word for word, _ in important_keywords]
+    except Exception as e:
+        print(f"중요 키워드 추출 중 오류 발생: {str(e)}")
+        # 실패 시 degree 기반으로 간단히 처리
+        degrees = dict(G.degree())
+        sorted_words = sorted(degrees.items(), key=lambda x: x[1], reverse=True)[:top_n]
+        return [word for word, _ in sorted_words]
