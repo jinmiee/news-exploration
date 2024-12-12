@@ -173,12 +173,12 @@ class YouTubeDataCollector:
                     video_data = {
                         'channel_name': channel_name,
                         'title': video['snippet'].get('title'),
-                        'views': video['statistics'].get('viewCount', '0'),
+                        'views': int(video['statistics'].get('viewCount', '0')),  # 조회수를 정수로 변환
                         'upload_date': published_at_kst,
                         'url': f"https://www.youtube.com/watch?v={video['id']}",
                         'channel': video['snippet'].get('channelTitle'),
                         'desc': video['snippet'].get('description', ''),
-                        'likes': video['statistics'].get('likeCount', '0'),
+                        'likes': int(video['statistics'].get('likeCount', '0')),  # 좋아요 수도 정수로 변환
                         'comments': comments,
                         'transcript': transcript,  # 자막 추가
                         'thumbnail': video['snippet']['thumbnails']['high']['url'],
