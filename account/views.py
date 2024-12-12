@@ -2,7 +2,7 @@
 pip install konlpy networkx matplotlib pandas
 '''
 from collections import defaultdict
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 from django.db.models.functions import TruncDate
 from django.http import JsonResponse
@@ -42,6 +42,9 @@ from .analysis.emotion_analysis import (
     analyze_morphemes,
     analyze_sentiment
 )
+
+from .analysis.clustering import choose_10
+
 
 
 def clean_title(title):
@@ -109,11 +112,27 @@ def chart(request):
         analysis_start = now.replace(hour=11, minute=0, second=0, microsecond=0)
         analysis_end = now.replace(hour=23, minute=0, second=0, microsecond=0)
 
-    # 데이터 필터링
-    top_news = YouTubeData.objects.filter(
-        upload_date__gte=analysis_start,
-        upload_date__lt=analysis_end
-    ).order_by('-views')[:10]
+    # 특정 날짜 (2024-11-21)
+    target_date = datetime(2024, 11, 21)
+
+    # 날짜의 시작과 끝 정의
+    start_of_day = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_of_day = start_of_day + timedelta(days=1) - timedelta(seconds=1)
+
+    # 필터링: upload_date가 2024-11-21에 해당하는 데이터
+    all_news = YouTubeData.objects.filter(upload_date__gte=start_of_day, upload_date__lte=end_of_day)
+
+    titles = [news.title for news in all_news]
+    views = [news.views for news in all_news]
+    ids = [news._id for news in all_news]
+
+    top_news_ids = choose_10(titles,views,ids)
+
+    
+
+    # 해당 인스턴스의 id를 사용하여 새로운 QuerySet 생성
+    top_news = YouTubeData.objects.filter(_id__in=top_news_ids)
+
 
     # 제목 정리 및 찜 상태 확인
     for news in top_news:
