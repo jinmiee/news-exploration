@@ -20,6 +20,7 @@ from django.contrib.auth import views as auth_views
 from . import views
 from django.urls import reverse_lazy
 
+
 app_name = 'account'
 
 urlpatterns = [
@@ -36,6 +37,7 @@ urlpatterns = [
     path('emotion/', views.emotion, name='emotion'),
     path('relate/', views.relate, name='relate'),
     path('register/', views.register, name='register'),
+    path('find-username/', views.find_username, name='find_username'),
     path('mypage/', views.mypage, name='mypage'),
     path('like/<str:video_id>/', views.like_video, name='like_video'),
     path('mypage/like/', views.my_liked_videos, name='my_liked_video'),
