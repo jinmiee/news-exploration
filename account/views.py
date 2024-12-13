@@ -15,7 +15,7 @@ from datetime import date
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseBadRequest
 from bson import ObjectId
-
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 from .forms import UserRegistrationForm
 from .models import YouTubeData, Like
@@ -45,7 +45,120 @@ from .analysis.emotion_analysis import (
 
 from .analysis.clustering import choose_10
 
+
 from django.contrib.auth.models import User
+
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.preprocessing import MinMaxScaler
+import re
+
+def process_titles_and_scripts(request):
+    # 초기화 및 전처리 설정
+    okt = Okt()
+    UNNECESSARY_TAGS = [
+        'Josa', 'Conj', 'Punctuation', 'Eomi', 'Suffix', 'Foreign',
+        'KoreanParticle', 'Alpha', 'Exclamation'
+    ]
+    start_date = datetime(2024, 12, 11)
+    end_date = start_date + timedelta(days=1)
+    all_data = YouTubeData.objects.filter(upload_date__gte=start_date, upload_date__lt=end_date).order_by('-views')
+
+    processed_titles = []
+    corpus = []
+    views_list = []
+
+    # 텍스트 전처리 함수
+    def clean_text(text):
+        text = re.sub(r'\s+', ' ', text)  # 여러 공백을 단일 공백으로 변환
+        text = re.sub(r'[^\w\s]', '', text)  # 특수문자 제거
+        return text.strip()
+
+    for data in all_data:
+        # 제목 전처리
+        cleaned_title = clean_text(' '.join([word for word, tag in okt.pos(data.title) if tag not in UNNECESSARY_TAGS]))
+
+        # 스크립트 전처리
+        if data.transcript and isinstance(data.transcript, list):
+            script_text = ' '.join([item.text for item in data.transcript if hasattr(item, 'text')])
+            cleaned_script = clean_text(' '.join([word for word, tag in okt.pos(script_text) if tag not in UNNECESSARY_TAGS]))
+        else:
+            cleaned_script = ''
+
+        # 제목과 스크립트 결합
+        combined_text = f"{cleaned_title} {cleaned_script}"
+
+        # 데이터 저장
+        corpus.append(combined_text)
+        views_list.append(data.views)
+
+        processed_titles.append({
+            "original_title": data.title,
+            "cleaned_title": cleaned_title,
+            "cleaned_script": cleaned_script,
+            "combined_text": combined_text,
+            "upload_date": data.upload_date,
+            "channel": data.channel_name,
+            "url": data.url,
+            "views": data.views
+        })
+
+    # TF-IDF 분석
+    vectorizer = TfidfVectorizer(max_features=5000, stop_words='english')
+    tfidf_matrix = vectorizer.fit_transform(corpus)
+
+    # 조회수 정규화 및 가중치 계산
+    scaler = MinMaxScaler()
+    normalized_views = scaler.fit_transform([[view] for view in views_list]).flatten()
+    weighted_scores = normalized_views + tfidf_matrix.sum(axis=1).A.flatten()
+
+    # 코사인 유사도 계산
+    similarity_matrix = cosine_similarity(tfidf_matrix)
+
+    # 가중치를 기준으로 정렬
+    sorted_titles = sorted(
+        processed_titles,
+        key=lambda x: weighted_scores[processed_titles.index(x)],
+        reverse=True
+    )
+
+    # 상위 10개 기사 선택
+    chart_titles = sorted_titles[:10]
+
+    # 중복된 기사 그룹화
+    duplicates = []
+    seen_titles = set()  # 중복 확인용
+
+    for chart_title in chart_titles:
+        duplicate_group = []
+        for i, data in enumerate(processed_titles):
+            # 차트의 기사와 동일하지 않으면서 유사도가 0.75 이상인 기사 찾기
+            if data != chart_title and similarity_matrix[processed_titles.index(chart_title)][i] > 0.7:
+                # 중복된 기사 중복 방지
+                if data["original_title"] not in seen_titles:
+                    duplicate_group.append(data)
+                    seen_titles.add(data["original_title"])
+
+        if duplicate_group:
+            duplicates.append({
+                "original": chart_title,
+                "duplicates": duplicate_group
+            })
+
+    # 템플릿으로 전달
+    context = {
+        "processed_titles": chart_titles,  # 상위 10개 기사
+        "duplicates": duplicates,         # 중복된 기사 목록
+        "processing_stats": {
+            "total_videos": len(all_data),
+            "processed_titles": len(processed_titles),
+            "unique_titles": len(chart_titles),
+            "duplicate_groups": len(duplicates)
+        },
+        "section": "processed_data"
+    }
+
+    return render(request, 'analysis/processed_data.html', context)
+
 
 
 def clean_title(title):
