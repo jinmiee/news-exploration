@@ -95,7 +95,7 @@ def clean_title(title):
     return title.strip()
 
 
-@login_required
+
 def chart(request):
     now = localtime()  # 현재 시간 가져오기
 
@@ -439,8 +439,7 @@ def relate(request):
     
     return render(request, 'analysis/relate.html', context)
 
-
-# @login_required
+@login_required
 def mypage(request):
     return render(request, 'analysis/mypage/mypage.html', {'section': 'mypage'}) 
 

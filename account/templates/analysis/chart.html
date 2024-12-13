@@ -54,16 +54,23 @@
                                     {% endif %}
                                 </button>
                             {% else %}
-                                <a href="{% url 'account:login' %}" class="like-button">
+                                <a href="#" class="like-button" data-title="{{ item.title }}" data-url="{{ item.url }}">
                                     ♡
                                 </a>
                             {% endif %}
                         </div>
                     </div>
                 </li>
-                {% empty %}
-                <li class="no-data">데이터가 없습니다.</li>
                 {% endfor %}
+
+                <!-- 공통 모달 -->
+                <div id="login-modal" class="modal" style="display: none;">
+                    <div class="modal-content">
+                        <p id="modal-message">로그인 후 사용해주세요.</p>
+                        <button id="close-modal">닫기</button>
+                    </div>
+                </div>
+
             </ul>
         </div>
 
@@ -517,6 +524,40 @@
             });
         };
     });
+
+    document.addEventListener("DOMContentLoaded", function () {
+        const likeButtons = document.querySelectorAll(".like-button");
+        const modal = document.getElementById("login-modal");
+        const closeModal = document.getElementById("close-modal");
+    
+        likeButtons.forEach((button) => {
+            button.addEventListener("click", function (event) {
+                event.preventDefault();
+                const title = button.getAttribute("data-title");
+                const url = button.getAttribute("data-url");
+    
+                // 모달 메시지 업데이트 (필요 시)
+                const message = document.getElementById("modal-message");
+                message.textContent = title ? `찜기능을 사용하려면 로그인해주세요.` : "로그인 후 사용해주세요.";
+    
+                // 모달 표시
+                modal.style.display = "block";
+            });
+        });
+    
+        closeModal.addEventListener("click", function () {
+            modal.style.display = "none";
+        });
+    
+        // 모달 외부 클릭 시 닫기
+        window.addEventListener("click", function (event) {
+            if (event.target === modal) {
+                modal.style.display = "none";
+            }
+        });
+    });
+    
+    
 </script>
 
 <style>
@@ -576,5 +617,41 @@
     color: #007bff;
     font-weight: bold;
 }
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 5px;
+    text-align: center;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+#close-modal {
+    margin-top: 10px;
+    padding: 5px 10px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+#close-modal:hover {
+    background-color: #0056b3;
+}
+
 </style>
 {% endblock %}
