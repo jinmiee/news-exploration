@@ -147,6 +147,7 @@
                 <a href="{% url 'account:chart' %}" class="nav-link {% if section == 'chart' %}active{% endif %}">차트</a>
                 <a href="{% url 'account:weekly_issues' %}" class="nav-link {% if section == 'weekly_issues' %}active{% endif %}">주간 이슈</a>
                 <a href="{% url 'account:mypage' %}" class="nav-link {% if section == 'mypage' %}active{% endif %}">마이페이지</a>
+                <a href="{% url 'account:process_titles_and_scripts' %}" class="nav-link {% if section == 'processed_data' %}active{% endif %}">데이터 처리</a>
                 
                 {% if user.is_authenticated %}
                     <div class="user-menu">

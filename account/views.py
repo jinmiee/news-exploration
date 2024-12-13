@@ -15,7 +15,7 @@ from datetime import date
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseBadRequest
 from bson import ObjectId
-
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 from .forms import UserRegistrationForm
 from .models import YouTubeData, Like
@@ -45,7 +45,146 @@ from .analysis.emotion_analysis import (
 
 from .analysis.clustering import choose_10
 
+
 from django.contrib.auth.models import User
+
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.preprocessing import MinMaxScaler
+import re
+
+def process_titles_and_scripts(request):
+    '''
+    # 현재 시간 가져오기
+    now = localtime()
+
+    # 기준 시간 설정
+    if now.hour < 11:  # 현재 시간이 오전 11시 이전
+        analysis_start = (now - timedelta(days=1)).replace(hour=11, minute=0, second=0, microsecond=0)
+        analysis_end = (now - timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)
+    elif now.hour < 23:  # 현재 시간이 오전 11시 이후, 오늘 오후 11시 이전
+        analysis_start = (now - timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)
+        analysis_end = now.replace(hour=11, minute=0, second=0, microsecond=0)
+    else:  # 현재 시간이 오후 11시 이후
+        analysis_start = now.replace(hour=11, minute=0, second=0, microsecond=0)
+        analysis_end = now.replace(hour=23, minute=0, second=0, microsecond=0)
+
+    # 데이터 가져오기 (기준 시간에 맞는 데이터 필터링)
+    all_data = YouTubeData.objects.filter(upload_date__gte=analysis_start, upload_date__lt=analysis_end).order_by('-views')
+    '''
+    # 초기화 및 전처리 설정
+    okt = Okt()
+    UNNECESSARY_TAGS = [
+        'Josa', 'Conj', 'Punctuation', 'Eomi', 'Suffix', 'Foreign',
+        'KoreanParticle', 'Alpha', 'Exclamation'
+    ]
+    start_date = datetime(2024, 11, 21)
+    end_date = start_date + timedelta(days=1)
+    all_data = YouTubeData.objects.filter(upload_date__gte=start_date, upload_date__lt=end_date).order_by('-views')
+
+    processed_titles = []
+    corpus = []
+    views_list = []
+
+    # 텍스트 전처리 함수
+    def clean_text(text):
+        text = re.sub(r'\s+', ' ', text)  # 여러 공백을 단일 공백으로 변환
+        text = re.sub(r'[^\w\s]', '', text)  # 특수문자 제거
+        return text.strip()
+
+    for data in all_data:
+        # 제목 전처리
+        try:
+            cleaned_title = clean_text(
+                ' '.join([word for word, tag in okt.pos(data.title) if tag not in UNNECESSARY_TAGS]))
+        except Exception as e:
+            print(f"Title processing failed for: {data.title}, Error: {e}")
+            cleaned_title = "제목 없음"
+
+        # 스크립트 전처리
+        if data.transcript and isinstance(data.transcript, list):
+            script_text = ' '.join(
+                [item.text for item in data.transcript if hasattr(item, 'text') and isinstance(item.text, str)])
+            cleaned_script = clean_text(
+                ' '.join([word for word, tag in okt.pos(script_text) if tag not in UNNECESSARY_TAGS]))
+        else:
+            cleaned_script = "스크립트 없음"
+
+        # 제목과 스크립트 결합
+        combined_text = f"{cleaned_title} {cleaned_script}"
+        print(f"Processed Combined Text: {combined_text[:100]}")  # 디버깅용 출력
+
+        # 데이터 저장
+        corpus.append(combined_text)
+        views_list.append(data.views)
+
+        processed_titles.append({
+            "original_title": data.title,
+            "cleaned_title": cleaned_title,
+            "cleaned_script": cleaned_script,
+            "combined_text": combined_text,
+            "upload_date": data.upload_date,
+            "channel": data.channel_name,
+            "url": data.url,
+            "views": data.views
+        })
+
+    # TF-IDF 분석
+    vectorizer = TfidfVectorizer(max_features=5000, stop_words='english')
+    tfidf_matrix = vectorizer.fit_transform(corpus)
+
+    # 조회수 정규화 및 가중치 계산
+    scaler = MinMaxScaler()
+    normalized_views = scaler.fit_transform([[view] for view in views_list]).flatten()
+    weighted_scores = normalized_views + tfidf_matrix.sum(axis=1).A.flatten()
+
+    # 코사인 유사도 계산
+    similarity_matrix = cosine_similarity(tfidf_matrix)
+
+    # 가중치를 기준으로 정렬
+    sorted_titles = sorted(
+        processed_titles,
+        key=lambda x: weighted_scores[processed_titles.index(x)],
+        reverse=True
+    )
+
+    # 상위 10개 기사 선택
+    chart_titles = sorted_titles[:10]
+
+    # 중복된 기사 그룹화
+    duplicates = []
+    seen_titles = set()  # 중복 확인용
+
+    for chart_title in chart_titles:
+        duplicate_group = []
+        for i, data in enumerate(processed_titles):
+            # 차트의 기사와 동일하지 않으면서 유사도가 0.7 이상인 기사 찾기
+            if data != chart_title and similarity_matrix[processed_titles.index(chart_title)][i] > 0.7:
+                # 중복된 기사 중복 방지
+                if data["original_title"] not in seen_titles:
+                    duplicate_group.append(data)
+                    seen_titles.add(data["original_title"])
+
+        if duplicate_group:
+            duplicates.append({
+                "original": chart_title,
+                "duplicates": duplicate_group
+            })
+
+    # 템플릿으로 전달
+    context = {
+        "processed_titles": chart_titles,  # 상위 10개 기사
+        "duplicates": duplicates,         # 중복된 기사 목록
+        "processing_stats": {
+            "total_videos": len(all_data),
+            "processed_titles": len(processed_titles),
+            "unique_titles": len(chart_titles),
+            "duplicate_groups": len(duplicates)
+        },
+        "section": "processed_data"
+    }
+
+    return render(request, 'analysis/processed_data.html', context)
+
 
 
 def clean_title(title):
@@ -226,38 +365,57 @@ def detail(request):
 
     return render(request, 'analysis/detail.html', context)
 
-
-
 def weekly_issues(request):
     # 현재 날짜 가져오기
     today = localtime().date()
-    # 오늘로부터 7일 전 날짜 계산
     week_ago = today - timedelta(days=7)
 
-    # 데이터베이스에서 7일 동안 업로드된 동영상을 조회
-    # 조건: 업로드 날짜가 7일 전 이후(>=)이고 오늘 이전(<=)
-    # 정렬: 업로드 날짜 역순(-upload_date) 및 조회수 높은 순(-views)
-    weekly_videos = YouTubeData.objects.filter(
-        upload_date__gte=week_ago,  # 업로드 날짜가 7일 전 이후
-        upload_date__lte=today      # 업로드 날짜가 오늘 이전
-    ).order_by('-upload_date', '-views')  # 최신순 및 조회수 높은 순으로 정렬
+    # GET 요청으로 특정 날짜 받기 (형식: 'YYYY-MM-DD')
+    date_str = request.GET.get('date')
 
-    # 데이터를 날짜별로 그룹화
-    grouped_issues = defaultdict(list)
-    for video in weekly_videos:
-        # 날짜별로 최대 10개 동영상만 추가
-        date_key = video.upload_date.date()
-        if len(grouped_issues[date_key]) < 10:
-            grouped_issues[date_key].append(video)
+    if date_str:
+        try:
+            # 특정 날짜로 변환
+            target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            target_date = None  # 잘못된 날짜 형식 처리
+    else:
+        target_date = None  # 날짜가 없으면 None
 
-    # grouped_issues 딕셔너리를 날짜 순서로 정렬
-    # 정렬 기준: 날짜 (x[0]), 내림차순(reverse=True)
-    sorted_issues = sorted(grouped_issues.items(), key=lambda x: x[0], reverse=True)
+    if target_date:
+        # 특정 날짜의 데이터 필터링
+        day_start = datetime.combine(target_date, datetime.min.time())
+        day_end = datetime.combine(target_date, datetime.max.time())
 
-    # 정렬된 데이터를 템플릿에 전달
-    # sorted_issues는 (날짜, [동영상 리스트]) 형태의 리스트
-    return render(request, 'analysis/weekly_issues.html', {'sorted_issues': sorted_issues})
+        daily_videos = YouTubeData.objects.filter(
+            upload_date__gte=day_start,
+            upload_date__lte=day_end
+        ).order_by('-views')[:10]  # 조회수 기준 상위 10개
 
+        context = {
+            'daily_videos': daily_videos,
+            'target_date': target_date,
+        }
+        return render(request, 'analysis/weekly_issues.html', context)
+    else:
+        # 기존 주간 데이터 로직 (날짜 범위: 7일)
+        weekly_videos = YouTubeData.objects.filter(
+            upload_date__gte=week_ago,
+            upload_date__lte=today
+        ).order_by('-views','-upload_date')
+
+        grouped_issues = defaultdict(list)
+        for video in weekly_videos:
+            date_key = video.upload_date.date()
+            if len(grouped_issues[date_key]) < 10:
+                grouped_issues[date_key].append(video)
+
+        sorted_issues = sorted(grouped_issues.items(), key=lambda x: x[0], reverse=True)
+
+        context = {
+            'sorted_issues': sorted_issues,
+        }
+        return render(request, 'analysis/weekly_issues.html', context)
 
 
 import matplotlib.pyplot as plt

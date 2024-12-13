@@ -142,10 +142,29 @@ header p {
 {% block content %}
 <div class="weekly-issues-container">
     <header>
-        <h1>주간 이슈</h1>
-        <p>지난 7일간 주요 뉴스를 날짜별로 확인하세요.</p>
+         <h1>주간 이슈</h1>
+        <p>지난 7일간 주요 뉴스를 날짜별로 확인하거나, 원하는 날짜를 검색하세요</p>
     </header>
-    <!-- Swiper -->
+    <form method="get" action="{% url 'account:weekly_issues' %}" class="mb-4">
+        <label for="date">날짜 선택 (YYYY-MM-DD):</label>
+        <input type="date" id="date" name="date" value="{{ target_date|date:"Y-m-d" }}" class="form-control w-25 d-inline">
+        <button type="submit" class="btn btn-primary">검색</button>
+    </form>
+
+    {% if target_date %}
+    <h2>{{ target_date|date:"Y년 m월 d일" }} 기사</h2>
+    <ul class="list-group">
+        {% for video in daily_videos %}
+        <li class="list-group-item">
+            <strong>{{ forloop.counter }}.</strong> {{ video.title }}<br>
+            조회수: {{ video.views }}<br>
+            업로드 날짜: {{ video.upload_date|date:"Y-m-d H:i" }}
+        </li>
+        {% empty %}
+        <li class="list-group-item">해당 날짜에 데이터가 없습니다.</li>
+        {% endfor %}
+    </ul>
+    {% else %}
     <div class="swiper weekly-issues-slider">
         <div class="swiper-wrapper">
             {% for date, issues in sorted_issues %}
@@ -172,6 +191,7 @@ header p {
         <div class="swiper-button-next"></div>
         <div class="swiper-button-prev"></div>
     </div>
+    {% endif %}
 </div>
 
 <!-- Swiper JS -->

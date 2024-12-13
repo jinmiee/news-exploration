@@ -1,5 +1,18 @@
+{% extends 'base.html' %}
+
+{% block title %}
+데이터 처리 결과
+{% endblock %}
+
+{% block content %}
 <div class="container mt-5">
-    <!-- 중복 제거 후 상위 10개 기사 -->
+    <!-- 분석 시간 정보 -->
+    <div class="alert alert-info">
+        <strong>분석 기간:</strong>
+        {{ analysis_start|date:"Y-m-d H:i" }} ~ {{ analysis_end|date:"Y-m-d H:i" }}
+    </div>
+
+    <!-- 상위 10개 기사 -->
     <div class="card mb-4">
         <div class="card-header bg-success text-white">
             <h5 class="mb-0">중복 제거 후 상위 10개 기사</h5>
@@ -12,8 +25,10 @@
                             <th>채널</th>
                             <th>원본 제목</th>
                             <th>처리된 제목</th>
+                            <th>처리된 스크립트</th>
                             <th>업로드 날짜</th>
                             <th>조회수</th>
+                            <th>가중치</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -22,8 +37,10 @@
                             <td>{{ title.channel }}</td>
                             <td>{{ title.original_title }}</td>
                             <td>{{ title.cleaned_title }}</td>
+                            <td>{{ title.cleaned_script|truncatewords:30 }}</td>
                             <td>{{ title.upload_date|date:"Y-m-d H:i" }}</td>
                             <td>{{ title.views }}</td>
+                            <td>{{ title.weight|floatformat:2 }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -44,7 +61,9 @@
                 <p>
                     <strong>채널:</strong> {{ group.original.channel }}<br>
                     <strong>제목:</strong> {{ group.original.original_title }}<br>
-                    <strong>조회수:</strong> {{ group.original.views }}
+                    <strong>처리된 스크립트:</strong> {{ group.original.cleaned_script|truncatewords:20 }}<br>
+                    <strong>조회수:</strong> {{ group.original.views }}<br>
+                    <strong>가중치:</strong> {{ group.original.weight|floatformat:2 }}
                 </p>
                 <h6>중복된 기사:</h6>
                 <ul>
@@ -52,7 +71,9 @@
                     <li>
                         <strong>채널:</strong> {{ duplicate.channel }}<br>
                         <strong>제목:</strong> {{ duplicate.original_title }}<br>
-                        <strong>조회수:</strong> {{ duplicate.views }}
+                        <strong>처리된 스크립트:</strong> {{ duplicate.cleaned_script|truncatewords:20 }}<br>
+                        <strong>조회수:</strong> {{ duplicate.views }}<br>
+                        <strong>가중치:</strong> {{ duplicate.weight|floatformat:2 }}
                     </li>
                     {% endfor %}
                 </ul>
@@ -61,3 +82,4 @@
         </div>
     </div>
 </div>
+{% endblock %}
