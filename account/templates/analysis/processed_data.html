@@ -6,6 +6,12 @@
 
 {% block content %}
 <div class="container mt-5">
+    <!-- 분석 시간 정보 -->
+    <div class="alert alert-info">
+        <strong>분석 기간:</strong>
+        {{ analysis_start|date:"Y-m-d H:i" }} ~ {{ analysis_end|date:"Y-m-d H:i" }}
+    </div>
+
     <!-- 상위 10개 기사 -->
     <div class="card mb-4">
         <div class="card-header bg-success text-white">

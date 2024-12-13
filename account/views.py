@@ -53,6 +53,24 @@ from sklearn.preprocessing import MinMaxScaler
 import re
 
 def process_titles_and_scripts(request):
+    '''
+    # 현재 시간 가져오기
+    now = localtime()
+
+    # 기준 시간 설정
+    if now.hour < 11:  # 현재 시간이 오전 11시 이전
+        analysis_start = (now - timedelta(days=1)).replace(hour=11, minute=0, second=0, microsecond=0)
+        analysis_end = (now - timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)
+    elif now.hour < 23:  # 현재 시간이 오전 11시 이후, 오늘 오후 11시 이전
+        analysis_start = (now - timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)
+        analysis_end = now.replace(hour=11, minute=0, second=0, microsecond=0)
+    else:  # 현재 시간이 오후 11시 이후
+        analysis_start = now.replace(hour=11, minute=0, second=0, microsecond=0)
+        analysis_end = now.replace(hour=23, minute=0, second=0, microsecond=0)
+
+    # 데이터 가져오기 (기준 시간에 맞는 데이터 필터링)
+    all_data = YouTubeData.objects.filter(upload_date__gte=analysis_start, upload_date__lt=analysis_end).order_by('-views')
+    '''
     # 초기화 및 전처리 설정
     okt = Okt()
     UNNECESSARY_TAGS = [
@@ -341,36 +359,26 @@ def detail(request):
 
     return render(request, 'analysis/detail.html', context)
 
-
-
 def weekly_issues(request):
-    # 현재 날짜 가져오기
     today = localtime().date()
-    # 오늘로부터 7일 전 날짜 계산
     week_ago = today - timedelta(days=7)
 
-    # 데이터베이스에서 7일 동안 업로드된 동영상을 조회
-    # 조건: 업로드 날짜가 7일 전 이후(>=)이고 오늘 이전(<=)
-    # 정렬: 업로드 날짜 역순(-upload_date) 및 조회수 높은 순(-views)
+    # 데이터 필터링 및 정렬 (조회수 기준 내림차순)
     weekly_videos = YouTubeData.objects.filter(
-        upload_date__gte=week_ago,  # 업로드 날짜가 7일 전 이후
-        upload_date__lte=today      # 업로드 날짜가 오늘 이전
-    ).order_by('-upload_date', '-views')  # 최신순 및 조회수 높은 순으로 정렬
+        upload_date__gte=week_ago,
+        upload_date__lte=today
+    ).order_by('-views', '-upload_date')  # 조회수 > 업로드 날짜 순 정렬
 
     # 데이터를 날짜별로 그룹화
     grouped_issues = defaultdict(list)
     for video in weekly_videos:
-        # 날짜별로 최대 10개 동영상만 추가
         date_key = video.upload_date.date()
         if len(grouped_issues[date_key]) < 10:
             grouped_issues[date_key].append(video)
 
-    # grouped_issues 딕셔너리를 날짜 순서로 정렬
-    # 정렬 기준: 날짜 (x[0]), 내림차순(reverse=True)
+    # 날짜별 내림차순 정렬
     sorted_issues = sorted(grouped_issues.items(), key=lambda x: x[0], reverse=True)
 
-    # 정렬된 데이터를 템플릿에 전달
-    # sorted_issues는 (날짜, [동영상 리스트]) 형태의 리스트
     return render(request, 'analysis/weekly_issues.html', {'sorted_issues': sorted_issues})
 
 
