@@ -561,9 +561,25 @@ def relate(request):
                         'time': time_str,
                         'text': item['text']
                     })
-            
-            graph, top_pairs, important_keywords = analyze_related_words(transcript_text)
-            network_graph = generate_network_graph(graph)
+
+            # 연관어 분석 시도
+            try:
+                graph, top_pairs, important_keywords = analyze_related_words(transcript_text)
+                network_graph = generate_network_graph(graph)
+            except Exception as e:
+                print(f"연관어 분석 중 오류 발생: {str(e)}")
+                # Word2Vec 모델 재로드 시도
+                from .analysis.relate_analysis import load_pretrained_model, word2vec_model
+                if word2vec_model is None:
+                    try:
+                        word2vec_model = load_pretrained_model()
+                        # 모델 재로드 후 다시 분석 시도
+                        graph, top_pairs, important_keywords = analyze_related_words(transcript_text)
+                        network_graph = generate_network_graph(graph)
+                    except Exception as load_error:
+                        print(f"모델 재로드 실패: {str(load_error)}")
+                        raise
+                raise
             
             # 키워드별 관련 뉴스 분류
             categorized_news = {}
@@ -599,8 +615,9 @@ def relate(request):
             print(f"분석 중 오류 발생: {str(e)}")
             context = {
                 'section': 'relate',
-                'error_message': '분석 중 오류가 발생했습니다.'
+                'error_message': '분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
             }
+            return render(request, 'analysis/relate.html', context)
     else:
         context = {
             'section': 'relate',

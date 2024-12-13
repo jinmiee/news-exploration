@@ -16,6 +16,10 @@ import urllib.request
 import os
 from collections import defaultdict
 import math
+from sentence_transformers import SentenceTransformer
+import torch
+import pickle
+import os.path
 
 
 # 바른 형태소 분석기 초기화
@@ -27,15 +31,56 @@ t = brn.Tagger(API_KEY, "localhost")  # 형태소 분석기 객체 생성
 def load_pretrained_model():
     """
     사전 학습된 한국어 Word2Vec 모델을 로드하는 함수
+    피클 파일이 있으면 피클에서 로드하고, 없으면 다운로드 후 피클로 저장
     """
-    model_path = 'account/static/ko.bin'
-    if not os.path.exists(model_path):
-        print("사전 학습된 모델 다운로드 중... 시간 다소 소요됩니당")
-        urllib.request.urlretrieve(
-            'https://dl.fbaipublicfiles.com/fasttext/vectors-crawl/cc.ko.300.bin.gz',
-            model_path
-        )
-    return KeyedVectors.load_word2vec_format(model_path, binary=True)
+    # 디렉토리 경로 설정
+    static_dir = 'account/static'
+    model_pickle_path = f'{static_dir}/word2vec_model.pkl'
+    model_bin_path = f'{static_dir}/ko.bin'
+    
+    # static 디렉토리가 없으면 생성
+    if not os.path.exists(static_dir):
+        try:
+            os.makedirs(static_dir)
+            print(f"디렉토리 생성됨: {static_dir}")
+        except Exception as e:
+            print(f"디렉토리 생성 실패: {str(e)}")
+            return None
+    
+    # 피클 파일이 존재하면 피클에서 로드
+    if os.path.exists(model_pickle_path):
+        print("피클 파일에서 Word2Vec 모델 로드 중...")
+        try:
+            with open(model_pickle_path, 'rb') as f:
+                return pickle.load(f)
+        except Exception as e:
+            print(f"피클 파일 로드 실패: {str(e)}")
+            # 피클 파일이 손상된 경우 삭제
+            os.remove(model_pickle_path)
+    
+    # 피클 파일이 없으면 bin 파일에서 로드 후 피클로 저장
+    print("Word2Vec 모델 새로 로드 중... 시간이 다소 소요됩니다.")
+    try:
+        if not os.path.exists(model_bin_path):
+            print("사전 학습된 모델 다운로드 중...")
+            urllib.request.urlretrieve(
+                'https://dl.fbaipublicfiles.com/fasttext/vectors-crawl/cc.ko.300.bin.gz',
+                model_bin_path
+            )
+        
+        # bin 파일에서 모델 로드
+        model = KeyedVectors.load_word2vec_format(model_bin_path, binary=True)
+        
+        # 피클로 저장
+        print("모델을 피클 파일로 저장 중...")
+        with open(model_pickle_path, 'wb') as f:
+            pickle.dump(model, f)
+        
+        return model
+        
+    except Exception as e:
+        print(f"모델 로드 중 오류 발생: {str(e)}")
+        return None
 
 # 전역 변수로 모델 로드
 try:
@@ -43,6 +88,25 @@ try:
 except Exception as e:
     print(f"모델 로드 중 오류 발생: {str(e)}")
     word2vec_model = None
+
+
+def load_sbert_model():
+    """
+    한국어 Sentence-BERT 모델을 로드하는 함수
+    """
+    try:
+        model_name = 'jhgan/ko-sbert-nli'
+        return SentenceTransformer(model_name)
+    except Exception as e:
+        print(f"SBERT 모델 로드 중 오류 발생: {str(e)}")
+        return None
+
+# 전역 변수로 SBERT 모델 로드 (word2vec_model 선언 아래에 추가)
+try:
+    sbert_model = load_sbert_model()
+except Exception as e:
+    print(f"SBERT 모델 로드 중 오류 발생: {str(e)}")
+    sbert_model = None
 
 
 def analyze_related_words(video_desc):
@@ -113,24 +177,48 @@ def analyze_related_words(video_desc):
             word_pairs = []
             word_importance = {}  # 단어별 중요도 저장
             
-            # Word2Vec 모델을 사용한 유사도 계산
-            if word2vec_model is not None:
+            # 문맥 윈도우 내의 단어들을 문장으로 결합
+            context_windows = []
+            window_size = 5
+            for i in range(len(words)):
+                start = max(0, i - window_size)
+                end = min(len(words), i + window_size)
+                context = ' '.join(words[start:end])
+                context_windows.append(context)
+            
+            if sbert_model is not None and word2vec_model is not None:
+                # SBERT 임베딩 계산
+                context_embeddings = sbert_model.encode(context_windows)
+                
                 for i, word1 in enumerate(words):
                     for j, word2 in enumerate(words[i+1:], i+1):
                         try:
-                            # 1. Word2Vec 유사도 계산
-                            similarity = word2vec_model.similarity(word1, word2)
+                            # 1. Word2Vec 유사도
+                            w2v_similarity = word2vec_model.similarity(word1, word2)
                             
-                            # 2. 거리 기반 가중치 계산 (가까운 단어일수록 높은 가중치)
+                            # 2. SBERT 문맥 유사도
+                            context1_embed = context_embeddings[i]
+                            context2_embed = context_embeddings[j]
+                            sbert_similarity = cosine_similarity(
+                                context1_embed.reshape(1, -1), 
+                                context2_embed.reshape(1, -1)
+                            )[0][0]
+                            
+                            # 3. 거리 기반 가중치
                             distance_weight = 1.0 / (j - i)
                             
-                            # 3. 빈도 기반 가중치 계산
+                            # 4. 빈도 기반 가중치
                             freq_weight = (word_freq[word1] + word_freq[word2]) / len(words)
                             
-                            # 4. 최종 유사도 점수 계산
-                            final_score = similarity * (0.4 + 0.3 * distance_weight + 0.3 * freq_weight)
+                            # 5. 최종 유사도 점수 계산 (가중치 조정)
+                            final_score = (
+                                0.4 * w2v_similarity + 
+                                0.3 * sbert_similarity + 
+                                0.2 * distance_weight + 
+                                0.1 * freq_weight
+                            )
                             
-                            if final_score > 0.3:  # 임계값 조정 가능
+                            if final_score > 0.3:  # 임계값
                                 word_pair = tuple(sorted([word1, word2]))
                                 word_pairs.append((word_pair, final_score))
                                 
@@ -139,12 +227,18 @@ def analyze_related_words(video_desc):
                                 word_importance[word2] = word_importance.get(word2, 0) + final_score
                                 
                         except KeyError:
-                            # 모델에 없는 단어는 문맥 기반으로 처리
-                            if j < min(i+5, len(words)):
-                                distance_weight = 1.0 / (j - i)
-                                freq_weight = (word_freq[word1] + word_freq[word2]) / len(words)
-                                context_score = 0.5 * (distance_weight + freq_weight)
-                                word_pairs.append((tuple(sorted([word1, word2])), context_score))
+                            # Word2Vec에 없는 단어는 SBERT만 사용
+                            try:
+                                sbert_similarity = cosine_similarity(
+                                    context1_embed.reshape(1, -1), 
+                                    context2_embed.reshape(1, -1)
+                                )[0][0]
+                                
+                                if sbert_similarity > 0.3:
+                                    word_pair = tuple(sorted([word1, word2]))
+                                    word_pairs.append((word_pair, sbert_similarity))
+                            except:
+                                continue
             else:
                 # 기존 방식으로 단어 쌍 생성
                 for i in range(len(words)-1):
@@ -285,7 +379,7 @@ def get_important_keywords(G, top_n=5):
         return [word for word, _ in important_keywords]
     except Exception as e:
         print(f"중요 키워드 추출 중 오류 발생: {str(e)}")
-        # 실패 시 degree 기반으로 간단히 처리
+        # 실패 �� degree 기반으로 간단히 처리
         degrees = dict(G.degree())
         sorted_words = sorted(degrees.items(), key=lambda x: x[1], reverse=True)[:top_n]
         return [word for word, _ in sorted_words]
