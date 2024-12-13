@@ -77,7 +77,7 @@ def process_titles_and_scripts(request):
         'Josa', 'Conj', 'Punctuation', 'Eomi', 'Suffix', 'Foreign',
         'KoreanParticle', 'Alpha', 'Exclamation'
     ]
-    start_date = datetime(2024, 11, 21)
+    start_date = datetime(2024, 11, 28)
     end_date = start_date + timedelta(days=1)
     all_data = YouTubeData.objects.filter(upload_date__gte=start_date, upload_date__lt=end_date).order_by('-views')
 
@@ -152,14 +152,29 @@ def process_titles_and_scripts(request):
 
     # 중복된 기사 그룹화
     duplicates = []
-    seen_titles = set()  # 중복 확인용
+    seen_titles = set()  # 이미 확인된 제목 저장
 
-    for chart_title in chart_titles:
+    for chart_title in chart_titles:  # 상위 10개 기사 순회
         duplicate_group = []
-        for i, data in enumerate(processed_titles):
-            # 차트의 기사와 동일하지 않으면서 유사도가 0.7 이상인 기사 찾기
-            if data != chart_title and similarity_matrix[processed_titles.index(chart_title)][i] > 0.7:
-                # 중복된 기사 중복 방지
+        for i, data in enumerate(processed_titles):  # 전체 기사와 비교
+            # 유사도 계산
+            similarity = similarity_matrix[processed_titles.index(chart_title)][i]
+
+            # 공통 단어 비율 계산 (전체 단어 대비 공통 단어 비율)
+            common_words = set(chart_title["cleaned_title"].split()) & set(data["cleaned_title"].split())
+            all_words = set(chart_title["cleaned_title"].split()) | set(data["cleaned_title"].split())
+            common_word_ratio = len(common_words) / len(all_words)
+
+            # 코사인 유사도와 공통 단어 비율 병합 (가중 평균 활용)
+            combined_score = 0.5 * similarity + 0.4 * common_word_ratio
+
+            # 디버깅 로그
+            print(f"Title A: {chart_title['cleaned_title']}")
+            print(f"Title B: {data['cleaned_title']}")
+            print(f"Similarity: {similarity}, Common Word Ratio: {common_word_ratio}, Combined Score: {combined_score}")
+
+            # 기준 만족 시 중복 처리
+            if (data != chart_title) and (combined_score > 0.4):  # 병합된 점수 기준으로 중복 판단
                 if data["original_title"] not in seen_titles:
                     duplicate_group.append(data)
                     seen_titles.add(data["original_title"])
@@ -173,7 +188,7 @@ def process_titles_and_scripts(request):
     # 템플릿으로 전달
     context = {
         "processed_titles": chart_titles,  # 상위 10개 기사
-        "duplicates": duplicates,         # 중복된 기사 목록
+        "duplicates": duplicates,  # 중복된 기사 목록
         "processing_stats": {
             "total_videos": len(all_data),
             "processed_titles": len(processed_titles),
@@ -184,7 +199,6 @@ def process_titles_and_scripts(request):
     }
 
     return render(request, 'analysis/processed_data.html', context)
-
 
 
 def clean_title(title):
