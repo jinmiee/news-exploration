@@ -75,17 +75,25 @@ def process_titles_and_scripts(request):
 
     for data in all_data:
         # 제목 전처리
-        cleaned_title = clean_text(' '.join([word for word, tag in okt.pos(data.title) if tag not in UNNECESSARY_TAGS]))
+        try:
+            cleaned_title = clean_text(
+                ' '.join([word for word, tag in okt.pos(data.title) if tag not in UNNECESSARY_TAGS]))
+        except Exception as e:
+            print(f"Title processing failed for: {data.title}, Error: {e}")
+            cleaned_title = "제목 없음"
 
         # 스크립트 전처리
         if data.transcript and isinstance(data.transcript, list):
-            script_text = ' '.join([item.text for item in data.transcript if hasattr(item, 'text')])
-            cleaned_script = clean_text(' '.join([word for word, tag in okt.pos(script_text) if tag not in UNNECESSARY_TAGS]))
+            script_text = ' '.join(
+                [item.text for item in data.transcript if hasattr(item, 'text') and isinstance(item.text, str)])
+            cleaned_script = clean_text(
+                ' '.join([word for word, tag in okt.pos(script_text) if tag not in UNNECESSARY_TAGS]))
         else:
-            cleaned_script = ''
+            cleaned_script = "스크립트 없음"
 
         # 제목과 스크립트 결합
         combined_text = f"{cleaned_title} {cleaned_script}"
+        print(f"Processed Combined Text: {combined_text[:100]}")  # 디버깅용 출력
 
         # 데이터 저장
         corpus.append(combined_text)
@@ -131,7 +139,7 @@ def process_titles_and_scripts(request):
     for chart_title in chart_titles:
         duplicate_group = []
         for i, data in enumerate(processed_titles):
-            # 차트의 기사와 동일하지 않으면서 유사도가 0.75 이상인 기사 찾기
+            # 차트의 기사와 동일하지 않으면서 유사도가 0.7 이상인 기사 찾기
             if data != chart_title and similarity_matrix[processed_titles.index(chart_title)][i] > 0.7:
                 # 중복된 기사 중복 방지
                 if data["original_title"] not in seen_titles:
