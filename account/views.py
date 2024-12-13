@@ -91,6 +91,12 @@ def clean_title(title):
     # '/ 모아보는 뉴스' 제거
     title = re.sub(r'/\s*모아보는 뉴스|굿모닝연예|뉴스딱', '', title)
 
+    #'-MBC 중계방송' 제거
+    title = re.sub(r'-\s*MBC\s*중계방송', '', title, flags=re.IGNORECASE)
+
+    # 'YYYY년 MM월 DD일'형식 날짜 제거
+    title = re.sub(r'\d{4}년\s*\d{1,2}월\s*\d{1,2}일', '', title)
+
     # 앞뒤 공백 제거
     return title.strip()
 
