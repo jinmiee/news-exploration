@@ -123,9 +123,9 @@ def chart(request):
 
     # top_news를 정의하는 방법 두가지
 
-    #1 클러스터링을 이용한 방법
-    # # 특정 날짜 (2024-11-21)
-    # target_date = datetime(2024, 11, 21)
+    # # 1. 클러스터링을 이용한 방법
+    
+    # target_date = datetime(2024, 12, 13)
 
     # # 날짜의 시작과 끝 정의
     # start_of_day = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -144,11 +144,17 @@ def chart(request):
     # # 해당 인스턴스의 id를 사용하여 새로운 QuerySet 생성
     # top_news = YouTubeData.objects.filter(_id__in=top_news_ids)
 
-    # 2단순 조회순 정렬
-    top_news = YouTubeData.objects.filter(
-    upload_date__gte=analysis_start,
-    upload_date__lt=analysis_end
-    ).order_by('-views')[:10]
+
+    # 2. 단순 조회순 정렬 (하루전체)
+    # top_news = YouTubeData.objects.filter(upload_date__gte=start_of_day, upload_date__lte=end_of_day).order_by('-views')[:10]
+    
+    # 3. 오전오후
+    top_news = YouTubeData.objects.filter(upload_date__gte=analysis_start, upload_date__lte=analysis_end).order_by('-views')[:10]
+
+
+
+
+
 
     # 제목 정리 및 찜 상태 확인
     for news in top_news:

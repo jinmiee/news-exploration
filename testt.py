@@ -7,7 +7,7 @@ import django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'news.settings')
 django.setup()
 from collections import defaultdict
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 from django.db.models.functions import TruncDate
 from django.http import JsonResponse
@@ -62,8 +62,14 @@ else:  # 현재 시간이 오후 11시 이후
     analysis_end = now.replace(hour=23, minute=0, second=0, microsecond=0)
 
 # 데이터 필터링
-all_news = YouTubeData.objects.filter(
-    upload_date__gte=analysis_start, upload_date__lte=analysis_end)
+target_date = datetime(2024, 11, 21)
+
+# 날짜의 시작과 끝 정의
+start_of_day = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
+end_of_day = start_of_day + timedelta(days=1) - timedelta(seconds=1)
+
+# 필터링: upload_date가 2024-11-21에 해당하는 데이터
+all_news = YouTubeData.objects.filter(upload_date__gte=start_of_day, upload_date__lte=end_of_day)
 
 titles = [news.title for news in all_news]
 views = [news.views for news in all_news]

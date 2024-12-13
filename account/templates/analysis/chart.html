@@ -531,18 +531,23 @@
         const closeModal = document.getElementById("close-modal");
     
         likeButtons.forEach((button) => {
-            button.addEventListener("click", function (event) {
-                event.preventDefault();
-                const title = button.getAttribute("data-title");
-                const url = button.getAttribute("data-url");
+            // 로그인하지 않은 상태의 버튼에만 이벤트 추가
+            if (!button.dataset.id) { 
+                button.addEventListener("click", function (event) {
+                    event.preventDefault();
+                    const title = button.getAttribute("data-title");
+                    const url = button.getAttribute("data-url");
     
-                // 모달 메시지 업데이트 (필요 시)
-                const message = document.getElementById("modal-message");
-                message.textContent = title ? `찜기능을 사용하려면 로그인해주세요.` : "로그인 후 사용해주세요.";
+                    // 모달 메시지 업데이트
+                    const message = document.getElementById("modal-message");
+                    message.textContent = title
+                        ? `찜기능을 사용하려면 로그인해주세요.`
+                        : "로그인 후 사용해주세요.";
     
-                // 모달 표시
-                modal.style.display = "block";
-            });
+                    // 모달 표시
+                    modal.style.display = "block";
+                });
+            }
         });
     
         closeModal.addEventListener("click", function () {
