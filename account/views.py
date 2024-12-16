@@ -83,8 +83,18 @@ def process_titles_and_scripts(request):
 
     # 텍스트 전처리 함수: 명사와 동사만 추출
     def clean_text(text):
-        words = [word for word, tag in okt.pos(text) if tag in ['Noun', 'Verb']]
-        return ' '.join(words)
+        # 숫자+단어 조합 유지 및 불필요한 공백 제거
+        text = re.sub(r'(\d+)\s*([가-힣]+)', r'\1\2', text)  # 53 대 → 53대
+        text = re.sub(r'\s+', ' ', text).strip()  # 다중 공백 제거
+
+        words = [word for word, tag in okt.pos(text) if tag in ['Noun', 'Verb', 'Number']]
+        return ' '.join(sorted(set(words)))  # 중복 단어 제거 및 정렬
+
+    def remove_title_from_script(title, script):
+        title_words = set(title.split())
+        script_words = script.split()
+        filtered_script = [word for word in script_words if word not in title_words]
+        return ' '.join(filtered_script)
 
     # 데이터 전처리
     for data in all_data:
@@ -97,18 +107,18 @@ def process_titles_and_scripts(request):
         if data.transcript and isinstance(data.transcript, list):
             script_text = ' '.join([item.text for item in data.transcript if hasattr(item, 'text')])
             cleaned_script = clean_text(script_text)
+            filtered_script = remove_title_from_script(cleaned_title, cleaned_script)
         else:
-            cleaned_script = "스크립트 없음"
+            filtered_script = "스크립트 없음"
 
-        combined_text = f"{cleaned_title} {cleaned_script}"
+        combined_text = f"{cleaned_title} {filtered_script}"
         corpus.append(combined_text)
         views_list.append(data.views)
-
 
         processed_titles.append({
             "original_title": data.title,
             "cleaned_title": cleaned_title,
-            "cleaned_script": cleaned_script,
+            "cleaned_script": filtered_script,
             "combined_text": combined_text,
             "upload_date": data.upload_date,
             "channel": data.channel_name,
@@ -132,6 +142,12 @@ def process_titles_and_scripts(request):
     seen_titles = set()
     duplicates = []
 
+    # 가중치 설정 및 중복 판정 기준
+    SIMILARITY_WEIGHT = 0.5
+    COMMON_WORDS_WEIGHT = 0.3
+    KEYWORD_OVERLAP_WEIGHT = 0.2
+    THRESHOLD = 0.55  # 중복 감지 기준
+
     for chart_title in chart_titles:
         if chart_title["original_title"] in seen_titles:
             continue
@@ -141,12 +157,20 @@ def process_titles_and_scripts(request):
             if data["original_title"] in seen_titles or data == chart_title:
                 continue
 
+            # 코사인 유사도 및 공통 단어 비율 계산
             similarity = similarity_matrix[processed_titles.index(chart_title)][processed_titles.index(data)]
             common_words = set(chart_title["cleaned_title"].split()) & set(data["cleaned_title"].split())
-            combined_score = 0.5 * similarity + 0.5 * (
-                        len(common_words) / len(set(chart_title["cleaned_title"].split())))
+            keyword_overlap = len(common_words)
 
-            if combined_score > 0.6:
+            # 가중치를 적용한 결합 점수
+            combined_score = (
+                    SIMILARITY_WEIGHT * similarity +
+                    COMMON_WORDS_WEIGHT * (len(common_words) / len(set(chart_title["cleaned_title"].split()))) +
+                    KEYWORD_OVERLAP_WEIGHT * keyword_overlap
+            )
+
+            # 중복 판정
+            if combined_score > THRESHOLD:
                 duplicate_group.append(data)
                 seen_titles.add(data["original_title"])
 
