@@ -73,10 +73,6 @@ def process_titles_and_scripts(request):
     '''
     # 초기화 및 전처리 설정
     okt = Okt()
-    UNNECESSARY_TAGS = [
-        'Josa', 'Conj', 'Punctuation', 'Eomi', 'Suffix', 'Foreign',
-        'KoreanParticle', 'Alpha', 'Exclamation'
-    ]
     start_date = datetime(2024, 11, 28)
     end_date = start_date + timedelta(days=1)
     all_data = YouTubeData.objects.filter(upload_date__gte=start_date, upload_date__lt=end_date).order_by('-views')
@@ -85,37 +81,29 @@ def process_titles_and_scripts(request):
     corpus = []
     views_list = []
 
-    # 텍스트 전처리 함수
+    # 텍스트 전처리 함수: 명사와 동사만 추출
     def clean_text(text):
-        text = re.sub(r'\s+', ' ', text)  # 여러 공백을 단일 공백으로 변환
-        text = re.sub(r'[^\w\s]', '', text)  # 특수문자 제거
-        return text.strip()
+        words = [word for word, tag in okt.pos(text) if tag in ['Noun', 'Verb']]
+        return ' '.join(words)
 
+    # 데이터 전처리
     for data in all_data:
-        # 제목 전처리
         try:
-            cleaned_title = clean_text(
-                ' '.join([word for word, tag in okt.pos(data.title) if tag not in UNNECESSARY_TAGS]))
+            cleaned_title = clean_text(data.title)
         except Exception as e:
-            print(f"Title processing failed for: {data.title}, Error: {e}")
+            print(f"Title processing failed: {data.title}, Error: {e}")
             cleaned_title = "제목 없음"
 
-        # 스크립트 전처리
         if data.transcript and isinstance(data.transcript, list):
-            script_text = ' '.join(
-                [item.text for item in data.transcript if hasattr(item, 'text') and isinstance(item.text, str)])
-            cleaned_script = clean_text(
-                ' '.join([word for word, tag in okt.pos(script_text) if tag not in UNNECESSARY_TAGS]))
+            script_text = ' '.join([item.text for item in data.transcript if hasattr(item, 'text')])
+            cleaned_script = clean_text(script_text)
         else:
             cleaned_script = "스크립트 없음"
 
-        # 제목과 스크립트 결합
         combined_text = f"{cleaned_title} {cleaned_script}"
-        print(f"Processed Combined Text: {combined_text[:100]}")  # 디버깅용 출력
-
-        # 데이터 저장
         corpus.append(combined_text)
         views_list.append(data.views)
+
 
         processed_titles.append({
             "original_title": data.title,
@@ -128,62 +116,46 @@ def process_titles_and_scripts(request):
             "views": data.views
         })
 
-    # TF-IDF 분석
+    # TF-IDF 및 유사도 분석
     vectorizer = TfidfVectorizer(max_features=5000, stop_words='english')
     tfidf_matrix = vectorizer.fit_transform(corpus)
+    similarity_matrix = cosine_similarity(tfidf_matrix)
 
-    # 조회수 정규화 및 가중치 계산
+    # 가중치 계산 및 정렬
     scaler = MinMaxScaler()
     normalized_views = scaler.fit_transform([[view] for view in views_list]).flatten()
     weighted_scores = normalized_views + tfidf_matrix.sum(axis=1).A.flatten()
-
-    # 코사인 유사도 계산
-    similarity_matrix = cosine_similarity(tfidf_matrix)
-
-    # 가중치를 기준으로 정렬
-    sorted_titles = sorted(
-        processed_titles,
-        key=lambda x: weighted_scores[processed_titles.index(x)],
-        reverse=True
-    )
-
-    # 상위 10개 기사 선택
+    sorted_titles = sorted(processed_titles, key=lambda x: weighted_scores[processed_titles.index(x)], reverse=True)
     chart_titles = sorted_titles[:10]
 
-    # 중복된 기사 그룹화
+    # 중복 그룹화
+    seen_titles = set()
     duplicates = []
-    seen_titles = set()  # 이미 확인된 제목 저장
 
-    for chart_title in chart_titles:  # 상위 10개 기사 순회
-        duplicate_group = []
-        for i, data in enumerate(processed_titles):  # 전체 기사와 비교
-            # 유사도 계산
-            similarity = similarity_matrix[processed_titles.index(chart_title)][i]
+    for chart_title in chart_titles:
+        if chart_title["original_title"] in seen_titles:
+            continue
 
-            # 공통 단어 비율 계산 (전체 단어 대비 공통 단어 비율)
+        duplicate_group = [chart_title]
+        for data in processed_titles:
+            if data["original_title"] in seen_titles or data == chart_title:
+                continue
+
+            similarity = similarity_matrix[processed_titles.index(chart_title)][processed_titles.index(data)]
             common_words = set(chart_title["cleaned_title"].split()) & set(data["cleaned_title"].split())
-            all_words = set(chart_title["cleaned_title"].split()) | set(data["cleaned_title"].split())
-            common_word_ratio = len(common_words) / len(all_words)
+            combined_score = 0.5 * similarity + 0.5 * (
+                        len(common_words) / len(set(chart_title["cleaned_title"].split())))
 
-            # 코사인 유사도와 공통 단어 비율 병합 (가중 평균 활용)
-            combined_score = 0.5 * similarity + 0.4 * common_word_ratio
+            if combined_score > 0.6:
+                duplicate_group.append(data)
+                seen_titles.add(data["original_title"])
 
-            # 디버깅 로그
-            print(f"Title A: {chart_title['cleaned_title']}")
-            print(f"Title B: {data['cleaned_title']}")
-            print(f"Similarity: {similarity}, Common Word Ratio: {common_word_ratio}, Combined Score: {combined_score}")
-
-            # 기준 만족 시 중복 처리
-            if (data != chart_title) and (combined_score > 0.4):  # 병합된 점수 기준으로 중복 판단
-                if data["original_title"] not in seen_titles:
-                    duplicate_group.append(data)
-                    seen_titles.add(data["original_title"])
-
-        if duplicate_group:
+        if len(duplicate_group) > 1:
             duplicates.append({
                 "original": chart_title,
                 "duplicates": duplicate_group
             })
+            seen_titles.add(chart_title["original_title"])
 
     # 템플릿으로 전달
     context = {
