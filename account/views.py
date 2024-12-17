@@ -437,14 +437,57 @@ def save_daily_top10():
         print(f"Error while saving daily top 10 videos: {str(e)}")
 
 def weekly_issues(request):
-    weekly_videos = WeeklyIssue.objects.all().order_by('-views', '-upload_date')
+    # 현재 날짜 가져오기
+    today = localtime().date()
+    week_ago = today - timedelta(days=7)
 
-    context = {
-        'weekly_videos': weekly_videos
-    }
-    return render(request, 'analysis/weekly_issues.html', context)
+    # GET 요청으로 특정 날짜 받기 (형식: 'YYYY-MM-DD')
+    date_str = request.GET.get('date')
 
+    if date_str:
+        try:
+            # 특정 날짜로 변환
+            target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            target_date = None  # 잘못된 날짜 형식 처리
+    else:
+        target_date = None  # 날짜가 없으면 None
 
+    if target_date:
+        # 특정 날짜의 데이터 필터링 (WeeklyIssue 컬렉션 사용)
+        day_start = datetime.combine(target_date, datetime.min.time())
+        day_end = datetime.combine(target_date, datetime.max.time())
+
+        daily_videos = WeeklyIssue.objects.filter(
+            upload_date__gte=day_start,
+            upload_date__lte=day_end
+        ).order_by('-views')[:10]  # 조회수 기준 상위 10개
+
+        context = {
+            'daily_videos': daily_videos,
+            'target_date': target_date,
+        }
+        return render(request, 'analysis/weekly_issues.html', context)
+    else:
+        # 기존 주간 데이터 로직 (WeeklyIssue 사용, 날짜 범위: 7일)
+        weekly_videos = WeeklyIssue.objects.filter(
+            upload_date__gte=week_ago,
+            upload_date__lte=today
+        ).order_by('-views', '-upload_date')
+
+        grouped_issues = defaultdict(list)
+        for video in weekly_videos:
+            date_key = video.upload_date.date()
+            if len(grouped_issues[date_key]) < 10:
+                grouped_issues[date_key].append(video)
+
+        # 날짜별 이슈를 정렬
+        sorted_issues = sorted(grouped_issues.items(), key=lambda x: x[0], reverse=True)
+
+        context = {
+            'sorted_issues': sorted_issues,
+        }
+        return render(request, 'analysis/weekly_issues.html', context)
 
 #상세분석
 # @login_required
