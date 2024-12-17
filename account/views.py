@@ -8,7 +8,7 @@ from django.db.models.functions import TruncDate
 from django.http import JsonResponse
 from django.utils import timezone
 from django.shortcuts import render, get_object_or_404, redirect
-from django.utils.timezone import localtime
+from django.utils.timezone import localtime, make_aware, is_aware
 from django.views.decorators.csrf import csrf_exempt
 import json
 from datetime import date
@@ -18,9 +18,11 @@ from bson import ObjectId
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 from .forms import UserRegistrationForm
-from .models import YouTubeData, Like
+from .models import YouTubeData, Like, WeeklyIssue
 from urllib.parse import urlparse, parse_qs
 import re
+import pytz
+from dateutil.parser import parse
 
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
@@ -339,6 +341,110 @@ def video_details(request):
     # 요청이 POST 방식이 아닐 경우 에러 응답
     return JsonResponse({"error": "Invalid request method."}, status=400)
 
+# KST 타임존 처리 함수
+def kst_to_aware(date_string):
+    try:
+        # 문자열을 datetime 객체로 파싱
+        dt = parse(date_string)
+
+        # 타임존이 이미 설정된 경우 그대로 반환
+        if is_aware(dt):
+            return dt
+
+        # KST 문자열이 포함된 경우 UTC+9 적용
+        if "KST" in date_string:
+            dt = dt.replace(tzinfo=pytz.timezone("Asia/Seoul"))
+        else:
+            dt = make_aware(dt)  # 타임존이 없으면 UTC로 설정
+        return dt
+
+    except Exception as e:
+        print(f"Failed to parse date: {date_string}, Error: {e}")
+        return None
+
+
+def save_all_historical_top10():
+    all_videos = YouTubeData.objects.all().order_by('upload_date')  # 모든 비디오 정렬
+    grouped_videos = defaultdict(list)
+
+    for video in all_videos:
+        try:
+            # upload_date가 문자열이면 KST 타임존 적용
+            if isinstance(video.upload_date, str):
+                video.upload_date = kst_to_aware(video.upload_date)
+                if not video.upload_date:  # 파싱 실패 시 건너뜀
+                    continue
+            elif not isinstance(video.upload_date, datetime):
+                print(f"Invalid upload_date format for video ID {video._id}")
+                continue  # 잘못된 형식이면 건너뜀
+
+            # views를 정수형으로 변환
+            if isinstance(video.views, str):
+                video.views = int(video.views)
+
+            date_key = video.upload_date.date()
+            grouped_videos[date_key].append(video)
+
+        except Exception as e:
+            print(f"Error processing video ID {getattr(video, '_id', 'Unknown')}: {e}")
+
+    # 각 날짜별로 상위 10개 저장
+    for date_key, videos in grouped_videos.items():
+        # 정렬 시 views를 기준으로 비교 (정수형)
+        top_videos = sorted(videos, key=lambda x: x.views, reverse=True)[:10]
+        for video in top_videos:
+            WeeklyIssue.objects.update_or_create(
+                _id=video._id,
+                defaults={
+                    'title': video.title,
+                    'channel_name': video.channel_name,
+                    'views': video.views,
+                    'upload_date': video.upload_date,
+                    'url': video.url,
+                    'channel': video.channel,
+                    'thumbnail': video.thumbnail,
+                    'comments': video.comments if video.comments else [],
+                    'transcript': video.transcript if video.transcript else []
+                }
+            )
+    print("All historical top 10 videos saved successfully.")
+
+def save_daily_top10():
+    try:
+        today = localtime().date()
+        yesterday = today - timedelta(days=1)
+
+        daily_videos = YouTubeData.objects.filter(
+            upload_date__date=yesterday
+        ).order_by('-views')[:10]
+
+        for video in daily_videos:
+            WeeklyIssue.objects.update_or_create(
+                _id=video._id,
+                defaults={
+                    'title': video.title,
+                    'views': video.views,
+                    'upload_date': video.upload_date,
+                    'url': video.url,
+                    'channel': video.channel,
+                    'thumbnail': video.thumbnail,
+                    'comments': video.comments if video.comments else [],
+                    'transcript': video.transcript if video.transcript else []
+                }
+            )
+        print(f"Daily top 10 videos saved for {yesterday}")
+    except Exception as e:
+        print(f"Error while saving daily top 10 videos: {str(e)}")
+
+def weekly_issues(request):
+    weekly_videos = WeeklyIssue.objects.all().order_by('-views', '-upload_date')
+
+    context = {
+        'weekly_videos': weekly_videos
+    }
+    return render(request, 'analysis/weekly_issues.html', context)
+
+
 
 #상세분석
 # @login_required
@@ -365,57 +471,6 @@ def detail(request):
 
     return render(request, 'analysis/detail.html', context)
 
-def weekly_issues(request):
-    # 현재 날짜 가져오기
-    today = localtime().date()
-    week_ago = today - timedelta(days=7)
-
-    # GET 요청으로 특정 날짜 받기 (형식: 'YYYY-MM-DD')
-    date_str = request.GET.get('date')
-
-    if date_str:
-        try:
-            # 특정 날짜로 변환
-            target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-        except ValueError:
-            target_date = None  # 잘못된 날짜 형식 처리
-    else:
-        target_date = None  # 날짜가 없으면 None
-
-    if target_date:
-        # 특정 날짜의 데이터 필터링
-        day_start = datetime.combine(target_date, datetime.min.time())
-        day_end = datetime.combine(target_date, datetime.max.time())
-
-        daily_videos = YouTubeData.objects.filter(
-            upload_date__gte=day_start,
-            upload_date__lte=day_end
-        ).order_by('-views')[:10]  # 조회수 기준 상위 10개
-
-        context = {
-            'daily_videos': daily_videos,
-            'target_date': target_date,
-        }
-        return render(request, 'analysis/weekly_issues.html', context)
-    else:
-        # 기존 주간 데이터 로직 (날짜 범위: 7일)
-        weekly_videos = YouTubeData.objects.filter(
-            upload_date__gte=week_ago,
-            upload_date__lte=today
-        ).order_by('-views','-upload_date')
-
-        grouped_issues = defaultdict(list)
-        for video in weekly_videos:
-            date_key = video.upload_date.date()
-            if len(grouped_issues[date_key]) < 10:
-                grouped_issues[date_key].append(video)
-
-        sorted_issues = sorted(grouped_issues.items(), key=lambda x: x[0], reverse=True)
-
-        context = {
-            'sorted_issues': sorted_issues,
-        }
-        return render(request, 'analysis/weekly_issues.html', context)
 
 
 import matplotlib.pyplot as plt

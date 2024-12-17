@@ -61,3 +61,27 @@ class Like(models.Model):
 
     def __str__(self):
         return f"{self.user.username} likes {self.youtube_data.title}"
+
+
+class WeeklyIssue(models.Model):
+    _id = models.ObjectIdField(primary_key=True)
+    channel_name = models.CharField(max_length=255)
+    title = models.TextField()
+    views = models.BigIntegerField()
+    upload_date = models.DateTimeField()
+    url = models.URLField(unique=True)
+    channel = models.CharField(max_length=255)
+    thumbnail = models.URLField(blank=True, null=True)
+    comments = models.ArrayField(
+        model_container=YouTubeComment,  # YouTubeComment 모델 재활용
+        blank=True,
+        null=True
+    )
+    transcript = models.ArrayField(
+        model_container=Transcript,  # Transcript 모델 재활용
+        blank=True,
+        null=True
+    )
+
+    class Meta:
+        db_table = "weekly_issues"  # MongoDB 컬렉션 이름
