@@ -1,3 +1,4 @@
+from bson import ObjectId
 from djongo import models
 from django.contrib.auth.models import User
 
@@ -64,7 +65,7 @@ class Like(models.Model):
 
 
 class WeeklyIssue(models.Model):
-    _id = models.ObjectIdField(primary_key=True)
+    _id = models.ObjectIdField(primary_key=True, default=ObjectId)
     channel_name = models.CharField(max_length=255)
     title = models.TextField()
     views = models.BigIntegerField()
