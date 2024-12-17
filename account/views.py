@@ -73,7 +73,11 @@ def process_titles_and_scripts(request):
     '''
     # 초기화 및 전처리 설정
     okt = Okt()
-    start_date = datetime(2024, 11, 28)
+    UNNECESSARY_TAGS = [
+        'Josa', 'Conj', 'Punctuation', 'Eomi', 'Suffix', 'Foreign',
+        'KoreanParticle', 'Alpha', 'Exclamation'
+    ]
+    start_date = datetime(2024, 11, 21)
     end_date = start_date + timedelta(days=1)
     all_data = YouTubeData.objects.filter(upload_date__gte=start_date, upload_date__lt=end_date).order_by('-views')
 
@@ -81,44 +85,42 @@ def process_titles_and_scripts(request):
     corpus = []
     views_list = []
 
-    # 텍스트 전처리 함수: 명사와 동사만 추출
+    # 텍스트 전처리 함수
     def clean_text(text):
-        # 숫자+단어 조합 유지 및 불필요한 공백 제거
-        text = re.sub(r'(\d+)\s*([가-힣]+)', r'\1\2', text)  # 53 대 → 53대
-        text = re.sub(r'\s+', ' ', text).strip()  # 다중 공백 제거
+        text = re.sub(r'\s+', ' ', text)  # 여러 공백을 단일 공백으로 변환
+        text = re.sub(r'[^\w\s]', '', text)  # 특수문자 제거
+        return text.strip()
 
-        words = [word for word, tag in okt.pos(text) if tag in ['Noun', 'Verb', 'Number']]
-        return ' '.join(sorted(set(words)))  # 중복 단어 제거 및 정렬
-
-    def remove_title_from_script(title, script):
-        title_words = set(title.split())
-        script_words = script.split()
-        filtered_script = [word for word in script_words if word not in title_words]
-        return ' '.join(filtered_script)
-
-    # 데이터 전처리
     for data in all_data:
+        # 제목 전처리
         try:
-            cleaned_title = clean_text(data.title)
+            cleaned_title = clean_text(
+                ' '.join([word for word, tag in okt.pos(data.title) if tag not in UNNECESSARY_TAGS]))
         except Exception as e:
-            print(f"Title processing failed: {data.title}, Error: {e}")
+            print(f"Title processing failed for: {data.title}, Error: {e}")
             cleaned_title = "제목 없음"
 
+        # 스크립트 전처리
         if data.transcript and isinstance(data.transcript, list):
-            script_text = ' '.join([item.text for item in data.transcript if hasattr(item, 'text')])
-            cleaned_script = clean_text(script_text)
-            filtered_script = remove_title_from_script(cleaned_title, cleaned_script)
+            script_text = ' '.join(
+                [item.text for item in data.transcript if hasattr(item, 'text') and isinstance(item.text, str)])
+            cleaned_script = clean_text(
+                ' '.join([word for word, tag in okt.pos(script_text) if tag not in UNNECESSARY_TAGS]))
         else:
-            filtered_script = "스크립트 없음"
+            cleaned_script = "스크립트 없음"
 
-        combined_text = f"{cleaned_title} {filtered_script}"
+        # 제목과 스크립트 결합
+        combined_text = f"{cleaned_title} {cleaned_script}"
+        print(f"Processed Combined Text: {combined_text[:100]}")  # 디버깅용 출력
+
+        # 데이터 저장
         corpus.append(combined_text)
         views_list.append(data.views)
 
         processed_titles.append({
             "original_title": data.title,
             "cleaned_title": cleaned_title,
-            "cleaned_script": filtered_script,
+            "cleaned_script": cleaned_script,
             "combined_text": combined_text,
             "upload_date": data.upload_date,
             "channel": data.channel_name,
@@ -126,65 +128,52 @@ def process_titles_and_scripts(request):
             "views": data.views
         })
 
-    # TF-IDF 및 유사도 분석
+    # TF-IDF 분석
     vectorizer = TfidfVectorizer(max_features=5000, stop_words='english')
     tfidf_matrix = vectorizer.fit_transform(corpus)
-    similarity_matrix = cosine_similarity(tfidf_matrix)
 
-    # 가중치 계산 및 정렬
+    # 조회수 정규화 및 가중치 계산
     scaler = MinMaxScaler()
     normalized_views = scaler.fit_transform([[view] for view in views_list]).flatten()
     weighted_scores = normalized_views + tfidf_matrix.sum(axis=1).A.flatten()
-    sorted_titles = sorted(processed_titles, key=lambda x: weighted_scores[processed_titles.index(x)], reverse=True)
+
+    # 코사인 유사도 계산
+    similarity_matrix = cosine_similarity(tfidf_matrix)
+
+    # 가중치를 기준으로 정렬
+    sorted_titles = sorted(
+        processed_titles,
+        key=lambda x: weighted_scores[processed_titles.index(x)],
+        reverse=True
+    )
+
+    # 상위 10개 기사 선택
     chart_titles = sorted_titles[:10]
 
-    # 중복 그룹화
-    seen_titles = set()
+    # 중복된 기사 그룹화
     duplicates = []
-
-    # 가중치 설정 및 중복 판정 기준
-    SIMILARITY_WEIGHT = 0.5
-    COMMON_WORDS_WEIGHT = 0.3
-    KEYWORD_OVERLAP_WEIGHT = 0.2
-    THRESHOLD = 0.55  # 중복 감지 기준
+    seen_titles = set()  # 중복 확인용
 
     for chart_title in chart_titles:
-        if chart_title["original_title"] in seen_titles:
-            continue
+        duplicate_group = []
+        for i, data in enumerate(processed_titles):
+            # 차트의 기사와 동일하지 않으면서 유사도가 0.7 이상인 기사 찾기
+            if data != chart_title and similarity_matrix[processed_titles.index(chart_title)][i] > 0.7:
+                # 중복된 기사 중복 방지
+                if data["original_title"] not in seen_titles:
+                    duplicate_group.append(data)
+                    seen_titles.add(data["original_title"])
 
-        duplicate_group = [chart_title]
-        for data in processed_titles:
-            if data["original_title"] in seen_titles or data == chart_title:
-                continue
-
-            # 코사인 유사도 및 공통 단어 비율 계산
-            similarity = similarity_matrix[processed_titles.index(chart_title)][processed_titles.index(data)]
-            common_words = set(chart_title["cleaned_title"].split()) & set(data["cleaned_title"].split())
-            keyword_overlap = len(common_words)
-
-            # 가중치를 적용한 결합 점수
-            combined_score = (
-                    SIMILARITY_WEIGHT * similarity +
-                    COMMON_WORDS_WEIGHT * (len(common_words) / len(set(chart_title["cleaned_title"].split()))) +
-                    KEYWORD_OVERLAP_WEIGHT * keyword_overlap
-            )
-
-            # 중복 판정
-            if combined_score > THRESHOLD:
-                duplicate_group.append(data)
-                seen_titles.add(data["original_title"])
-
-        if len(duplicate_group) > 1:
+        if duplicate_group:
             duplicates.append({
                 "original": chart_title,
                 "duplicates": duplicate_group
             })
-            seen_titles.add(chart_title["original_title"])
 
     # 템플릿으로 전달
     context = {
         "processed_titles": chart_titles,  # 상위 10개 기사
-        "duplicates": duplicates,  # 중복된 기사 목록
+        "duplicates": duplicates,         # 중복된 기사 목록
         "processing_stats": {
             "total_videos": len(all_data),
             "processed_titles": len(processed_titles),
@@ -195,6 +184,7 @@ def process_titles_and_scripts(request):
     }
 
     return render(request, 'analysis/processed_data.html', context)
+
 
 
 def clean_title(title):
@@ -571,25 +561,9 @@ def relate(request):
                         'time': time_str,
                         'text': item['text']
                     })
-
-            # 연관어 분석 시도
-            try:
-                graph, top_pairs, important_keywords = analyze_related_words(transcript_text)
-                network_graph = generate_network_graph(graph)
-            except Exception as e:
-                print(f"연관어 분석 중 오류 발생: {str(e)}")
-                # Word2Vec 모델 재로드 시도
-                from .analysis.relate_analysis import load_pretrained_model, word2vec_model
-                if word2vec_model is None:
-                    try:
-                        word2vec_model = load_pretrained_model()
-                        # 모델 재로드 후 다시 분석 시도
-                        graph, top_pairs, important_keywords = analyze_related_words(transcript_text)
-                        network_graph = generate_network_graph(graph)
-                    except Exception as load_error:
-                        print(f"모델 재로드 실패: {str(load_error)}")
-                        raise
-                raise
+            
+            graph, top_pairs, important_keywords = analyze_related_words(transcript_text)
+            network_graph = generate_network_graph(graph)
             
             # 키워드별 관련 뉴스 분류
             categorized_news = {}
@@ -625,9 +599,8 @@ def relate(request):
             print(f"분석 중 오류 발생: {str(e)}")
             context = {
                 'section': 'relate',
-                'error_message': '분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
+                'error_message': '분석 중 오류가 발생했습니다.'
             }
-            return render(request, 'analysis/relate.html', context)
     else:
         context = {
             'section': 'relate',
@@ -675,6 +648,10 @@ def my_liked_videos(request):
         'liked_videos': liked_videos,
         'section': 'mypage'
     } 
+    for video in liked_videos:
+        print(video)
+        video.id = str(video._id)
+        print(video.id)
     return render(request, 'analysis/mypage/my_liked_videos.html', context)
 
 
@@ -704,3 +681,58 @@ def find_username(request):
             error = "사용자를 찾을 수 없습니다."
     
     return render(request, 'registration/find_username.html', {"username": username, "error": error})
+
+from django.shortcuts import render, redirect
+from django.contrib.auth.models import User
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from django.contrib.auth.tokens import default_token_generator
+from django.core.mail import send_mail
+from django.conf import settings
+
+
+def password_reset_request(request):
+    if request.method == "POST":
+        form = PasswordResetRequestForm(request.POST)
+        if form.is_valid():
+            email = form.cleaned_data['email']
+            try:
+                user = User.objects.get(email=email)
+                token = default_token_generator.make_token(user)
+                uid = urlsafe_base64_encode(force_bytes(user.pk))
+                reset_url = f"{request.scheme}://{request.get_host()}/password-reset/{uid}/{token}/"
+
+                # 이메일 전송
+                send_mail(
+                    '비밀번호 재설정 요청',
+                    f'비밀번호를 재설정하려면 다음 링크를 클릭하세요: {reset_url}',
+                    settings.DEFAULT_FROM_EMAIL,
+                    [email],
+                )
+                return render(request, 'registration/password_reset_done.html')
+            except User.DoesNotExist:
+                form.add_error('email', '해당 이메일이 등록되어 있지 않습니다.')
+    else:
+        form = PasswordResetRequestForm()
+
+    return render(request, 'registration/password_reset_request.html', {'form': form})
+
+def password_reset_confirm(request, uidb64, token):
+    try:
+        uid = force_str(urlsafe_base64_decode(uidb64))
+        user = User.objects.get(pk=uid)
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        user = None
+
+    if user is not None and default_token_generator.check_token(user, token):
+        if request.method == "POST":
+            form = SetNewPasswordForm(request.POST)
+            if form.is_valid():
+                user.set_password(form.cleaned_data['new_password'])
+                user.save()
+                return render(request, 'registration/password_reset_complete.html')
+        else:
+            form = SetNewPasswordForm()
+        return render(request, 'registration/password_reset_confirm.html', {'form': form})
+    else:
+        return render(request, 'registration/password_reset_invalid.html')
