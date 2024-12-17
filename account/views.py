@@ -79,7 +79,7 @@ def process_titles_and_scripts(request):
         'Josa', 'Conj', 'Punctuation', 'Eomi', 'Suffix', 'Foreign',
         'KoreanParticle', 'Alpha', 'Exclamation'
     ]
-    start_date = datetime(2024, 11, 21)
+    start_date = datetime(2024, 12, 4)
     end_date = start_date + timedelta(days=1)
     all_data = YouTubeData.objects.filter(upload_date__gte=start_date, upload_date__lt=end_date).order_by('-views')
 
@@ -292,11 +292,6 @@ def chart(request):
     # 3. 오전오후
     top_news = YouTubeData.objects.filter(upload_date__gte=analysis_start, upload_date__lte=analysis_end).order_by('-views')[:10]
 
-
-
-
-
-
     # 제목 정리 및 찜 상태 확인
     for news in top_news:
         news.title = clean_title(news.title)
@@ -410,17 +405,23 @@ def save_all_historical_top10():
     print("All historical top 10 videos saved successfully.")
 
 def save_daily_top10():
-    try:
-        today = localtime().date()
-        yesterday = today - timedelta(days=1)
+    """
+    어제 날짜 기준으로 조회수 상위 10개 데이터를 WeeklyIssue에 저장하는 함수
+    """
+    # 한국 시간 기준으로 오늘과 어제 날짜 계산
+    today = localtime().date()
+    yesterday = today - timedelta(days=1)
 
-        daily_videos = YouTubeData.objects.filter(
-            upload_date__date=yesterday
-        ).order_by('-views')[:10]
+    # 어제 날짜의 상위 10개 영상 조회
+    daily_videos = YouTubeData.objects.filter(
+        upload_date__date=yesterday
+    ).order_by('-views')[:10]
 
-        for video in daily_videos:
+    for video in daily_videos:
+        try:
+            # WeeklyIssue에 저장 (중복 방지)
             WeeklyIssue.objects.update_or_create(
-                _id=video._id,
+                _id=video._id,  # 기존 레코드 업데이트
                 defaults={
                     'title': video.title,
                     'views': video.views,
@@ -432,57 +433,70 @@ def save_daily_top10():
                     'transcript': video.transcript if video.transcript else []
                 }
             )
-        print(f"Daily top 10 videos saved for {yesterday}")
-    except Exception as e:
-        print(f"Error while saving daily top 10 videos: {str(e)}")
+        except Exception as e:
+            print(f"Error while saving daily top 10 videos: {str(e)}")
 
 def weekly_issues(request):
-    # 현재 날짜 가져오기
+    """
+    특정 날짜나 최근 7일간의 이슈 데이터를 보여주는 뷰 함수
+    """
+    # 한국 시간 기준으로 오늘 날짜와 7일 전 날짜 계산
     today = localtime().date()
     week_ago = today - timedelta(days=7)
 
-    # GET 요청으로 특정 날짜 받기 (형식: 'YYYY-MM-DD')
+    # GET 요청으로 특정 날짜 받기
     date_str = request.GET.get('date')
-
     if date_str:
         try:
-            # 특정 날짜로 변환
             target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
         except ValueError:
-            target_date = None  # 잘못된 날짜 형식 처리
+            target_date = None
     else:
-        target_date = None  # 날짜가 없으면 None
+        target_date = None
 
+    # 특정 날짜가 있을 때
     if target_date:
-        # 특정 날짜의 데이터 필터링 (WeeklyIssue 컬렉션 사용)
-        day_start = datetime.combine(target_date, datetime.min.time())
-        day_end = datetime.combine(target_date, datetime.max.time())
+        day_start = make_aware(datetime.combine(target_date, datetime.min.time()), timezone=pytz.timezone('Asia/Seoul'))
+        day_end = make_aware(datetime.combine(target_date + timedelta(days=1), datetime.min.time()), timezone=pytz.timezone('Asia/Seoul'))
 
         daily_videos = WeeklyIssue.objects.filter(
             upload_date__gte=day_start,
-            upload_date__lte=day_end
-        ).order_by('-views')[:10]  # 조회수 기준 상위 10개
+            upload_date__lt=day_end
+        ).order_by('-views')
 
         context = {
             'daily_videos': daily_videos,
             'target_date': target_date,
         }
         return render(request, 'analysis/weekly_issues.html', context)
+
+    # 최근 7일 데이터 가져오기
     else:
-        # 기존 주간 데이터 로직 (WeeklyIssue 사용, 날짜 범위: 7일)
+        week_start = make_aware(datetime.combine(week_ago, datetime.min.time()), timezone=pytz.timezone('Asia/Seoul'))
+        week_end = make_aware(datetime.combine(today + timedelta(days=1), datetime.min.time()), timezone=pytz.timezone('Asia/Seoul'))
+
         weekly_videos = WeeklyIssue.objects.filter(
-            upload_date__gte=week_ago,
-            upload_date__lte=today
-        ).order_by('-views', '-upload_date')
+            upload_date__gte=week_start,
+            upload_date__lt=week_end
+        ).order_by('-upload_date', '-views')
 
-        grouped_issues = defaultdict(list)
+        grouped_issues = {}
         for video in weekly_videos:
-            date_key = video.upload_date.date()
-            if len(grouped_issues[date_key]) < 10:
-                grouped_issues[date_key].append(video)
+            date_key = video.upload_date.astimezone(pytz.timezone('Asia/Seoul')).date()  # 날짜 변환만 적용
+            if date_key not in grouped_issues:
+                grouped_issues[date_key] = []
+            grouped_issues[date_key].append(video)
 
-        # 날짜별 이슈를 정렬
-        sorted_issues = sorted(grouped_issues.items(), key=lambda x: x[0], reverse=True)
+        # 디버깅: grouped_issues 검증
+        for date_key, videos in grouped_issues.items():
+            print(f"Date: {date_key}, Count: {len(videos)}")  # 날짜별 데이터 개수 확인
+
+        if 'all' in request.GET:
+            sorted_issues = [(date_key, videos) for date_key, videos in grouped_issues.items()]
+        else:
+            sorted_issues = [(date_key, videos[:10]) for date_key, videos in grouped_issues.items()]
+
+        sorted_issues = sorted(sorted_issues, key=lambda x: x[0], reverse=True)
 
         context = {
             'sorted_issues': sorted_issues,
