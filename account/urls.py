@@ -47,5 +47,4 @@ urlpatterns = [
     path('signup/', views.register, name='signup'),
     path('find-password/', views.find_password, name='find_password'),
 
-    path('process-data/', views.process_titles_and_scripts, name='process_titles_and_scripts'),
 ]
