@@ -803,57 +803,33 @@ def find_username(request):
     
     return render(request, 'registration/find_username.html', {"username": username, "error": error})
 
-from django.shortcuts import render, redirect
-from django.contrib.auth.models import User
-from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
-from django.utils.encoding import force_bytes, force_str
-from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
-from django.conf import settings
+
+def send_password_reset_email(user, temp_password):
+    subject = "비밀번호 초기화 안내"
+    message = f"안녕하세요 {user.username}님,\n\n초기화된 임시 비밀번호는 다음과 같습니다: {temp_password}\n로그인 후 비밀번호를 변경해주세요."
+    from_email = "namsugb99@gmail.com"
+    recipient_list = [user.email]
+    send_mail(subject, message, from_email, recipient_list)
 
 
-def password_reset_request(request):
+def find_password(request):
+    error = None
     if request.method == "POST":
-        form = PasswordResetRequestForm(request.POST)
-        if form.is_valid():
-            email = form.cleaned_data['email']
-            try:
-                user = User.objects.get(email=email)
-                token = default_token_generator.make_token(user)
-                uid = urlsafe_base64_encode(force_bytes(user.pk))
-                reset_url = f"{request.scheme}://{request.get_host()}/password-reset/{uid}/{token}/"
+        email = request.POST.get('email')
+        try:
+            user = User.objects.get(email=email)
+            # 비밀번호 초기화 이메일 전송
+            temp_password = User.objects.make_random_password()
+            user.set_password(temp_password)
+            user.save()
+            # 비밀번호 초기화 이메일 전송
+            send_password_reset_email(user, temp_password)
+            return render(request, 'registration/find_password_done.html', {'email': email})
+        except User.DoesNotExist:
+            error = "사용자를 찾을 수 없습니다."
+    
+    return render(request, 'registration/find_password.html', {"error": error})
 
-                # 이메일 전송
-                send_mail(
-                    '비밀번호 재설정 요청',
-                    f'비밀번호를 재설정하려면 다음 링크를 클릭하세요: {reset_url}',
-                    settings.DEFAULT_FROM_EMAIL,
-                    [email],
-                )
-                return render(request, 'registration/password_reset_done.html')
-            except User.DoesNotExist:
-                form.add_error('email', '해당 이메일이 등록되어 있지 않습니다.')
-    else:
-        form = PasswordResetRequestForm()
 
-    return render(request, 'registration/password_reset_request.html', {'form': form})
 
-def password_reset_confirm(request, uidb64, token):
-    try:
-        uid = force_str(urlsafe_base64_decode(uidb64))
-        user = User.objects.get(pk=uid)
-    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-        user = None
-
-    if user is not None and default_token_generator.check_token(user, token):
-        if request.method == "POST":
-            form = SetNewPasswordForm(request.POST)
-            if form.is_valid():
-                user.set_password(form.cleaned_data['new_password'])
-                user.save()
-                return render(request, 'registration/password_reset_complete.html')
-        else:
-            form = SetNewPasswordForm()
-        return render(request, 'registration/password_reset_confirm.html', {'form': form})
-    else:
-        return render(request, 'registration/password_reset_invalid.html')
