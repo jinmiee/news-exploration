@@ -38,7 +38,7 @@ header p {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     padding: 15px;
     height: 100%;
-    max-height: 450px; /* 카드 최대 높이 제한 */
+    max-height: 800px; /* 카드 최대 높이 제한 */
     overflow-y: auto; /* 내용이 넘칠 경우 스크롤 */
 }
 
@@ -154,7 +154,7 @@ header p {
     {% if target_date %}
     <h2>{{ target_date|date:"Y년 m월 d일" }} 기사</h2>
     <ul class="list-group">
-        {% for video in daily_videos %}
+        {% for video in sorted_issues.0.1 %}
         <li class="list-group-item">
             <strong>{{ forloop.counter }}.</strong> {{ video.title }}<br>
             조회수: {{ video.views }}<br>
@@ -164,7 +164,7 @@ header p {
         <li class="list-group-item">해당 날짜에 데이터가 없습니다.</li>
         {% endfor %}
     </ul>
-    {% else %}
+{% else %}
     <div class="swiper weekly-issues-slider">
         <div class="swiper-wrapper">
             {% for date, issues in sorted_issues %}
@@ -198,8 +198,8 @@ header p {
 <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
 <script>
     const swiper = new Swiper('.weekly-issues-slider', {
-        slidesPerView: 1,
-        spaceBetween: 30,
+        slidesPerView: 'auto', // 자동으로 슬라이드 너비 조정
+        spaceBetween: 20, // 슬라이드 간격 줄이기
         pagination: {
             el: '.swiper-pagination',
             clickable: true,

@@ -38,15 +38,16 @@ class YouTubeData(models.Model):
     likes = models.BigIntegerField(blank=True, null=True)  # 좋아요 수
     thumbnail = models.URLField(blank=True, null=True)  # 썸네일 URL 추가
     comments = models.ArrayField(
-        model_container=YouTubeComment,  # 댓글 모델 지정
+        model_container=YouTubeComment,
         blank=True,
-        null=True
+        null=False,  # null 값 허용하지 않음
+        default=list  # 기본값을 빈 리스트로 설정
     )
     transcript = models.ArrayField(
         model_container=Transcript,
         blank=True,
-        null=True,
-        default=list  # 기본값으로 빈 리스트를 설정
+        null=False,  # null 값을 허용하지 않음
+        default=list
     )
 
     class Meta:
@@ -58,7 +59,9 @@ class Like(models.Model):
     youtube_data = models.ForeignKey(YouTubeData, on_delete=models.CASCADE)
 
     class Meta:
-        unique_together = ('user', 'youtube_data')
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'youtube_data'], name='unique_user_like')
+        ]
 
     def __str__(self):
         return f"{self.user.username} likes {self.youtube_data.title}"
@@ -74,14 +77,16 @@ class WeeklyIssue(models.Model):
     channel = models.CharField(max_length=255)
     thumbnail = models.URLField(blank=True, null=True)
     comments = models.ArrayField(
-        model_container=YouTubeComment,  # YouTubeComment 모델 재활용
+        model_container=YouTubeComment,
         blank=True,
-        null=True
+        null=False,  # null 값 허용하지 않음
+        default=list  # 기본값을 빈 리스트로 설정
     )
     transcript = models.ArrayField(
-        model_container=Transcript,  # Transcript 모델 재활용
+        model_container=Transcript,
         blank=True,
-        null=True
+        null=False,  # null 값을 허용하지 않음
+        default=list
     )
 
     class Meta:
