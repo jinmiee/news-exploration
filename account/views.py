@@ -294,12 +294,7 @@ def chart(request):
     top_news = YouTubeData.objects.filter(upload_date__gte=start_of_day, upload_date__lte=end_of_day).order_by('-views')[:10]
     
     # 3. 오전오후
-<<<<<<< HEAD
-    # top_news = YouTubeData.objects.filter(upload_date__gte=analysis_start, upload_date__lte=analysis_end).order_by('-views')[:10]
-
-=======
     top_news = YouTubeData.objects.filter(upload_date__gte=analysis_start, upload_date__lte=analysis_end).order_by('-views')[:10]
->>>>>>> 2ea2cd2057632b5fe21d944fd30300cf38f46e42
 
     # 제목 정리 및 찜 상태 확인
     for news in top_news:
