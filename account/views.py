@@ -44,150 +44,11 @@ from .analysis.emotion_analysis import (
     analyze_morphemes,
     analyze_sentiment
 )
-
-from .analysis.clustering import choose_10
-
-
 from django.contrib.auth.models import User
 
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import MinMaxScaler
 import re
-
-def process_titles_and_scripts(request):
-    '''
-    # 현재 시간 가져오기
-    now = localtime()
-
-    # 기준 시간 설정
-    if now.hour < 11:  # 현재 시간이 오전 11시 이전
-        analysis_start = (now - timedelta(days=1)).replace(hour=11, minute=0, second=0, microsecond=0)
-        analysis_end = (now - timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)
-    elif now.hour < 23:  # 현재 시간이 오전 11시 이후, 오늘 오후 11시 이전
-        analysis_start = (now - timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)
-        analysis_end = now.replace(hour=11, minute=0, second=0, microsecond=0)
-    else:  # 현재 시간이 오후 11시 이후
-        analysis_start = now.replace(hour=11, minute=0, second=0, microsecond=0)
-        analysis_end = now.replace(hour=23, minute=0, second=0, microsecond=0)
-
-    # 데이터 가져오기 (기준 시간에 맞는 데이터 필터링)
-    all_data = YouTubeData.objects.filter(upload_date__gte=analysis_start, upload_date__lt=analysis_end).order_by('-views')
-    '''
-    # 초기화 및 전처리 설정
-    okt = Okt()
-    UNNECESSARY_TAGS = [
-        'Josa', 'Conj', 'Punctuation', 'Eomi', 'Suffix', 'Foreign',
-        'KoreanParticle', 'Alpha', 'Exclamation'
-    ]
-    start_date = datetime(2024, 12, 4)
-    end_date = start_date + timedelta(days=1)
-    all_data = YouTubeData.objects.filter(upload_date__gte=start_date, upload_date__lt=end_date).order_by('-views')
-
-    processed_titles = []
-    corpus = []
-    views_list = []
-
-    # 텍스트 전처리 함수
-    def clean_text(text):
-        text = re.sub(r'\s+', ' ', text)  # 여러 공백을 단일 공백으로 변환
-        text = re.sub(r'[^\w\s]', '', text)  # 특수문자 제거
-        return text.strip()
-
-    for data in all_data:
-        # 제목 전처리
-        try:
-            cleaned_title = clean_text(
-                ' '.join([word for word, tag in okt.pos(data.title) if tag not in UNNECESSARY_TAGS]))
-        except Exception as e:
-            print(f"Title processing failed for: {data.title}, Error: {e}")
-            cleaned_title = "제목 없음"
-
-        # 스크립트 전처리
-        if data.transcript and isinstance(data.transcript, list):
-            script_text = ' '.join(
-                [item.text for item in data.transcript if hasattr(item, 'text') and isinstance(item.text, str)])
-            cleaned_script = clean_text(
-                ' '.join([word for word, tag in okt.pos(script_text) if tag not in UNNECESSARY_TAGS]))
-        else:
-            cleaned_script = "스크립트 없음"
-
-        # 제목과 스크립트 결합
-        combined_text = f"{cleaned_title} {cleaned_script}"
-        print(f"Processed Combined Text: {combined_text[:100]}")  # 디버깅용 출력
-
-        # 데이터 저장
-        corpus.append(combined_text)
-        views_list.append(data.views)
-
-        processed_titles.append({
-            "original_title": data.title,
-            "cleaned_title": cleaned_title,
-            "cleaned_script": cleaned_script,
-            "combined_text": combined_text,
-            "upload_date": data.upload_date,
-            "channel": data.channel_name,
-            "url": data.url,
-            "views": data.views
-        })
-
-    # TF-IDF 분석
-    vectorizer = TfidfVectorizer(max_features=5000, stop_words='english')
-    tfidf_matrix = vectorizer.fit_transform(corpus)
-
-    # 조회수 정규화 및 가중치 계산
-    scaler = MinMaxScaler()
-    normalized_views = scaler.fit_transform([[view] for view in views_list]).flatten()
-    weighted_scores = normalized_views + tfidf_matrix.sum(axis=1).A.flatten()
-
-    # 코사인 유사도 계산
-    similarity_matrix = cosine_similarity(tfidf_matrix)
-
-    # 가중치를 기준으로 정렬
-    sorted_titles = sorted(
-        processed_titles,
-        key=lambda x: weighted_scores[processed_titles.index(x)],
-        reverse=True
-    )
-
-    # 상위 10개 기사 선택
-    chart_titles = sorted_titles[:10]
-
-    # 중복된 기사 그룹화
-    duplicates = []
-    seen_titles = set()  # 중복 확인용
-
-    for chart_title in chart_titles:
-        duplicate_group = []
-        for i, data in enumerate(processed_titles):
-            # 차트의 기사와 동일하지 않으면서 유사도가 0.7 이상인 기사 찾기
-            if data != chart_title and similarity_matrix[processed_titles.index(chart_title)][i] > 0.7:
-                # 중복된 기사 중복 방지
-                if data["original_title"] not in seen_titles:
-                    duplicate_group.append(data)
-                    seen_titles.add(data["original_title"])
-
-        if duplicate_group:
-            duplicates.append({
-                "original": chart_title,
-                "duplicates": duplicate_group
-            })
-
-    # 템플릿으로 전달
-    context = {
-        "processed_titles": chart_titles,  # 상위 10개 기사
-        "duplicates": duplicates,         # 중복된 기사 목록
-        "processing_stats": {
-            "total_videos": len(all_data),
-            "processed_titles": len(processed_titles),
-            "unique_titles": len(chart_titles),
-            "duplicate_groups": len(duplicates)
-        },
-        "section": "processed_data"
-    }
-
-    return render(request, 'analysis/processed_data.html', context)
-
-
 
 def clean_title(title):
     """
@@ -228,9 +89,10 @@ def clean_title(title):
 
     # '-' 뒤에 "뉴스투데이"와 날짜 제거
     title = re.sub(r'-\s*MBC\s*뉴스투데이\s*\d{4}년\s*\d{1,2}월\s*\d{1,2}일', '', title)
+    title = re.sub(r'아침&', '', title, flags=re.IGNORECASE)
 
     # '/ 모아보는 뉴스' 제거
-    title = re.sub(r'/\s*모아보는 뉴스|굿모닝연예|뉴스딱', '', title)
+    title = re.sub(r'/\s*모아보는 뉴스|굿모닝연예|뉴스딱|실시간 e뉴스|생생지구촌', '', title)
 
     #'-MBC 중계방송' 제거
     title = re.sub(r'-\s*MBC\s*중계방송', '', title, flags=re.IGNORECASE)
@@ -242,80 +104,167 @@ def clean_title(title):
     return title.strip()
 
 
-
 def chart(request):
-    now = localtime()  # 현재 시간 가져오기
+    # 현재 시간 가져오기
+    now = localtime()
 
     # 기준 시간 설정
-    if now.hour < 11:  # 현재 시간이 오전 11시 이전
-        # 전날 오전 11시 ~ 전날 오후 11시
+    if now.hour < 11:  # 오전 11시 이전
         analysis_start = (now - timedelta(days=1)).replace(hour=11, minute=0, second=0, microsecond=0)
         analysis_end = (now - timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)
-    elif now.hour < 23:  # 현재 시간이 오전 11시 이후, 오늘 오후 11시 이전
-        # 전날 오후 11시 ~ 오늘 오전 11시
+    elif now.hour < 23:  # 오전 11시 이후
         analysis_start = (now - timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)
         analysis_end = now.replace(hour=11, minute=0, second=0, microsecond=0)
-    else:  # 현재 시간이 오후 11시 이후
-        # 오늘 오전 11시 ~ 오늘 오후 11시
+    else:  # 오후 11시 이후
         analysis_start = now.replace(hour=11, minute=0, second=0, microsecond=0)
         analysis_end = now.replace(hour=23, minute=0, second=0, microsecond=0)
 
+    # 데이터 필터링
+    all_data = YouTubeData.objects.filter(
+        upload_date__gte=analysis_start, upload_date__lt=analysis_end
+    ).order_by('-views')
 
+    # 초기화 및 전처리 설정
+    okt = Okt()
+    UNNECESSARY_TAGS = [
+        'Josa', 'Conj', 'Punctuation', 'Eomi', 'Suffix', 'Foreign',
+        'KoreanParticle', 'Alpha', 'Exclamation'
+    ]
 
-    # top_news를 정의하는 방법 두가지
+    def clean_text(text):
+        text = re.sub(r'\s+', ' ', text)  # 여러 공백을 단일 공백으로 변환
+        text = re.sub(r'[^\w\s]', '', text)  # 특수문자 제거
+        return text.strip()
 
-    # 1. 클러스터링을 이용한 방법
-    
-    # target_date = datetime(2024, 12, 4)
+    processed_titles = []
+    corpus = []
+    views_list = []
 
-    # # 날짜의 시작과 끝 정의
-    # start_of_day = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
-    # end_of_day = start_of_day + timedelta(days=1) - timedelta(seconds=1)
+    for data in all_data:
+        try:
+            # 1. 원본 제목에 clean_title 함수 적용
+            cleaned_title = clean_title(data.title)
 
-    # # 필터링: upload_date가 2024-11-21에 해당하는 데이터
-    # all_news = YouTubeData.objects.filter(upload_date__gte=start_of_day, upload_date__lte=end_of_day)
+            # 2. 동사, 명사, 형용사만 남긴 제목 생성
+            processed_title = ' '.join([
+                word for word, tag in okt.pos(cleaned_title)
+                if tag in ['Noun', 'Verb', 'Adjective']
+            ])
+        except Exception as e:
+            print(f"Title processing failed for: {data.title}, Error: {e}")
+            cleaned_title = data.title if data.title else "제목 없음"
+            processed_title = cleaned_title
 
-    # titles = [news.title for news in all_news]
-    # views = [news.views for news in all_news]
-    # ids = [news._id for news in all_news]
-    # texts = [news.desc for news in all_news]
-
-    # top_news_ids = choose_10(titles,views,ids, texts)
-
-    
-    # # 해당 인스턴스의 id를 사용하여 새로운 QuerySet 생성
-    # top_news = YouTubeData.objects.filter(_id__in=top_news_ids)
-
-
-    # 2. 단순 조회순 정렬 (하루전체)
-    target_date = datetime(2024, 12, 4)
-    start_of_day = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
-    end_of_day = start_of_day + timedelta(days=1) - timedelta(seconds=1)
-    top_news = YouTubeData.objects.filter(upload_date__gte=start_of_day, upload_date__lte=end_of_day).order_by('-views')[:10]
-    
-    # 3. 오전오후
-    top_news = YouTubeData.objects.filter(upload_date__gte=analysis_start, upload_date__lte=analysis_end).order_by('-views')[:10]
-
-    # 제목 정리 및 찜 상태 확인
-    for news in top_news:
-        news.title = clean_title(news.title)
-
-    for item in top_news:
-        if request.user.is_authenticated:  # 로그인한 사용자인 경우에만 확인
-            item.is_liked_by_user = item.like_set.filter(user=request.user).exists()
+        # 스크립트 전처리 (기존 로직 유지)
+        if data.transcript and isinstance(data.transcript, list):
+            script_text = ' '.join(
+                [item.text for item in data.transcript if hasattr(item, 'text') and isinstance(item.text, str)]
+            )
+            processed_script = ' '.join([  # 스크립트에서 동사, 명사, 형용사만 남김
+                word for word, tag in okt.pos(script_text)
+                if tag in ['Noun', 'Verb', 'Adjective']
+            ])
+            cleaned_script = clean_text(
+                ' '.join([word for word, tag in okt.pos(script_text) if tag not in UNNECESSARY_TAGS])
+            )
         else:
-            item.is_liked_by_user = False
+            processed_script = "스크립트 없음"
+            cleaned_script = "스크립트 없음"
+
+        # 제목과 스크립트 결합
+        combined_text = f"{processed_title} {processed_script}"
+        corpus.append(combined_text)
+        views_list.append(data.views)
+
+        processed_titles.append({
+            "original_title": data.title,  # 원본 제목
+            "cleaned_title": cleaned_title,  # clean_title 함수로 전처리된 제목
+            "processed_title": processed_title,  # 동사, 명사, 형용사만 남긴 제목
+            "cleaned_script": cleaned_script,  # 전처리된 스크립트
+            "combined_text": combined_text,  # 전처리된 전체 텍스트
+            "upload_date": data.upload_date,
+            "channel": data.channel_name,
+            "url": data.url,
+            "views": data.views
+        })
+
+    # TF-IDF 분석
+    vectorizer = TfidfVectorizer(max_features=5000, stop_words='english')
+    tfidf_matrix = vectorizer.fit_transform(corpus)
+
+    # 조회수 정규화 및 가중치 계산
+    scaler = MinMaxScaler()
+    normalized_views = scaler.fit_transform([[view] for view in views_list]).flatten()
+    weighted_scores = normalized_views + tfidf_matrix.sum(axis=1).A.flatten()
+
+    # 가중치를 기준으로 정렬
+    sorted_titles = sorted(
+        processed_titles,
+        key=lambda x: weighted_scores[processed_titles.index(x)],
+        reverse=True
+    )
+
+    # 상위 10개 기사 선택
+    chart_titles = sorted_titles[:10]
+
+    # 코사인 유사도를 활용한 중복 그룹화
+    similarity_matrix = cosine_similarity(tfidf_matrix)
+    duplicates = []
+    seen_titles = set()
+
+    for chart_title in chart_titles:
+        duplicate_group = []
+        for i, data in enumerate(processed_titles):
+            # 차트의 기사와 동일하지 않으면서 유사도가 0.7 이상인 기사 찾기
+            if data != chart_title and similarity_matrix[processed_titles.index(chart_title)][i] > 0.7:
+                # 중복된 기사 중복 방지
+                if data["original_title"] not in seen_titles:
+                    duplicate_group.append(data)
+                    seen_titles.add(data["original_title"])
+
+        if duplicate_group:
+            duplicates.append({
+                "original": chart_title,
+                "duplicates": duplicate_group
+            })
+
+    # 제목 정리 및 찜 상태 확인 (수정된 코드)
+    for news in chart_titles:
+        # HTML에서 보여줄 제목은 cleaned_title로 설정
+        news["html_title"] = news["cleaned_title"]  # cleaned_title이 불용어 제거된 제목
+
+    print("Processed Chart Titles:")
+    for item in chart_titles:
+        print(f"Original: {item['original_title']}, Cleaned: {item['cleaned_title']}")
+        # 로그인한 사용자인 경우 찜 상태 확인
+        if request.user.is_authenticated:
+            related_data = YouTubeData.objects.filter(url=item["url"]).first()
+            if related_data:
+                item["is_liked_by_user"] = related_data.like_set.filter(user=request.user).exists()
+            else:
+                item["is_liked_by_user"] = False
+        else:
+            item["is_liked_by_user"] = False
 
     # top_news 리스트의 각 항목에 대해 id 필드 추가
-    for item in top_news:
-        item.id = str(item._id)  # 직접 _id 값을 id로 할당
-    
+    for item in chart_titles:
+        item["id"] = str(item["url"].split("=")[-1])  # URL의 비디오 ID를 ID로 설정
+
     context = {
-        'section': 'chart',
-        'top_news': top_news,
-        'analysis_start': analysis_start,
-        'analysis_end': analysis_end
+        "top_news": chart_titles,
+        "processed_titles": chart_titles,
+        "duplicates": duplicates,
+        "processing_stats": {
+            "total_videos": len(all_data),
+            "processed_titles": len(processed_titles),
+            "unique_titles": len(chart_titles),
+            "duplicate_groups": len(duplicates)
+        },
+        "analysis_start": analysis_start,  # 추가
+        "analysis_end": analysis_end,  # 추가
+        "section": "chart"
     }
+
     return render(request, 'analysis/chart.html', context)
 
 # 동영상 세부 정보 조회 API
