@@ -262,9 +262,9 @@ def chart(request):
 
     # top_news를 정의하는 방법 두가지
 
-    # # 1. 클러스터링을 이용한 방법
+    # 1. 클러스터링을 이용한 방법
     
-    # target_date = datetime(2024, 12, 13)
+    # target_date = datetime(2024, 12, 4)
 
     # # 날짜의 시작과 끝 정의
     # start_of_day = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -276,8 +276,9 @@ def chart(request):
     # titles = [news.title for news in all_news]
     # views = [news.views for news in all_news]
     # ids = [news._id for news in all_news]
+    # texts = [news.desc for news in all_news]
 
-    # top_news_ids = choose_10(titles,views,ids)
+    # top_news_ids = choose_10(titles,views,ids, texts)
 
     
     # # 해당 인스턴스의 id를 사용하여 새로운 QuerySet 생성
@@ -285,14 +286,13 @@ def chart(request):
 
 
     # 2. 단순 조회순 정렬 (하루전체)
-    # top_news = YouTubeData.objects.filter(upload_date__gte=start_of_day, upload_date__lte=end_of_day).order_by('-views')[:10]
+    target_date = datetime(2024, 12, 4)
+    start_of_day = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_of_day = start_of_day + timedelta(days=1) - timedelta(seconds=1)
+    top_news = YouTubeData.objects.filter(upload_date__gte=start_of_day, upload_date__lte=end_of_day).order_by('-views')[:10]
     
     # 3. 오전오후
-    top_news = YouTubeData.objects.filter(upload_date__gte=analysis_start, upload_date__lte=analysis_end).order_by('-views')[:10]
-
-
-
-
+    # top_news = YouTubeData.objects.filter(upload_date__gte=analysis_start, upload_date__lte=analysis_end).order_by('-views')[:10]
 
 
     # 제목 정리 및 찜 상태 확인
@@ -653,6 +653,11 @@ def my_liked_videos(request):
         video.id = str(video._id)
         print(video.id)
     return render(request, 'analysis/mypage/my_liked_videos.html', context)
+
+
+
+
+    
 
 
 def register(request):
