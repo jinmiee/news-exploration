@@ -1,11 +1,11 @@
-from airflow import DAG
-from airflow.operators.python import PythonOperator
-from airflow.providers.mongo.hooks.mongo import MongoHook
-from googleapiclient.discovery import build
-from datetime import datetime, timezone, timedelta
-import pytz
-from youtube_transcript_api import YouTubeTranscriptApi
-from isodate import parse_duration
+# from airflow import DAG
+# from airflow.operators.python import PythonOperator
+# from airflow.providers.mongo.hooks.mongo import MongoHook
+# from googleapiclient.discovery import build
+# from datetime import datetime, timezone, timedelta
+# import pytz
+# from youtube_transcript_api import YouTubeTranscriptApi
+# from isodate import parse_duration
 
 class YouTubeDataCollector:
     """

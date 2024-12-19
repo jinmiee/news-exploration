@@ -107,6 +107,7 @@ def process_text(title, transcript=None):
     """
     제목과 스크립트를 전처리하여 결합한 텍스트 반환
     """
+    okt = Okt()
     # 제목 전처리
     cleaned_title = clean_title(title)
     stop_words = {'그', '저', '것', '수'}
