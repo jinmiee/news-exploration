@@ -8,6 +8,8 @@ import matplotlib
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 from transformers import pipeline
+from django.conf import settings
+import os
 
 matplotlib.use('Agg')
 
@@ -40,13 +42,26 @@ def analyze_sentiment(comment_text):
 
 
 def generate_wordcloud(comments, analyzed_comments, max_comments=100):
-
-    # 한글 폰트 설정
-    font_path = "C:/Windows/Fonts/malgun.ttf"  # Windows 환경
-    font_name = matplotlib.font_manager.FontProperties(fname=font_path).get_name()
-    matplotlib.rc('font', family=font_name)
-
     try:
+        # 한글 폰트 설정
+        font_path = os.path.join(settings.STATIC_ROOT, 'fonts', 'NanumGothic.ttf')
+        if not os.path.exists(font_path):
+            # STATIC_ROOT에 없으면 STATICFILES_DIRS에서 찾기
+            for static_dir in settings.STATICFILES_DIRS:
+                alt_font_path = os.path.join(static_dir, 'fonts', 'NanumGothic.ttf')
+                if os.path.exists(alt_font_path):
+                    font_path = alt_font_path
+                    break
+        
+        # 워드클라우드 생성
+        wordcloud = WordCloud(
+            font_path=font_path,  # 수정된 폰트 경로
+            width=800,
+            height=400,
+            background_color='white',
+            max_words=100
+        )
+
         # 댓글 수 제한
         limited_comments = comments[:max_comments]
 
@@ -68,15 +83,15 @@ def generate_wordcloud(comments, analyzed_comments, max_comments=100):
             raise ValueError("No words available to generate WordCloud.")
 
         # 워드클라우드 생성
-        font_path = "C:/Windows/Fonts/malgun.ttf"  # 시스템에 맞는 폰트 경로로 변경
         wordcloud = WordCloud(
+            font_path=font_path,  # 수정된 폰트 경로
             width=800,
             height=400,
-            background_color="white",
-            font_path=font_path,
-            color_func=color_func,
+            background_color='white',
             max_words=100
-        ).generate(text)
+        )
+
+        wordcloud.generate(text)
 
         plt.figure(figsize=(10, 5))
         plt.imshow(wordcloud, interpolation='bilinear')
