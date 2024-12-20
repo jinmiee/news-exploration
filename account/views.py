@@ -4,38 +4,25 @@ pip install konlpy networkx matplotlib pandas
 from collections import defaultdict
 from datetime import timedelta, datetime
 
-from django.db.models.functions import TruncDate
 from django.http import JsonResponse
 from django.utils import timezone
-from django.shortcuts import render, get_object_or_404, redirect
+
 from django.utils.timezone import localtime, make_aware, is_aware
 from django.views.decorators.csrf import csrf_exempt
 import json
-from datetime import date
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponseBadRequest
 from bson import ObjectId
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 from .forms import UserRegistrationForm
 from .models import YouTubeData, Like, WeeklyIssue
 from urllib.parse import urlparse, parse_qs
-import re
+
 import pytz
-from dateutil.parser import parse
 
-from wordcloud import WordCloud
-import matplotlib.pyplot as plt
-from io import BytesIO
-import base64
-from transformers import pipeline
-
-from konlpy.tag import Okt
-from collections import Counter
-import networkx as nx
 import matplotlib
 matplotlib.use('Agg')
-import matplotlib.font_manager
+
 
 from .analysis.relate_analysis import analyze_related_words, generate_network_graph
 from .analysis.emotion_analysis import (
@@ -411,13 +398,42 @@ def detail(request):
     video_url = request.GET.get('url')
     video_id = request.GET.get('id')
 
-    # 데이터베이스에서 값 가져오기
+    # 선택된 비디오 데이터 가져오기
     video = YouTubeData.objects.filter(url=video_url).first()
-    video_views = video.views if video else None  # 조회수
-    video_likes = video.likes if video else None  # 좋아요 수
-    video_comments = video.comments if video else None  # 댓글 수
-    video_title = video.title if video else None  # 동영상 제목
-    # 컨텍스트 구성
+    video_views = video.views if video else None
+    video_likes = video.likes if video else None
+    video_comments = video.comments if video else None
+    video_title = video.title if video else None
+
+    # 관련 비디오 처리
+    all_videos = YouTubeData.objects.all()
+
+    def process_for_similarity(video_data):
+        title = clean_title(video_data.title)
+        transcript = " ".join([item['text'] for item in video_data.transcript]) if video_data.transcript else ""
+        return f"{title} {transcript}"
+
+    # TF-IDF 벡터화
+    corpus = [process_for_similarity(v) for v in all_videos]
+    vectorizer = TfidfVectorizer(max_features=5000, stop_words='english')
+    tfidf_matrix = vectorizer.fit_transform(corpus)
+
+    target_index = list(all_videos).index(video)
+    similarity_scores = cosine_similarity(tfidf_matrix[target_index:target_index+1], tfidf_matrix).flatten()
+
+    # 유사도가 높은 비디오 필터링
+    threshold = 0.7
+    related_videos = [
+        {
+            "url": v.url,
+            "video_id": v.url.split('v=')[1].split('&')[0],  # 여기서 ID를 추출
+            "thumbnail": v.thumbnail,
+            "title": v.title,
+        }
+        for i, v in enumerate(all_videos)
+        if similarity_scores[i] > threshold and i != target_index
+    ]
+
     context = {
         'video': video,
         'video_id': video_id,
@@ -426,19 +442,13 @@ def detail(request):
         'video_views': video_views,
         'video_likes': video_likes,
         'video_comments': video_comments,
+        'related_videos': related_videos,  # 유사한 비디오들
     }
 
     return render(request, 'analysis/detail.html', context)
 
-
-
-import matplotlib.pyplot as plt
-from io import BytesIO
-import base64
-from wordcloud import WordCloud
 from transformers import pipeline
 from django.shortcuts import render
-from collections import Counter
 from konlpy.tag import Okt
 from .models import YouTubeData
 
