@@ -258,6 +258,8 @@ def save_all_historical_top10():
         all_videos = YouTubeData.objects.all().order_by('upload_date')
         grouped_videos = defaultdict(list)
 
+        seoul_tz = timezone('Asia/Seoul')
+
         for video in all_videos:
             # Null 또는 None 체크
             if not video.upload_date:
@@ -272,37 +274,27 @@ def save_all_historical_top10():
                     print(f"Invalid date format for video {video.title}. Skipping...")
                     continue
 
-            # 날짜별 그룹화
-            try:
-                date_key = video.upload_date.date()
-                grouped_videos[date_key].append(video)
-            except AttributeError as e:
-                print(f"Error processing video {video.title}: {e}")
-                continue
+            # UTC → KST 변환 후 날짜별 그룹화
+            date_key = video.upload_date.astimezone(seoul_tz).date()
+            grouped_videos[date_key].append(video)
 
         # 상위 10개 선정
         for date_key, videos in grouped_videos.items():
             top_videos = get_top10_chart_based(videos)
 
             for video in top_videos:
-                # 원본 댓글과 스크립트 데이터를 그대로 저장
-                original_comments = video.comments if isinstance(video.comments, list) else []
-                original_transcript = video.transcript if isinstance(video.transcript, list) else []
-
-                # 데이터 저장
                 WeeklyIssue.objects.update_or_create(
                     _id=video._id,
                     defaults={
                         'title': video.title,
                         'channel_name': video.channel_name,
                         'views': video.views,
-                        'upload_date': video.upload_date,
+                        'upload_date': video.upload_date,  # 이미 UTC로 저장됨
                         'url': video.url,
                         'channel': video.channel,
                         'thumbnail': video.thumbnail,
-                        # 원본 데이터를 그대로 저장
-                        'comments': original_comments,
-                        'transcript': original_transcript,
+                        'comments': video.comments or [],
+                        'transcript': video.transcript or []
                     }
                 )
         print("All historical top 10 videos saved successfully.")
@@ -317,36 +309,24 @@ def save_daily_top10():
     어제 날짜 데이터를 기반으로 상위 10개 비디오를 선정하고 저장
     """
     try:
-        today = localtime().date()
+        # 오늘과 어제 날짜를 KST(Asia/Seoul) 기준으로 가져오기
+        seoul_tz = timezone('Asia/Seoul')
+        today = datetime.now(seoul_tz).date()
         yesterday = today - timedelta(days=1)
 
+        # 어제의 시작과 끝을 UTC로 변환
+        start_date = datetime.combine(yesterday, datetime.min.time()).replace(tzinfo=seoul_tz).astimezone(pytz.UTC)
+        end_date = datetime.combine(yesterday, datetime.max.time()).replace(tzinfo=seoul_tz).astimezone(pytz.UTC)
+
         # 어제 날짜 데이터 필터링
-        daily_videos = YouTubeData.objects.filter(upload_date__date=yesterday)
+        daily_videos = YouTubeData.objects.filter(upload_date__gte=start_date, upload_date__lt=end_date)
 
         if not daily_videos.exists():
             logger.warning("No videos found for yesterday.")
             return
 
-        # 데이터 처리
-        valid_videos = []
-        for video in daily_videos:
-            # Null 또는 None 체크
-            if not video.upload_date:
-                logger.warning(f"Video {video.title} has no upload_date. Skipping...")
-                continue
-
-            # 문자열인 경우 datetime으로 변환
-            if isinstance(video.upload_date, str):
-                try:
-                    video.upload_date = datetime.fromisoformat(video.upload_date)
-                except ValueError:
-                    logger.warning(f"Invalid date format for video {video.title}. Skipping...")
-                    continue
-
-            valid_videos.append(video)
-
         # 상위 10개 선정 (중복 제거 포함)
-        top_videos = get_top10_chart_based(valid_videos)
+        top_videos = get_top10_chart_based(daily_videos)
 
         # 데이터 저장
         for video in top_videos:
@@ -356,7 +336,7 @@ def save_daily_top10():
                     'title': video.title,
                     'channel_name': video.channel_name,
                     'views': video.views,
-                    'upload_date': video.upload_date,
+                    'upload_date': video.upload_date,  # 이미 UTC로 저장됨
                     'url': video.url,
                     'channel': video.channel,
                     'thumbnail': video.thumbnail,
@@ -368,21 +348,11 @@ def save_daily_top10():
     except Exception as e:
         logger.error(f"save_daily_top10 failed: {e}")
 
-def get_date_range(target_date=None, days=7):
-    """
-    특정 날짜 또는 최근 N일간의 시작 및 종료 시간 반환
-    """
-    if target_date:
-        start = make_aware(datetime.combine(target_date, datetime.min.time()))
-        end = make_aware(datetime.combine(target_date + timedelta(days=1), datetime.min.time()))
-    else:
-        today = localtime().date()
-        start = make_aware(datetime.combine(today - timedelta(days=days), datetime.min.time()))
-        end = make_aware(datetime.combine(today + timedelta(days=1), datetime.min.time()))
-    return start, end
-
 def weekly_issues(request):
+    # 요청에서 날짜 가져오기
     date_str = request.GET.get('date')
+    seoul_tz = pytz.timezone('Asia/Seoul')
+
     if date_str:
         try:
             target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
@@ -391,36 +361,48 @@ def weekly_issues(request):
     else:
         target_date = None
 
-    # 데이터 가져오기
+    # 특정 날짜 범위 설정
     if target_date:
-        start_date = make_aware(datetime.combine(target_date, datetime.min.time()))
-        end_date = make_aware(datetime.combine(target_date + timedelta(days=1), datetime.min.time()))
-        issues = WeeklyIssue.objects.filter(upload_date__gte=start_date, upload_date__lt=end_date)
-        print(f"MongoDB에서 가져온 데이터 개수: {issues.count()}")
+        start_date = datetime.combine(target_date, datetime.min.time()).replace(tzinfo=seoul_tz)
+        end_date = datetime.combine(target_date + timedelta(days=1), datetime.min.time()).replace(tzinfo=seoul_tz)
     else:
-        today = datetime.now(pytz.timezone('Asia/Seoul')).date()
-        start_date = make_aware(datetime.combine(today - timedelta(days=7), datetime.min.time()))
-        end_date = make_aware(datetime.combine(today + timedelta(days=1), datetime.min.time()))
-        issues = WeeklyIssue.objects.filter(upload_date__gte=start_date, upload_date__lt=end_date)
-        print(f"MongoDB에서 가져온 데이터 개수: {issues.count()}")
+        today = datetime.now(seoul_tz).date()
+        start_date = datetime.combine(today - timedelta(days=7), datetime.min.time()).replace(tzinfo=seoul_tz)
+        end_date = datetime.combine(today + timedelta(days=1), datetime.min.time()).replace(tzinfo=seoul_tz)
 
-    # 날짜별 그룹화
+    # UTC 변환
+    start_date_utc = start_date.astimezone(pytz.UTC)
+    end_date_utc = end_date.astimezone(pytz.UTC)
+
+    # MongoDB에서 데이터 필터링
+    issues = WeeklyIssue.objects.filter(upload_date__gte=start_date_utc, upload_date__lt=end_date_utc)
+
+    # 날짜별로 그룹화
     grouped_issues = defaultdict(list)
     for issue in issues:
-        date_key = issue.upload_date.astimezone(pytz.timezone('Asia/Seoul')).date()
+        # UTC → KST 변환 후 날짜별 그룹화
+        date_key = issue.upload_date.astimezone(seoul_tz).date()
         grouped_issues[date_key].append(issue)
 
     # 날짜별 상위 10개로 제한
     for date_key in grouped_issues:
         grouped_issues[date_key] = grouped_issues[date_key][:10]
 
-    # 데이터 정렬
+    # 날짜별로 정렬
     sorted_issues = sorted(grouped_issues.items(), key=lambda x: x[0], reverse=True)
 
+    # 디버깅 출력
+    print("Final Grouped Issues:")
+    for date_key, issue_list in sorted_issues:
+        print(f"Date: {date_key}, Count: {len(issue_list)}")
+        for issue in issue_list:
+            print(f"Title: {issue.title}, Upload Date: {issue.upload_date}")
+
+    # 템플릿에 전달할 컨텍스트
     context = {
         'sorted_issues': sorted_issues,
-        'target_date': target_date,
     }
+
     return render(request, 'analysis/weekly_issues.html', context)
 
 #상세분석
