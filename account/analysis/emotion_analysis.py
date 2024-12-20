@@ -88,6 +88,7 @@ def generate_wordcloud(comments, analyzed_comments, max_comments=100):
             width=800,
             height=400,
             background_color='white',
+            color_func=color_func,
             max_words=100
         )
 
