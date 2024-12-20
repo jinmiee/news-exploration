@@ -4,7 +4,7 @@ from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.triggers.cron import CronTrigger
 from django.core.mail import send_mail
 from pymongo import MongoClient
-
+from .views import save_daily_top10
 
 def send_email_task():
     from django.contrib.auth.models import User  # 함수 내부에서 import하여 초기화 시점 문제 방지
@@ -15,11 +15,6 @@ def send_email_task():
     recipient_list = [user.email for user in users if user.email]
 
     send_mail(subject, message, from_email, recipient_list)
-
-
-def save_daily_top10():
-    # 실제 작업 함수 구현 필요
-    print("save_daily_top10 작업 실행 중...")
 
 
 def start_scheduler():
@@ -43,7 +38,7 @@ def start_scheduler():
     # 작업 추가: 이메일 알림
     scheduler.add_job(
         send_email_task,
-        trigger=CronTrigger(hour='11,23', minute=0),
+        trigger=CronTrigger(hour='11,23', minute=5),
         id='send_email',
         replace_existing=True
     )
