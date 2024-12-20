@@ -42,6 +42,7 @@ from transformers import AutoModel, AutoTokenizer, AutoModelForMaskedLM, BertTok
 import torch
 import re
 from soynlp.normalizer import *
+from django.conf import settings
 
 
 # 바른 형태소 분석기 API 키 설정
@@ -85,7 +86,7 @@ def load_pretrained_model():
                             for encoding in ['utf-8', 'cp949', 'euc-kr']:
                                 try:
                                     header = header_bytes.decode(encoding).strip()
-                                    # 백으로 분리하여 숫자 추출 시���
+                                    # 백으로 분리하여 숫자 추출 시
                                     parts = [part for part in header.split() if part.isdigit()]
                                     if len(parts) >= 2:
                                         vocab_size, vector_size = map(int, parts[:2])
@@ -347,7 +348,7 @@ def analyze_related_words(video_desc):
             with open('account/static/불용어.txt', 'r', encoding='utf-8') as f:
                 stopwords = set(f.read().splitlines())
         except Exception as e:
-            print(f"불��어 파일 로드 중 오류: {str(e)}")
+            print(f"불용어 파일 로드 중 오류: {str(e)}")
         
         # 입력 텍스트가 바이트 문자열인 경우 반 문자열로 변환
         if isinstance(video_desc, bytes):
@@ -567,16 +568,18 @@ def generate_network_graph(G):
         # matplotlib 백엔드 설정
         matplotlib.use('Agg')
         
-        # 한글 폰트 설정 - Malgun Gothic 사용
-        plt.rcParams['font.family'] = 'Malgun Gothic'
-        
-        # 폰트 경로가 다르다면 직접 지정
-        try:
-            font_path = "C:/Windows/Fonts/malgun.ttf"
-            font_prop = matplotlib.font_manager.FontProperties(fname=font_path)
-            plt.rcParams['font.family'] = font_prop.get_name()
-        except:
-            print("기본 폰트를 사용���니다.")
+        # ���글 폰트 설정
+        font_path = os.path.join(settings.STATIC_ROOT, 'fonts', 'NanumGothic.ttf')
+        if not os.path.exists(font_path):
+            # STATIC_ROOT에 없으면 STATICFILES_DIRS에서 찾기
+            for static_dir in settings.STATICFILES_DIRS:
+                alt_font_path = os.path.join(static_dir, 'fonts', 'NanumGothic.ttf')
+                if os.path.exists(alt_font_path):
+                    font_path = alt_font_path
+                    break
+
+        # 폰트 설정
+        plt.rcParams['font.family'] = 'NanumGothic'
         
         # 그래프 크기 설정
         plt.figure(figsize=(8, 6))
