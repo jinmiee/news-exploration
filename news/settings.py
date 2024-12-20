@@ -150,3 +150,4 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'namsugb99@gmail.com'  # 발신자 이메일
 EMAIL_HOST_PASSWORD = 'gagl lbie riij ediz'  # 발신자 이메일 비밀번호
 
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
