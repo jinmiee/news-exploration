@@ -1,84 +1,177 @@
-/* 컨테이너 스타일 */
-.weekly-issues-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 2rem;
-}
-
-/* 카드 그리드 */
-.weekly-issues-grid {
+.issue-container {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-    gap: 2rem;
-    margin-top: 2rem;
+    grid-template-columns: repeat(3, 1fr); /* 한 줄에 3개의 카드 */
+    grid-template-rows: repeat(2, 1fr); /* 2줄로 배치 */
+    gap: 2rem; /* 카드 간 간격 */
+    margin: 2rem auto;
+    max-width: 1400px;
+    justify-items: center;
 }
 
-/* 개별 카드 */
 .issue-card {
-    background: white;
-    border-radius: 12px;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     padding: 1.5rem;
-    box-shadow: var(--card-shadow);
+    width: 400px; /* 카드 너비 */
+    height: 500px; /* 카드 높이를 고정 */
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between; /* 내부 요소 간 간격 균등 분배 */
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
-/* 날짜 스타일 */
+
+.issue-card h2.issue-date {
+    font-size: 1.4rem;
+    font-weight: bold;
+    color: #333;
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.issue-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
 .issue-date {
     font-size: 1.2rem;
-    font-weight: 600;
-    color: var(--primary-color);
-    margin-bottom: 1.5rem;
-    padding-bottom: 0.8rem;
-    border-bottom: 2px solid var(--border-color);
+    font-weight: bold;
+    text-align: center; /* 날짜 가운데 정렬 */
+    margin-bottom: 0.8rem;
 }
 
-/* 뉴스 목록 */
 .issue-list {
     list-style: none;
     padding: 0;
     margin: 0;
 }
 
-/* 개별 뉴스 */
 .issue-item {
     display: flex;
-    align-items: flex-start;
-    gap: 1rem;
-    padding: 1rem 0;
-    border-bottom: 1px solid var(--border-color);
+    align-items: flex-start; /* 텍스트가 위쪽 정렬 */
+    margin-bottom: 0.8rem;
+    line-height: 1.5;
 }
 
 .issue-item:last-child {
     border-bottom: none;
-    margin-bottom: 0;
-    padding-bottom: 0;
 }
 
-/* 뉴스 순위 */
 .issue-rank {
-    font-size: 1.2rem;
-    font-weight: 600;
-    color: var(--primary-color);
-    min-width: 30px;
-}
-
-/* 뉴스 내용 */
-.issue-content {
-    flex: 1;
+    font-size: 1rem;
+    color: #007bff; /* 파란색 */
+    font-weight: bold;
+    margin-right: 0.8rem; /* 순위와 제목 간 간격 */
 }
 
 .issue-title {
-    font-size: 1rem;
-    font-weight: 500;
-    margin-bottom: 0.5rem;
+    font-size: 0.9rem; /* 텍스트 크기 */
+    margin: 0;
+    line-height: 1.4; /* 줄 간격 */
+    white-space: nowrap; /* 텍스트를 한 줄로 제한 */
+    overflow: hidden; /* 넘치는 텍스트 숨김 */
+    text-overflow: ellipsis; /* 넘치는 텍스트를 '...'으로 표시 */
+    display: block; /* 텍스트를 블록 요소로 처리 */
+    max-width: 100%; /* 카드 너비에 맞게 조정 */
+}
+
+.issue-content {
+    overflow: hidden; /* 내용이 카드 밖으로 넘치지 않도록 설정 */
+    text-overflow: ellipsis; /* 넘칠 경우 '...' 표시 */
+    display: -webkit-box; /* Flexbox를 사용한 다중 줄 숨김 */
+    -webkit-line-clamp: 3; /* 텍스트를 3줄로 제한 */
+    -webkit-box-orient: vertical; /* 박스 방향을 세로로 설정 */
+}
+
+.issue-title a {
+    color: inherit; /* 기본 색상 상속 */
+    text-decoration: none; /* 기본 밑줄 제거 */
+    transition: color 0.3s ease; /* 색상 전환 효과 추가 */
+}
+
+.issue-title a:hover {
+    color: #007bff; /* 마우스를 올렸을 때 파란색 */
+    text-decoration: underline; /* 밑줄 추가 (옵션) */
 }
 
 .issue-link {
-    color: var(--primary-color);
+    color: #333;
     text-decoration: none;
-    font-size: 0.9rem;
-    transition: color 0.3s ease;
 }
 
 .issue-link:hover {
-    color: var(--secondary-color);
+    text-decoration: underline;
+}
+
+@media (max-width: 768px) {
+    .issue-container {
+        grid-template-columns: repeat(1, 1fr); /* 작은 화면에서는 한 줄에 1개 */
+    }
+    .issue-card {
+        width: 90%; /* 화면 너비의 90%를 차지 */
+        height: auto; /* 높이 자동 조정 */
+    }
+}
+
+
+/* 날짜 검색 컨테이너 */
+.date-search-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+/* 날짜 검색 폼 */
+.date-search-form {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* 날짜 입력 필드 */
+.date-input {
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 5px 10px;
+    font-size: 14px;
+    height: 36px;
+}
+
+/* 검색 버튼 */
+.search-btn {
+    background-color: #007bff;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 5px 15px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    height: 36px;
+}
+
+.search-btn:hover {
+    background-color: #0056b3;
+}
+
+/* 이전/다음 버튼 */
+.nav-btn {
+    background-color: #f5f5f5;
+    color: #333;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 5px 10px;
+    font-size: 14px;
+    cursor: pointer;
+    height: 36px;
+    transition: background-color 0.3s ease;
+}
+
+.nav-btn:hover {
+    background-color: #ddd;
 }
