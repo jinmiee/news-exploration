@@ -39,7 +39,7 @@ import re
 
 def clean_title(title):
     """
-    뉴스 제목에서 /방송사이름만 제거하고 나머지 텍스트는 유지하는 함수
+    뉴스 제목에서 /방송사이름만 제거���고 나머지 텍스트는 유지하는 함수
     """
     # 대괄호 안의 내용 제거 (예: [이슈])
     title = re.sub(r'\[.*?\]', '', title)
@@ -248,7 +248,7 @@ def save_all_historical_top10():
         seoul_tz = timezone('Asia/Seoul')
 
         for video in all_videos:
-            # Null 또는 None 체크
+            # Null 또는 None ��크
             if not video.upload_date:
                 print(f"Video {video.title} has no upload_date. Skipping...")
                 continue
@@ -361,7 +361,7 @@ def weekly_issues(request):
     start_date_utc = start_date.astimezone(pytz.UTC)
     end_date_utc = end_date.astimezone(pytz.UTC)
 
-    # MongoDB에서 데이터 필터링
+    # MongoDB���서 데이터 필터링
     issues = WeeklyIssue.objects.filter(upload_date__gte=start_date_utc, upload_date__lt=end_date_utc)
 
     # 날짜별로 그룹화
@@ -566,35 +566,37 @@ def relate(request):
     
     video = YouTubeData.objects.filter(url=video_url).first()
     
-    if video and video.transcript:
+    if video:
         try:
-            # 제목 불용어 처리
-            cleaned_title = clean_title(video.title)
+            # 제목과 설명을 결합하여 video_desc 생성
+            video_desc = f"{clean_title(video.title)} {video.desc if video.desc else ''}"
             
-            # transcript 데이터를 시간 단위로 구분하여 텍스트로 변환
-            transcript_text = ' '.join([item['text'] for item in video.transcript])
-            # 시간별 자막 데이터 생성
+            # transcript 데이터 처리
             transcript_segments = []
-            for item in video.transcript:
-                if 'start' in item and 'text' in item:
-                    start_time = int(float(item['start']))
-                    minutes = start_time // 60
-                    seconds = start_time % 60
-                    time_str = f"{minutes:02d}:{seconds:02d}"
-                    transcript_segments.append({
-                        'time': time_str,
-                        'text': item['text']
-                    })
+            if video.transcript:
+                for item in video.transcript:
+                    if 'start' in item and 'text' in item:
+                        start_time = int(float(item['start']))
+                        minutes = start_time // 60
+                        seconds = start_time % 60
+                        time_str = f"{minutes:02d}:{seconds:02d}"
+                        transcript_segments.append({
+                            'time': time_str,
+                            'text': item['text']
+                        })
             
-            graph, top_pairs, important_keywords = analyze_related_words(transcript_text)
+            # 연관어 분석 수행
+            graph, top_pairs, important_keywords = analyze_related_words(video_desc, video.transcript)
             network_graph = generate_network_graph(graph)
             
             # 키워드별 관련 뉴스 분류
             categorized_news = {}
             if important_keywords:
                 for keyword in important_keywords:
+                    # 키워드로 관련 뉴스 검색
                     related_news = YouTubeData.objects.filter(
-                        title__icontains=keyword
+                        Q(title__icontains=keyword) | 
+                        Q(desc__icontains=keyword)
                     ).exclude(url=video_url)[:6]
                     
                     if related_news:
@@ -611,13 +613,12 @@ def relate(request):
             context = {
                 'section': 'relate',
                 'video': video,
-                'video_title': cleaned_title,
+                'video_title': clean_title(video.title),
                 'network_graph': network_graph,
                 'top_pairs': top_pairs,
                 'categorized_news': categorized_news,
                 'important_keywords': important_keywords,
-                'transcript_text': transcript_text,
-                'transcript_segments': transcript_segments  # 시간별 자막 데이터 추가
+                'transcript_segments': transcript_segments
             }
         except Exception as e:
             print(f"분석 중 오류 발생: {str(e)}")
@@ -628,7 +629,7 @@ def relate(request):
     else:
         context = {
             'section': 'relate',
-            'error_message': '비디오 자막이 없거나 비디오를 찾을 수 없습니다.'
+            'error_message': '비디오를 찾을 수 없습니다.'
         }
     
     return render(request, 'analysis/relate.html', context)
@@ -715,7 +716,7 @@ from django.core.mail import send_mail
 
 def send_password_reset_email(user, temp_password):
     subject = "비밀번호 초기화 안내"
-    message = f"안녕하세요 {user.username}님,\n\n초기화된 임시 비밀번호는 다음과 같습니다: {temp_password}\n로그인 후 비밀번호를 변경해주세요."
+    message = f"안녕하세요 {user.username}님,\n\n초기화된 임시 비밀번호는 다음��� 같습니다: {temp_password}\n로그인 후 비밀번호를 변경해주세요."
     from_email = "namsugb99@gmail.com"
     recipient_list = [user.email]
     send_mail(subject, message, from_email, recipient_list)
