@@ -22,7 +22,7 @@ import unicodedata
 from gensim.models import Word2Vec
 # 수치 연산을 위한 numpy 임포트
 import numpy as np
-# 코사인 유사도 계산�� 위한 함수 임포트
+# 코사인 유사도 계산을 위한 함수 임포트
 from sklearn.metrics.pairwise import cosine_similarity
 # 사전학습된 Word2Vec 모델을 로드하기 위한 KeyedVectors 임포트
 from gensim.models import KeyedVectors
@@ -37,12 +37,9 @@ import math
 # 문장 임베딩을 위한 SentenceTransformer 임포트
 from sentence_transformers import SentenceTransformer
 # 트랜스포머 모델과 토크나이저 임포트
-from transformers import AutoModel, AutoTokenizer, AutoModelForMaskedLM, BertTokenizer, BertModel
+from transformers import AutoModel, AutoTokenizer
 # PyTorch 임포트
 import torch
-import re
-from soynlp.normalizer import *
-from django.conf import settings
 
 
 # 바른 형태소 분석기 API 키 설정
@@ -71,77 +68,55 @@ def load_pretrained_model():
                     # 파일 포맷 확인
                     if magic.startswith(b'\xba\x16O/'):  # 특정 매직 넘버 확인
                         print("파일 포맷 확인됨")
-                        
-                        # 헤더 처리 개선
+                        # 헤더 정보 읽기
+                        header = f.readline().decode('utf-8', errors='ignore').strip()
                         try:
-                            # 헤더 라인을 바이트로 읽기
-                            header_bytes = b''
-                            while True:
-                                byte = f.read(1)
-                                if byte == b'\n':
+                            vocab_size, vector_size = map(int, header.split())
+                            print(f"모델 정보 - 단어 수: {vocab_size}, 벡터 크기: {vector_size}")
+                        except ValueError:
+                            print("헤더 파싱 실패, 기본값 사용")
+                            vocab_size, vector_size = 100000, 300  # 기본값 설정
+                        
+                        # KeyedVectors 객체 생성
+                        model = KeyedVectors(vector_size)
+                        
+                        # 단어와 벡터 읽기
+                        for _ in range(vocab_size):
+                            try:
+                                # 단어 읽기
+                                word_bytes = bytearray()
+                                while True:
+                                    b = f.read(1)
+                                    if not b or b == b' ':
+                                        break
+                                    word_bytes.extend(b)
+                                
+                                if not word_bytes:
                                     break
-                                header_bytes += byte
-                            
-                            # 다양한 인코딩 시도
-                            for encoding in ['utf-8', 'cp949', 'euc-kr']:
-                                try:
-                                    header = header_bytes.decode(encoding).strip()
-                                    # 백으로 분리하여 숫자 추출 시
-                                    parts = [part for part in header.split() if part.isdigit()]
-                                    if len(parts) >= 2:
-                                        vocab_size, vector_size = map(int, parts[:2])
-                                        print(f"모델 정보 - 단어 수: {vocab_size}, 벡터 크기: {vector_size}")
+                                
+                                # 단어 디코딩 (여러 인코딩 시도)
+                                for encoding in ['utf-8', 'cp949', 'euc-kr']:
+                                    try:
+                                        word = word_bytes.decode(encoding)
                                         break
-                                except:
-                                    continue
-                            else:
-                                print("헤더 파싱 실패, 기본값 사용")
-                                # Word2Vec 모델의 일반적인 값으로 설정
-                                vocab_size, vector_size = 100000, 300
-                            
-                            # KeyedVectors 객체 생성
-                            model = KeyedVectors(vector_size)
-                            
-                            # 단어와 벡터 읽기
-                            for _ in range(vocab_size):
-                                try:
-                                    # 단어 읽기
-                                    word_bytes = bytearray()
-                                    while True:
-                                        b = f.read(1)
-                                        if not b or b == b' ':
-                                            break
-                                        word_bytes.extend(b)
-                                    
-                                    if not word_bytes:
-                                        break
-                                    
-                                    # 단어 디코딩 (여러 인코딩 시도)
-                                    for encoding in ['utf-8', 'cp949', 'euc-kr']:
-                                        try:
-                                            word = word_bytes.decode(encoding)
-                                            break
-                                        except UnicodeDecodeError:
-                                            continue
-                                    else:
-                                        word = word_bytes.decode('utf-8', errors='ignore')
-                                    
-                                    # 벡터 읽기
-                                    vector = np.fromfile(f, dtype=np.float32, count=vector_size)
-                                    if len(vector) != vector_size:
-                                        break
-                                    
-                                    # 단어와 벡터 추가
-                                    model.add_vector(word, vector)
-                                    
-                                except Exception as e:
-                                    print(f"단어 처리 중 오류: {str(e)}")
-                                    continue
-                            
-                            return model
-                        except Exception as e:
-                            print(f"헤더 파싱 중 오류 발생: {str(e)}")
-                            return None
+                                    except UnicodeDecodeError:
+                                        continue
+                                else:
+                                    word = word_bytes.decode('utf-8', errors='ignore')
+                                
+                                # 벡터 읽기
+                                vector = np.fromfile(f, dtype=np.float32, count=vector_size)
+                                if len(vector) != vector_size:
+                                    break
+                                
+                                # 단어와 벡터 추가
+                                model.add_vector(word, vector)
+                                
+                            except Exception as e:
+                                print(f"단어 처리 중 오류: {str(e)}")
+                                continue
+                        
+                        return model
                     else:
                         print("알 수 없는 파일 포맷")
                         return None
@@ -174,7 +149,7 @@ except Exception as e:
     word2vec_model = None
 
 
-# 한국어SBERT와 KoSimCSE 모델을 로드하는 함수 정의
+# SBERT와 KoSimCSE 모델을 로드하는 함수 정의
 def load_sbert_model():
     """
     한국어 SBERT와 KoSimCSE 모델을 로드하는 함수
@@ -203,132 +178,6 @@ except Exception as e:
     nlp_models = None
 
 
-# KPF-BERT 모델 로드 함수 수정
-def load_kpf_bert():
-    """한국어 BERT 모델과 토크나이저를 로드하는 함수"""
-    try:
-        # KLUE-BERT 모델 사용 (공개 모델)
-        model_name_or_path = "klue/bert-base"
-        
-        # 모델과 토크나이저 로드
-        tokenizer = BertTokenizer.from_pretrained(
-            model_name_or_path,
-            do_lower_case=False  # 한국어는 소문자화하지 않음
-        )
-        
-        model = BertModel.from_pretrained(
-            model_name_or_path,
-            add_pooling_layer=False
-        )
-        
-        if torch.cuda.is_available():
-            model = model.cuda()
-        model.eval()
-        
-        return tokenizer, model
-        
-    except Exception as e:
-        print(f"BERT 모델 로드 실패: {str(e)}")
-        # 대체 모델 시도
-        try:
-            # KoCharELECTRA 모델 시도 (또 다른 공개 모델)
-            model_name_or_path = "monologg/kocharelectra-base-discriminator"
-            
-            tokenizer = BertTokenizer.from_pretrained(model_name_or_path)
-            model = BertModel.from_pretrained(model_name_or_path)
-            
-            if torch.cuda.is_available():
-                model = model.cuda()
-            model.eval()
-            
-            return tokenizer, model
-            
-        except Exception as fallback_e:
-            print(f"대체 모델 로드도 실패: {str(fallback_e)}")
-            return None, None
-
-# 전역 변수로 KPF-BERT 모델 로드
-kpf_tokenizer, kpf_model = load_kpf_bert()
-
-def correct_text_with_bert(text, window_size=5):
-    """
-    KPF-BERT를 사용한 문맥 기반 오타 수정 함수
-    """
-    try:
-        if kpf_tokenizer is None or kpf_model is None:
-            return text
-
-        # 토큰화
-        tokens = kpf_tokenizer.tokenize(text)
-        if not tokens:
-            return text
-        
-        corrected_tokens = []
-        
-        # 슬라이딩 윈도우로 문맥 고려
-        for i in range(len(tokens)):
-            current_token = tokens[i]
-            
-            # 특수 토큰이나 숫자는 건너뛰기
-            if current_token.startswith('##') or current_token.isdigit():
-                corrected_tokens.append(current_token)
-                continue
-            
-            # 문맥 윈도우 생성
-            start_idx = max(0, i - window_size)
-            end_idx = min(len(tokens), i + window_size + 1)
-            context = tokens[start_idx:i] + [kpf_tokenizer.mask_token] + tokens[i+1:end_idx]
-            
-            # BERT 입력 생성
-            inputs = kpf_tokenizer.encode_plus(
-                ' '.join(context),
-                return_tensors='pt',
-                padding=True,
-                truncation=True,
-                max_length=512
-            )
-            
-            if torch.cuda.is_available():
-                inputs = {k: v.cuda() for k, v in inputs.items()}
-            
-            # BERT로 예측
-            with torch.no_grad():
-                outputs = kpf_model(**inputs)
-                predictions = outputs.logits
-            
-            # MASK 토큰 위치의 예측값 추출
-            mask_idx = torch.where(inputs['input_ids'] == kpf_tokenizer.mask_token_id)[1]
-            if len(mask_idx) == 0:
-                corrected_tokens.append(current_token)
-                continue
-                
-            mask_predictions = predictions[0, mask_idx[0]]
-            
-            # 상위 5개 예측 중에서 원본 토큰과 가장 유사한 것 선택
-            top_5 = torch.topk(mask_predictions, 5)
-            candidates = [kpf_tokenizer.convert_ids_to_tokens(idx.item()) 
-                        for idx in top_5.indices]
-            
-            # 원본 토큰과 가장 유사한 후보 선택
-            best_candidate = current_token
-            max_similarity = 0
-            
-            for candidate in candidates:
-                # 자카드 유사도 계산
-                similarity = len(set(current_token) & set(candidate)) / \
-                           len(set(current_token) | set(candidate))
-                if similarity > max_similarity and similarity > 0.5:  # 임계값
-                    max_similarity = similarity
-                    best_candidate = candidate
-            
-            corrected_tokens.append(best_candidate)
-        
-        # 토큰을 다시 문장으로 조합
-        return kpf_tokenizer.convert_tokens_to_string(corrected_tokens)
-        
-    except Exception as e:
-        print(f"텍스트 교정 중 오류 발생: {str(e)}")
-        return text
 
 
 # 유튜브 영상 설명에서 연관 단어를 분석하여 네트워크 그래프를 생성하는 함수
@@ -337,11 +186,6 @@ def analyze_related_words(video_desc):
     유튜브 영상 설명에서 연관 단어를 분석하여 네트워크 그래프를 생성하는 함수
     """
     try:
-        # 텍스트 전처리 및 오타 수정
-        if kpf_model is not None:
-            video_desc = correct_text_with_bert(video_desc)
-            print("오타 수정된 텍스트:", video_desc)
-        
         # 불용어 처리: 분석에서 제외할 단어들을 파일에서 로드
         stopwords = set()
         try:
@@ -406,7 +250,7 @@ def analyze_related_words(video_desc):
             word_pairs = []
             word_importance = {}  
             
-            # 문맥 윈도 생성
+            # 문맥 윈도우 생성
             context_windows = []
             window_size = 5
             for i in range(len(words)):
@@ -539,7 +383,7 @@ def analyze_related_words(video_desc):
                     print("그래프에 노드가 없습니다.")
                     return nx.Graph(), [], []
             
-            # 위 관계 추출
+            # 상위 관계 추출
             if word2vec_model is not None:
                 filtered_pairs = [(pair, score) for pair, score in word_pairs 
                                 if pair[0] in G.nodes and pair[1] in G.nodes]
@@ -561,25 +405,23 @@ def analyze_related_words(video_desc):
         return nx.Graph(), [], []
 
 
-# 네트워크 그래프를 시각화하는 함수
+# 네트워크 그���프를 시각화하는 함수
 def generate_network_graph(G):
     """네트워크 그래프를 생성하는 함수"""
     try:
         # matplotlib 백엔드 설정
         matplotlib.use('Agg')
         
-        # ���글 폰트 설정
-        font_path = os.path.join(settings.STATIC_ROOT, 'fonts', 'NanumGothic.ttf')
-        if not os.path.exists(font_path):
-            # STATIC_ROOT에 없으면 STATICFILES_DIRS에서 찾기
-            for static_dir in settings.STATICFILES_DIRS:
-                alt_font_path = os.path.join(static_dir, 'fonts', 'NanumGothic.ttf')
-                if os.path.exists(alt_font_path):
-                    font_path = alt_font_path
-                    break
-
-        # 폰트 설정
-        plt.rcParams['font.family'] = 'NanumGothic'
+        # 한글 폰트 설정 - Malgun Gothic 사용
+        plt.rcParams['font.family'] = 'Malgun Gothic'
+        
+        # 폰트 경로가 다르다면 직접 지정
+        try:
+            font_path = "C:/Windows/Fonts/malgun.ttf"
+            font_prop = matplotlib.font_manager.FontProperties(fname=font_path)
+            plt.rcParams['font.family'] = font_prop.get_name()
+        except:
+            print("기본 폰트를 사용합니다.")
         
         # 그래프 크기 설정
         plt.figure(figsize=(8, 6))
