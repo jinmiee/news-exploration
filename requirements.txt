@@ -108,14 +108,6 @@ multidict==6.1.0
 nest-asyncio==1.6.0
 networkx==3.4.2
 numpy==1.26.2
-opentelemetry-api==1.28.2
-opentelemetry-exporter-otlp==1.28.2
-opentelemetry-exporter-otlp-proto-common==1.28.2
-opentelemetry-exporter-otlp-proto-grpc==1.28.2
-opentelemetry-exporter-otlp-proto-http==1.28.2
-opentelemetry-proto==1.28.2
-opentelemetry-sdk==1.28.2
-opentelemetry-semantic-conventions==0.49b2
 ordered-set==4.1.0
 packaging==24.2
 pandas==2.1.4
