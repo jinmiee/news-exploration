@@ -295,6 +295,7 @@ def save_daily_top10():
     """
     어제 날짜 데이터를 기반으로 상위 10개 비디오를 선정하고 저장
     """
+    print("save_daily_top10 함수가 호출되었습니다.")  # 로그 추가
     try:
         # 오늘과 어제 날짜를 KST(Asia/Seoul) 기준으로 가져오기
         seoul_tz = timezone('Asia/Seoul')
@@ -335,59 +336,60 @@ def save_daily_top10():
     except Exception as e:
         logger.error(f"save_daily_top10 failed: {e}")
 
+from datetime import timedelta
+
 def weekly_issues(request):
-    # 요청에서 날짜 가져오기
     date_str = request.GET.get('date')
     seoul_tz = pytz.timezone('Asia/Seoul')
+    today = datetime.now(seoul_tz).date()
+    yesterday = today - timedelta(days=1)  # 어제 날짜 계산
 
+    # 날짜 처리
     if date_str:
         try:
             target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
         except ValueError:
-            target_date = None
+            target_date = yesterday  # 잘못된 날짜 입력 시 어제 날짜로 설정
     else:
-        target_date = None
+        target_date = yesterday  # 기본값: 어제 날짜
 
-    # 특정 날짜 범위 설정
-    if target_date:
-        start_date = datetime.combine(target_date, datetime.min.time()).replace(tzinfo=seoul_tz)
-        end_date = datetime.combine(target_date + timedelta(days=1), datetime.min.time()).replace(tzinfo=seoul_tz)
-    else:
-        today = datetime.now(seoul_tz).date()
-        start_date = datetime.combine(today - timedelta(days=7), datetime.min.time()).replace(tzinfo=seoul_tz)
-        end_date = datetime.combine(today + timedelta(days=1), datetime.min.time()).replace(tzinfo=seoul_tz)
+    # target_date가 어제보다 크다면 강제로 어제 날짜로 설정
+    if target_date > yesterday:
+        target_date = yesterday
+
+    # 검색한 날짜 기준으로 내림차순 최근 6일 범위 계산
+    start_date = target_date - timedelta(days=5)
+    end_date = target_date + timedelta(days=1)
 
     # UTC 변환
-    start_date_utc = start_date.astimezone(pytz.UTC)
-    end_date_utc = end_date.astimezone(pytz.UTC)
+    start_date_utc = datetime.combine(start_date, datetime.min.time()).astimezone(pytz.UTC)
+    end_date_utc = datetime.combine(end_date, datetime.min.time()).astimezone(pytz.UTC)
 
-    # MongoDB���서 데이터 필터링
-    issues = WeeklyIssue.objects.filter(upload_date__gte=start_date_utc, upload_date__lt=end_date_utc)
+    # 데이터 필터링
+    issues = WeeklyIssue.objects.filter(
+        upload_date__gte=start_date_utc,
+        upload_date__lt=end_date_utc
+    ).order_by('-upload_date')
 
     # 날짜별로 그룹화
     grouped_issues = defaultdict(list)
     for issue in issues:
-        # UTC → KST 변환 후 날짜별 그룹화
-        date_key = issue.upload_date.astimezone(seoul_tz).date()
-        grouped_issues[date_key].append(issue)
+        issue_date = issue.upload_date.astimezone(seoul_tz).date()
+        weekday = issue_date.strftime("%Y년 %m월 %d일 (%a)")
+        grouped_issues[weekday].append({
+            'rank': len(grouped_issues[weekday]) + 1,
+            'title': clean_title(issue.title),
+            'views': issue.views,
+            'url': issue.url,
+        })
 
-    # 날짜별 상위 10개로 제한
-    for date_key in grouped_issues:
-        grouped_issues[date_key] = grouped_issues[date_key][:10]
+    # 정렬 및 최대 6개만 유지
+    sorted_issues = sorted(grouped_issues.items(), key=lambda x: x[0], reverse=True)[:6]
 
-    # 날짜별로 정렬
-    sorted_issues = sorted(grouped_issues.items(), key=lambda x: x[0], reverse=True)
-
-    # 디버깅 출력
-    print("Final Grouped Issues:")
-    for date_key, issue_list in sorted_issues:
-        print(f"Date: {date_key}, Count: {len(issue_list)}")
-        for issue in issue_list:
-            print(f"Title: {issue.title}, Upload Date: {issue.upload_date}")
-
-    # 템플릿에 전달할 컨텍스트
     context = {
         'sorted_issues': sorted_issues,
+        'target_date': target_date,
+        'yesterday': yesterday,  # 어제 날짜를 템플릿에 전달
     }
 
     return render(request, 'analysis/weekly_issues.html', context)
