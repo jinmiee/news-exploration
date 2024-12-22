@@ -34,6 +34,10 @@ SIMILARITY_THRESHOLD = 0.73
 TOP_KEYWORDS_COUNT = 30
 t = brn.Tagger(API_KEY, "localhost")
 
+# 파일 상단에 추가
+import logging
+logging.getLogger('sentence_transformers').setLevel(logging.WARNING)  # INFO 대신 WARNING으로 설정
+
 def load_pretrained_model():
     """
     사전 학습된 한국어 Word2Vec 모델을 로드하는 함수
@@ -139,11 +143,11 @@ def load_sbert_model():
 # Word2Vec 모델 로드
 try:
     logger.info("Word2Vec 모델 로딩 시작...")
-    logger.info(f"현재 작업 디렉토리: {os.getcwd()}")
+    # logger.info(f"현재 작업 디렉토리: {os.getcwd()}")
     word2vec_model = load_pretrained_model()
     if word2vec_model is not None:
         logger.info("Word2Vec 모델 로딩 완료")
-        logger.info(f"모델 크기: {len(word2vec_model.key_to_index)} 어")
+        # logger.info(f"모델 크기: {len(word2vec_model.key_to_index)} ")
     else:
         logger.warning("Word2Vec 모델 로딩 실패")
 except Exception as e:
