@@ -32,36 +32,23 @@
                         <a href="#" class="news-title" data-video-url="{{ item.url }}" data-thumbnail="{{ item.thumbnail }}">
                             {{ item.cleaned_title }}
                         </a>
-                        <div class="news-info">
-                            <span class="info-item">
-                                <i class="fas fa-eye"></i>
-                                {{ item.views }}
-                            </span>
-                            <span class="info-item">
-                                <i class="fas fa-thumbs-up"></i>
-                                {{ item.likes }}
-                            </span>
-                            <span class="info-item">
-                                <i class="fas fa-calendar"></i>
-                                {{ item.upload_date|date:"Y-m-d H:i" }}
-                            </span>
-                            {% if user.is_authenticated %}
-                                <button class="like-button" data-id="{{ item.id }}" onclick="likeVideo('{{ item.id }}')">
-                                    {% if item.is_liked_by_user %}
-                                        ❤️
-                                    {% else %}
-                                        ♡
-                                    {% endif %}
-                                </button>
+                        {% if user.is_authenticated %}
+                        <button class="like-button" data-id="{{ item.id }}" onclick="likeVideo('{{ item.id }}')">
+                            {% if item.is_liked_by_user %}
+                                ❤️
                             {% else %}
-                                <a href="#" class="like-button" data-title="{{ item.title }}" data-url="{{ item.url }}">
-                                    ♡
-                                </a>
+                                ♡
                             {% endif %}
-                        </div>
+                        </button>
+                        {% else %}
+                        <a href="#" class="like-button" data-title="{{ item.title }}" data-url="{{ item.url }}">
+                            ♡
+                        </a>
+                        {% endif %}
                     </div>
                 </li>
                 {% endfor %}
+
 
                 <!-- 공통 모달 -->
                 <div id="login-modal" class="modal" style="display: none;">
@@ -111,255 +98,6 @@
         </div>
     </div>
 </div>
-
-<style>
-.chart-container {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 20px;
-}
-
-.chart-header {
-    text-align: center;
-    margin-bottom: 2rem;
-}
-
-.chart-header h1 {
-    font-size: 2.5rem;
-    color: #333;
-    margin-bottom: 0.5rem;
-}
-
-.subtitle {
-    color: #666;
-    font-size: 1.1rem;
-}
-
-.content-container {
-    display: flex;
-    gap: 2rem;
-    align-items: flex-start;
-}
-
-.news-list {
-    flex: 1;
-    min-width: 0;
-}
-
-.news-list ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-
-.news-item {
-    display: flex;
-    align-items: flex-start;
-    padding: 1.2rem;
-    margin-bottom: 1rem;
-    background: #fff;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.news-item:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
-}
-
-.rank-badge {
-    background: #007bff;
-    color: white;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    margin-right: 1rem;
-    flex-shrink: 0;
-}
-
-.news-content {
-    flex: 1;
-    min-width: 0;
-}
-
-.news-title {
-    display: block;
-    font-size: 1.1rem;
-    color: #333;
-    text-decoration: none;
-    margin-bottom: 0.8rem;
-    line-height: 1.4;
-}
-
-.news-title:hover {
-    color: #007bff;
-}
-
-.news-info {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
-    font-size: 0.9rem;
-    color: #666;
-}
-
-.info-item {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-}
-
-.like-button {
-    color: #ff4757;
-    text-decoration: none;
-}
-
-.video-sidebar {
-    width: 600px;
-    background: #fff;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    padding: 1.5rem;
-}
-
-.sidebar-header {
-    margin-bottom: 1rem;
-}
-
-.sidebar-header h2 {
-    font-size: 1.5rem;
-    color: #333;
-}
-
-#player-wrapper {
-    width: 100%;
-    position: relative;
-    padding-top: 56.25%; /* 16:9 비율 */
-    margin-bottom: 1.5rem;
-}
-
-#youtube-player,
-#thumbnail-container {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    border-radius: 8px;
-    overflow: hidden;
-}
-
-.thumbnail-wrapper {
-    display: block;
-    width: 100%;
-    height: 100%;
-    position: relative;
-}
-
-#thumbnail-img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.play-button-overlay {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(0, 0, 0, 0.8);
-    color: white;
-    padding: 1rem 1.5rem;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    gap: 0.8rem;
-    transition: background-color 0.3s;
-}
-
-.play-button-overlay:hover {
-    background: rgba(0, 0, 0, 0.9);
-}
-
-.analysis-buttons {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
-}
-
-.btn-analysis {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    padding: 0.8rem;
-    background: #f8f9fa;
-    color: #333;
-    text-decoration: none;
-    border-radius: 8px;
-    transition: all 0.3s;
-}
-
-.btn-analysis:hover {
-    background: #007bff;
-    color: white;
-}
-
-/* 반응형 스타일 */
-@media (max-width: 1200px) {
-    .content-container {
-        flex-direction: column;
-    }
-
-    .video-sidebar {
-        width: 100%;
-    }
-}
-
-@media (max-width: 768px) {
-    .chart-header h1 {
-        font-size: 2rem;
-    }
-
-    .news-item {
-        padding: 1rem;
-    }
-
-    .rank-badge {
-        width: 28px;
-        height: 28px;
-        font-size: 0.9rem;
-    }
-
-    .news-title {
-        font-size: 1rem;
-    }
-
-    .news-info {
-        font-size: 0.8rem;
-    }
-
-    .analysis-buttons {
-        grid-template-columns: 1fr;
-    }
-}
-
-@media (max-width: 480px) {
-    .chart-container {
-        padding: 10px;
-    }
-
-    .news-info {
-        flex-direction: column;
-        gap: 0.5rem;
-    }
-}
-</style>
 
 <!-- YouTube API 로드 -->
 <script src="https://www.youtube.com/iframe_api"></script>
@@ -424,26 +162,44 @@
     function loadVideo(videoUrl, thumbnailUrl) {
         const videoId = extractVideoId(videoUrl);
         const sidebar = document.getElementById('sidebar');
-        sidebar.style.display = 'block';
 
+        // 선택된 뉴스 제목에 활성화 클래스 추가
+        const activeTitle = document.querySelector('.news-title.active');
+        if (activeTitle && activeTitle.getAttribute('data-video-url') === videoUrl) {
+            // 같은 기사를 클릭하면 사이드바를 닫음
+            sidebar.style.display = 'none';
+            activeTitle.classList.remove('active');
+
+            // 동영상 정지
+            if (player) {
+                player.stopVideo();
+            }
+            return;
+        }
+
+        // 기존 활성화 클래스 제거
         document.querySelectorAll('.news-title').forEach(title => {
             title.classList.remove('active');
         });
         event.target.classList.add('active');
 
+        // 사이드바를 보이게 설정
+        sidebar.style.display = 'block';
+
+        // 유튜브 플레이어 설정
         document.getElementById('youtube-player').style.display = 'block';
         document.getElementById('thumbnail-container').style.display = 'none';
 
-        try {
-            player.loadVideoById({
-                videoId: videoId,
-                events: {
-                    'onError': handlePlayerError
-                }
-            });
-        } catch (error) {
-            console.error('동영상 로드 중 오류 발생:', error);
-            showThumbnailMode(videoUrl, thumbnailUrl);
+        // 동영상 로드
+        if (player && videoId) {
+            try {
+                player.loadVideoById(videoId);
+            } catch (error) {
+                console.error('동영상 로드 중 오류 발생:', error);
+                showThumbnailMode(videoUrl, thumbnailUrl);
+            }
+        } else {
+            console.error('유효하지 않은 동영상 ID입니다:', videoId);
         }
 
         updateAnalysisButtons(videoUrl, videoId);
@@ -564,99 +320,4 @@
     
     
 </script>
-
-<style>
-#player-wrapper {
-    width: 560px;
-    height: 315px;
-    position: relative;
-}
-
-#youtube-player,
-#thumbnail-container {
-    width: 100%;
-    height: 100%;
-    position: absolute;
-    top: 0;
-    left: 0;
-}
-
-.thumbnail-wrapper {
-    display: block;
-    width: 100%;
-    height: 100%;
-    position: relative;
-    text-decoration: none;
-}
-
-#thumbnail-img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.play-button-overlay {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background-color: rgba(0, 0, 0, 0.7);
-    color: white;
-    padding: 15px 25px;
-    border-radius: 5px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    transition: background-color 0.3s ease;
-}
-
-.play-button-overlay i {
-    font-size: 24px;
-}
-
-.play-button-overlay:hover {
-    background-color: rgba(0, 0, 0, 0.9);
-}
-
-.news-title.active {
-    color: #007bff;
-    font-weight: bold;
-}
-
-.modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-}
-
-.modal-content {
-    background-color: #fff;
-    padding: 20px;
-    border-radius: 5px;
-    text-align: center;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-}
-
-#close-modal {
-    margin-top: 10px;
-    padding: 5px 10px;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    border-radius: 3px;
-    cursor: pointer;
-}
-
-#close-modal:hover {
-    background-color: #0056b3;
-}
-
-</style>
 {% endblock %}

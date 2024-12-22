@@ -18,6 +18,7 @@ from .forms import UserRegistrationForm
 from .models import YouTubeData, Like, WeeklyIssue
 from urllib.parse import urlparse, parse_qs
 
+from pytz import timezone
 import pytz
 
 import matplotlib
@@ -307,38 +308,49 @@ def save_all_historical_top10():
     except Exception as e:
         print(f"save_all_historical_top10 failed: {e}")
 
-import logging
-logger = logging.getLogger(__name__)
-
 def save_daily_top10():
     """
     어제 날짜 데이터를 기반으로 상위 10개 비디오를 선정하고 저장
     """
-    print("save_daily_top10 함수가 호출되었습니다.")  # 로그 추가
+    print("save_daily_top10 함수가 호출되었습니다.")  # 디버깅 로그
     try:
-        # 오늘과 어제 날짜를 KST(Asia/Seoul) 기준으로 가져오기
-        seoul_tz = timezone('Asia/Seoul')
+        # KST(한국 시간대) 기준 어제 날짜 가져오기
+        seoul_tz = timezone('Asia/Seoul')  # pytz의 timezone 함수 사용
         today = datetime.now(seoul_tz).date()
         yesterday = today - timedelta(days=1)
 
-        # 어제의 시작과 끝을 UTC로 변환
-        start_date = datetime.combine(yesterday, datetime.min.time()).replace(tzinfo=seoul_tz).astimezone(pytz.UTC)
-        end_date = datetime.combine(yesterday, datetime.max.time()).replace(tzinfo=seoul_tz).astimezone(pytz.UTC)
+        print(f"어제 날짜: {yesterday}")  # 디버깅 로그
 
-        # 어제 날짜 데이터 필터링
-        daily_videos = YouTubeData.objects.filter(upload_date__gte=start_date, upload_date__lt=end_date)
+        # 어제 날짜의 동영상 필터링
+        all_videos = YouTubeData.objects.filter(
+            upload_date__gte=datetime.combine(yesterday, datetime.min.time()).replace(tzinfo=seoul_tz).astimezone(pytz.UTC),
+            upload_date__lt=datetime.combine(yesterday, datetime.max.time()).replace(tzinfo=seoul_tz).astimezone(pytz.UTC)
+        ).order_by('upload_date')
 
-        if not daily_videos.exists():
-            logger.warning("No videos found for yesterday.")
+        if not all_videos.exists():
+            print("어제 날짜에 해당하는 동영상이 없습니다.")  # 디버깅 로그
             return
 
-        # 상위 10개 선정 (중복 제거 포함)
-        top_videos = get_top10_chart_based(daily_videos)
+        print(f"어제 날짜의 동영상 수: {all_videos.count()}")  # 디버깅 로그
 
-        # 데이터 저장
+        # 상위 10개 선정
+        top_videos = get_top10_chart_based(all_videos)
+
         for video in top_videos:
+            print(f"Saving video: {video.title}, ID: {video._id}")  # 디버깅 로그
+
+            # _id가 문자열인 경우 ObjectId로 변환
+            video_id = video._id
+            if isinstance(video._id, str):
+                try:
+                    video_id = ObjectId(video._id)
+                except Exception as e:
+                    print(f"ObjectId 변환 실패: {e}")
+                    continue
+
+            # 데이터 저장
             WeeklyIssue.objects.update_or_create(
-                _id=video._id,
+                _id=video_id,
                 defaults={
                     'title': video.title,
                     'channel_name': video.channel_name,
@@ -351,11 +363,11 @@ def save_daily_top10():
                     'transcript': video.transcript or []
                 }
             )
-        logger.info("Daily top 10 videos saved successfully.")
+        print("Daily top 10 videos saved successfully.")
     except Exception as e:
-        logger.error(f"save_daily_top10 failed: {e}")
-
-from datetime import timedelta
+        import traceback
+        print("".join(traceback.format_exc()))  # 전체 스택 트레이스 출력
+        print(f"save_daily_top10 failed: {e}")  # 디버깅 로그
 
 def weekly_issues(request):
     date_str = request.GET.get('date')
