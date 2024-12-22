@@ -9,7 +9,7 @@
 {% block content %}
 <header>
     <h1>주간 이슈</h1>
-    <p>지난 7일간 주요 뉴스를 날짜별로 확인하세요.</p>
+    <p>지난 주요 뉴스를 날짜별로 확인하세요.</p>
 </header>
 
 <div class="date-search-container">
@@ -33,7 +33,27 @@
 <div class="issue-container">
     {% for date, issues in sorted_issues %}
     <div class="issue-card">
-        <h2 class="issue-date">{{ date }}</h2>
+        <h2 class="issue-date">
+            {% with date|date:"l" as weekday %}
+                {% if weekday == "Monday" %}
+                    월
+                {% elif weekday == "Tuesday" %}
+                    화
+                {% elif weekday == "Wednesday" %}
+                    수
+                {% elif weekday == "Thursday" %}
+                    목
+                {% elif weekday == "Friday" %}
+                    금
+                {% elif weekday == "Saturday" %}
+                    토
+                {% elif weekday == "Sunday" %}
+                    일
+                {% endif %}
+            {% endwith %}
+            {{ date }} <!-- 날짜 출력 -->
+        </h2>
+        <div class="date-bar"></div> <!-- 날짜 아래 바 추가 -->
         <ul class="issue-list">
             {% for issue in issues %}
             <li class="issue-item">
@@ -107,4 +127,3 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 
 {% endblock %}
-

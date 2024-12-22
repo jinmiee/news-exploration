@@ -39,7 +39,7 @@ import re
 
 def clean_title(title):
     """
-    뉴스 제목에서 /방송사이름만 제거���고 나머지 텍스트는 유지하는 함수
+    뉴스 제목에서 /방송사이름만 제거하고 나머지 텍스트는 유지하는 함수
     """
     # 대괄호 안의 내용 제거 (예: [이슈])
     title = re.sub(r'\[.*?\]', '', title)
@@ -86,6 +86,25 @@ def clean_title(title):
 
     # 'YYYY년 MM월 DD일'형식 날짜 제거
     title = re.sub(r'\d{4}년\s*\d{1,2}월\s*\d{1,2}일', '', title)
+
+    title = re.sub(r'-\s*MBC\s*뉴스', '', title, flags=re.IGNORECASE)
+
+    # 6시 뉴스 | 12/22 - 제거
+    title = re.sub(r'6시\s*뉴스\s*\|', '', title, flags=re.IGNORECASE)
+
+    # 특정 단어 제거 (예: MBC 뉴스, TV, News, 6시 뉴스 등)
+    title = re.sub(r'\b(MBC\s*뉴스|6시\s*뉴스|TV|News|8뉴스|오대영\s*라이브)\b', '', title, flags=re.IGNORECASE)
+
+    # 날짜 형식 제거 (예: 2024.12.05, 12/22, (일) 등)
+    title = re.sub(r'\d{4}\.\d{2}\.\d{2}', '', title)
+    title = re.sub(r'\d{1,2}/\d{1,2}', '', title)
+    title = re.sub(r'\(\S+\)', '', title)  # 괄호 안의 내용 제거 (예: (일))
+
+    # | 밀착카메라 2024 결산 제거
+    title = re.sub(r'\|\s*밀착카메라\s*\d{4}\s*결산', '', title, flags=re.IGNORECASE)
+
+    # | - 패턴 제거
+    title = re.sub(r'\|\s*-\s*', '', title)
 
     # 앞뒤 공백 제거
     return title.strip()
@@ -248,7 +267,7 @@ def save_all_historical_top10():
         seoul_tz = timezone('Asia/Seoul')
 
         for video in all_videos:
-            # Null 또는 None ��크
+            # Null 또는 None 체크
             if not video.upload_date:
                 print(f"Video {video.title} has no upload_date. Skipping...")
                 continue
@@ -375,7 +394,7 @@ def weekly_issues(request):
     grouped_issues = defaultdict(list)
     for issue in issues:
         issue_date = issue.upload_date.astimezone(seoul_tz).date()
-        weekday = issue_date.strftime("%Y년 %m월 %d일 (%a)")
+        weekday = issue_date.strftime("%Y년 %m월 %d일 (%a)").replace("Mon", "월").replace("Tue", "화").replace("Wed", "수").replace("Thu", "목").replace("Fri", "금").replace("Sat", "토").replace("Sun", "일")
         grouped_issues[weekday].append({
             'rank': len(grouped_issues[weekday]) + 1,
             'title': clean_title(issue.title),
@@ -568,37 +587,35 @@ def relate(request):
     
     video = YouTubeData.objects.filter(url=video_url).first()
     
-    if video:
+    if video and video.transcript:
         try:
-            # 제목과 설명을 결합하여 video_desc 생성
-            video_desc = f"{clean_title(video.title)} {video.desc if video.desc else ''}"
+            # 제목 불용어 처리
+            cleaned_title = clean_title(video.title)
             
-            # transcript 데이터 처리
+            # transcript 데이터를 시간 단위로 구분하여 텍스트로 변환
+            transcript_text = ' '.join([item['text'] for item in video.transcript])
+            # 시간별 자막 데이터 생성
             transcript_segments = []
-            if video.transcript:
-                for item in video.transcript:
-                    if 'start' in item and 'text' in item:
-                        start_time = int(float(item['start']))
-                        minutes = start_time // 60
-                        seconds = start_time % 60
-                        time_str = f"{minutes:02d}:{seconds:02d}"
-                        transcript_segments.append({
-                            'time': time_str,
-                            'text': item['text']
-                        })
+            for item in video.transcript:
+                if 'start' in item and 'text' in item:
+                    start_time = int(float(item['start']))
+                    minutes = start_time // 60
+                    seconds = start_time % 60
+                    time_str = f"{minutes:02d}:{seconds:02d}"
+                    transcript_segments.append({
+                        'time': time_str,
+                        'text': item['text']
+                    })
             
-            # 연관어 분석 수행
-            graph, top_pairs, important_keywords = analyze_related_words(video_desc, video.transcript)
+            graph, top_pairs, important_keywords = analyze_related_words(transcript_text)
             network_graph = generate_network_graph(graph)
             
             # 키워드별 관련 뉴스 분류
             categorized_news = {}
             if important_keywords:
                 for keyword in important_keywords:
-                    # 키워드로 관련 뉴스 검색
                     related_news = YouTubeData.objects.filter(
-                        Q(title__icontains=keyword) | 
-                        Q(desc__icontains=keyword)
+                        title__icontains=keyword
                     ).exclude(url=video_url)[:6]
                     
                     if related_news:
@@ -615,12 +632,13 @@ def relate(request):
             context = {
                 'section': 'relate',
                 'video': video,
-                'video_title': clean_title(video.title),
+                'video_title': cleaned_title,
                 'network_graph': network_graph,
                 'top_pairs': top_pairs,
                 'categorized_news': categorized_news,
                 'important_keywords': important_keywords,
-                'transcript_segments': transcript_segments
+                'transcript_text': transcript_text,
+                'transcript_segments': transcript_segments  # 시간별 자막 데이터 추가
             }
         except Exception as e:
             print(f"분석 중 오류 발생: {str(e)}")
@@ -631,7 +649,7 @@ def relate(request):
     else:
         context = {
             'section': 'relate',
-            'error_message': '비디오를 찾을 수 없습니다.'
+            'error_message': '비디오 자막이 없거나 비디오를 찾을 수 없습니다.'
         }
     
     return render(request, 'analysis/relate.html', context)
@@ -718,7 +736,7 @@ from django.core.mail import send_mail
 
 def send_password_reset_email(user, temp_password):
     subject = "비밀번호 초기화 안내"
-    message = f"안녕하세요 {user.username}님,\n\n초기화된 임시 비밀번호는 다음��� 같습니다: {temp_password}\n로그인 후 비밀번호를 변경해주세요."
+    message = f"안녕하세요 {user.username}님,\n\n초기화된 임시 비밀번호는 다음과 같습니다: {temp_password}\n로그인 후 비밀번호를 변경해주세요."
     from_email = "namsugb99@gmail.com"
     recipient_list = [user.email]
     send_mail(subject, message, from_email, recipient_list)

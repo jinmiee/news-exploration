@@ -1,3 +1,37 @@
+main {
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* 모든 자식 요소를 가로 중앙 정렬 */
+    justify-content: flex-start; /* 위쪽부터 정렬 시작 */
+    width: 100%;
+}
+
+header {
+    display: flex; /* 플렉스 박스 사용 */
+    flex-direction: column; /* 세로 정렬 */
+    align-items: center; /* 가로 중앙 정렬 */
+    justify-content: center; /* 세로 중앙 정렬 */
+    text-align: center; /* 텍스트 가운데 정렬 */
+    width: 100%; /* 전체 너비 설정 */
+    margin: 0 auto; /* 전체 가운데 정렬 보조 */
+    padding: 20px 0; /* 위아래 패딩 추가 */
+    box-sizing: border-box; /* 여백 포함한 박스 크기 계산 */
+}
+
+header h1 {
+    font-size: 2rem; /* 제목 크기 조정 */
+    margin-bottom: 10px; /* 제목과 부제목 간 간격 */
+    text-align: center;
+}
+
+header p {
+    margin: 0;
+    font-size: 1rem; /* 부제목 크기 조정 */
+    color: #555; /* 부제목 색상 조정 */
+    text-align: center;
+}
+
+
 .issue-container {
     display: grid;
     grid-template-columns: repeat(3, 1fr); /* 한 줄에 3개의 카드 */
@@ -21,8 +55,8 @@
     flex-direction: column;
     justify-content: space-between; /* 내부 요소 간 간격 균등 분배 */
     transition: transform 0.3s ease, box-shadow 0.3s ease;
+    position: relative;
 }
-
 
 .issue-card h2.issue-date {
     font-size: 1.4rem;
@@ -37,11 +71,14 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
+/* 날짜 밑에 바 추가 */
 .issue-date {
     font-size: 1.2rem;
     font-weight: bold;
     text-align: center; /* 날짜 가운데 정렬 */
     margin-bottom: 0.8rem;
+    padding-bottom: 10px; /* 날짜와 바 사이의 간격 */
+    border-bottom: 2px solid #000; /* 날짜 밑에 바 추가 */
 }
 
 .issue-list {
@@ -117,8 +154,31 @@
     }
 }
 
+.date-bar {
+    background-color: #fafafa; /* 더 연한 회색 */
+    margin: 10px 0;
+}
 
-/* 날짜 검색 컨테이너 */
+.date-container {
+    position: relative;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.date-container .date {
+    padding-bottom: 10px; /* 날짜와 바 사이의 간격 */
+    border-bottom: 2px solid #000; /* 날짜 밑에 바 추가 */
+    margin-bottom: 5px;
+}
+
+/* 요일 한글로 변경 */
+.date-container .weekday {
+    font-weight: bold;
+    font-size: 1.2rem;
+}
+
 .date-search-container {
     display: flex;
     justify-content: center;
