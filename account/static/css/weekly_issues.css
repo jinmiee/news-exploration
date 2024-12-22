@@ -1,9 +1,13 @@
 main {
     display: flex;
     flex-direction: column;
-    align-items: center; /* 모든 자식 요소를 가로 중앙 정렬 */
-    justify-content: flex-start; /* 위쪽부터 정렬 시작 */
-    width: 100%;
+    align-items: center;
+    justify-content: flex-start;
+    width: calc(100% - 40px); /* 좌우 20px씩 여백 추가 */
+    max-width: 1140px;
+    margin: 0 auto;
+    padding: 0; /* 추가적인 패딩 제거 */
+    box-sizing: border-box; /* 여백 포함한 크기 계산 */
 }
 
 header {
@@ -31,32 +35,33 @@ header p {
     text-align: center;
 }
 
-
 .issue-container {
     display: grid;
-    grid-template-columns: repeat(3, 1fr); /* 한 줄에 3개의 카드 */
-    grid-template-rows: repeat(2, 1fr); /* 2줄로 배치 */
-    gap: 2rem; /* 카드 간 간격 */
-    margin: 2rem auto;
-    max-width: 1400px;
-    justify-items: center;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2rem;
+    margin: 0 auto;
+    max-width: 1140px;
+    padding: 0; /* 추가적인 패딩 제거 */
+    justify-content: center; /* 가운데 정렬 */
+    box-sizing: border-box; /* 여백 포함 크기 계산 */
 }
 
 .issue-card {
     background: #fff;
     border: 1px solid #ccc;
-    border-radius: 8px;
+    border-radius: 16px; /* 둥근 모서리를 기존 8px에서 16px로 변경 */
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     padding: 1.5rem;
-    width: 400px; /* 카드 너비 */
-    height: 500px; /* 카드 높이를 고정 */
+    width: 400px;
+    height: 500px;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    justify-content: space-between; /* 내부 요소 간 간격 균등 분배 */
+    justify-content: space-between;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
     position: relative;
 }
+
 
 .issue-card h2.issue-date {
     font-size: 1.4rem;
@@ -78,7 +83,7 @@ header p {
     text-align: center; /* 날짜 가운데 정렬 */
     margin-bottom: 0.8rem;
     padding-bottom: 10px; /* 날짜와 바 사이의 간격 */
-    border-bottom: 2px solid #000; /* 날짜 밑에 바 추가 */
+    border-bottom: none;
 }
 
 .issue-list {
@@ -106,9 +111,11 @@ header p {
 }
 
 .issue-title {
+    font-weight: normal; /* 얇은 글씨 */
+    color: #666; /* 덜 진한 회색으로 변경 (기존 #000에서 더 연한 색상) */
     font-size: 0.9rem; /* 텍스트 크기 */
     margin: 0;
-    line-height: 1.4; /* 줄 간격 */
+    line-height: 1.5; /* 줄 간격 */
     white-space: nowrap; /* 텍스트를 한 줄로 제한 */
     overflow: hidden; /* 넘치는 텍스트 숨김 */
     text-overflow: ellipsis; /* 넘치는 텍스트를 '...'으로 표시 */
@@ -155,8 +162,11 @@ header p {
 }
 
 .date-bar {
-    background-color: #fafafa; /* 더 연한 회색 */
-    margin: 10px 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1); /* 연한 색상 */
+    margin: 0.5rem 0; /* 간격 조정 */
+    width: 80%; /* 중앙 정렬 효과를 위해 너비 조정 */
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .date-container {

@@ -94,7 +94,7 @@ def clean_title(title):
     title = re.sub(r'6시\s*뉴스\s*\|', '', title, flags=re.IGNORECASE)
 
     # 특정 단어 제거 (예: MBC 뉴스, TV, News, 6시 뉴스 등)
-    title = re.sub(r'\b(MBC\s*뉴스|6시\s*뉴스|TV|News|8뉴스|오대영\s*라이브)\b', '', title, flags=re.IGNORECASE)
+    title = re.sub(r'\b(MBC\s*뉴스|6시\s*뉴스|TV|News|8뉴스|오대영\s*라이브|뉴스룸)\b', '', title, flags=re.IGNORECASE)
 
     # 날짜 형식 제거 (예: 2024.12.05, 12/22, (일) 등)
     title = re.sub(r'\d{4}\.\d{2}\.\d{2}', '', title)
