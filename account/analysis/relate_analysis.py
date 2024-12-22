@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 # 상수 정의
 API_KEY = "koba-5JNWNQI-MH5EQJY-QINVNIQ-2IOA5IY"
-SIMILARITY_THRESHOLD = 0.8
+SIMILARITY_THRESHOLD = 0.73
 TOP_KEYWORDS_COUNT = 30
 t = brn.Tagger(API_KEY, "localhost")
 
@@ -290,16 +290,15 @@ def analyze_related_words(video_desc, video_transcript=None):
     try:
         logger.info("연관어 분석 시작")
         
+        # 특정 키워드 매핑 정의
+        special_mappings = {
+            "윤성": "윤석열",
+            "윤성열": "윤석열"
+        }
+        
         # 1. 설명에서 모든 키워드 추출
         desc_keywords = extract_keywords_from_desc(video_desc)
         logger.info(f"설명에서 추출된 키워드: {desc_keywords}")
-        
-        # 디버깅: "윤성"과 "윤석열" 유사도 체크
-        test_keywords = ["윤성", "윤석열"]
-        sbert = nlp_models['sbert']
-        test_embeddings = sbert.encode(test_keywords)
-        test_similarity = cosine_similarity([test_embeddings[0]], [test_embeddings[1]])[0][0]
-        logger.info(f"디버깅 - '윤성'과 '윤석열'의 유사도: {test_similarity:.4f}")
         
         # 2. 자막 처리 및 상위 30개 키워드 추출
         transcript_keywords = []
@@ -312,23 +311,37 @@ def analyze_related_words(video_desc, video_transcript=None):
                 transcript_text = video_transcript
                 
             # 자막에서 키워드 추출
-            transcript_keywords = extract_keywords_from_desc(transcript_text)
+            all_transcript_keywords = extract_keywords_from_desc(transcript_text)
             
+            if not all_transcript_keywords:
+                logger.warning("자막에서 추출된 키워드가 없습니다.")
+                return nx.Graph(), [], []
+            
+            # TF-IDF 계산을 위한 문서 생성
+            documents = [' '.join([k] * all_transcript_keywords.count(k)) for k in set(all_transcript_keywords)]
+            if not documents:
+                logger.warning("TF-IDF 계산을 위한 문서가 없습니다.")
+                return nx.Graph(), [], []
+                
             # TF-IDF 계산
-            vectorizer = TfidfVectorizer()
-            tfidf_matrix = vectorizer.fit_transform([' '.join([k] * transcript_keywords.count(k)) for k in set(transcript_keywords)])
-            tfidf_scores = dict(zip(set(transcript_keywords), tfidf_matrix.toarray().sum(axis=1)))
+            try:
+                vectorizer = TfidfVectorizer(min_df=1)  # 최소 문서 빈도를 1로 설정
+                tfidf_matrix = vectorizer.fit_transform(documents)
+                tfidf_scores = dict(zip(vectorizer.get_feature_names_out(), tfidf_matrix.toarray().sum(axis=0)))
+            except Exception as e:
+                logger.error(f"TF-IDF 계산 중 오류: {str(e)}")
+                return nx.Graph(), [], []
             
             # 빈도수 계산
-            keyword_freq = Counter(transcript_keywords)
+            keyword_freq = Counter(all_transcript_keywords)
             
             # 중요도 점수 계산 (TF-IDF + 빈도)
             max_freq = max(keyword_freq.values())
-            max_tfidf = max(tfidf_scores.values())
+            max_tfidf = max(tfidf_scores.values()) if tfidf_scores else 1.0
             
-            for keyword in set(transcript_keywords):
+            for keyword in set(all_transcript_keywords):
                 freq_score = keyword_freq[keyword] / max_freq
-                tfidf_score = tfidf_scores[keyword] / max_tfidf
+                tfidf_score = tfidf_scores.get(keyword, 0) / max_tfidf
                 keyword_importance[keyword] = 0.7 * freq_score + 0.3 * tfidf_score
             
             # 상위 30개 키워드 선정
@@ -340,67 +353,113 @@ def analyze_related_words(video_desc, video_transcript=None):
             
             logger.info(f"자막에서 추출된 상위 {TOP_KEYWORDS_COUNT}개 키워드: {transcript_keywords}")
         
-        # 3. LSH를 사용한 효율적인 유사도 계산
+        if not transcript_keywords:
+            logger.warning("처리할 키워드가 없습니다.")
+            return nx.Graph(), [], []
+            
+        # 3. LSH, SBERT, SimCSE 결합한 효율적인 유사도 계산
         keyword_mapping = {}  # 매핑 결과 저장
         node_sizes = {}       # 노드 크기 저장
         final_keywords = set()  # 최종 키워드 집합
         
-        # SBERT 모델을 사용하여 임베딩 계산
-        desc_embeddings = sbert.encode(desc_keywords)
-        transcript_embeddings = sbert.encode(transcript_keywords)
-        
-        # 유사도 행렬 계산
-        similarity_matrix = cosine_similarity(transcript_embeddings, desc_embeddings)
-        
-        # 각 자막 키워드에 대해 매핑 수행
-        for i, keyword in enumerate(transcript_keywords):
-            # 가장 유사한 설명 키워드 찾기
-            max_sim_idx = similarity_matrix[i].argmax()
-            max_sim = similarity_matrix[i][max_sim_idx]
+        if desc_keywords and transcript_keywords:
+            # LSH 인덱스 생성
+            lsh = MinHashLSH(threshold=0.5, num_perm=128)
+            desc_minhashes = {}
             
-            # 디버깅: 각 키워드의 최대 유사도 출력
-            logger.info(f"디버깅 - 키워드 '{keyword}'의 최대 유사도: {max_sim:.4f} (with '{desc_keywords[max_sim_idx]}')")
+            # 설명 키워드의 MinHash 생성 및 LSH 인덱스에 추가
+            for keyword in desc_keywords:
+                m = create_minhash(keyword)
+                if m:
+                    desc_minhashes[keyword] = m
+                    lsh.insert(keyword, m)
             
-            if max_sim >= SIMILARITY_THRESHOLD:
-                # 유사도가 높은 경우 설명 키워드로 매핑
-                mapped_keyword = desc_keywords[max_sim_idx]
-                keyword_mapping[keyword] = mapped_keyword
-                if mapped_keyword not in node_sizes or keyword_importance[keyword] > node_sizes[mapped_keyword]:
-                    node_sizes[mapped_keyword] = keyword_importance[keyword]
-                final_keywords.add(mapped_keyword)
-                logger.info(f"키워드 변환: {keyword} → {mapped_keyword} (유사도: {max_sim:.3f})")
-            else:
-                # 유사도가 낮은 경우 원본 키워드 유지
+            # SBERT와 SimCSE 임베딩 미리 계산
+            sbert = nlp_models['sbert']
+            simcse_model, simcse_tokenizer = nlp_models['simcse']
+            
+            desc_sbert_embeddings = sbert.encode(desc_keywords)
+            desc_inputs = simcse_tokenizer(desc_keywords, padding=True, truncation=True, return_tensors="pt")
+            desc_simcse_embeddings = simcse_model(**desc_inputs).pooler_output.detach().numpy()
+            
+            # 각 자막 키워드에 대해 매핑 수행
+            for keyword in transcript_keywords:
+                # 특정 키워드 매핑 체크
+                if keyword in special_mappings:
+                    mapped_keyword = special_mappings[keyword]
+                    if mapped_keyword in desc_keywords:
+                        keyword_mapping[keyword] = mapped_keyword
+                        node_sizes[mapped_keyword] = keyword_importance[keyword]
+                        final_keywords.add(mapped_keyword)
+                        continue
+                
+                # LSH로 후보 키워드 추출
+                m = create_minhash(keyword)
+                if m:
+                    candidates = lsh.query(m)
+                    if candidates:
+                        # 후보 키워드에 대해서만 SBERT와 SimCSE 유사도 계산
+                        keyword_sbert_embedding = sbert.encode([keyword])[0]
+                        keyword_inputs = simcse_tokenizer([keyword], padding=True, truncation=True, return_tensors="pt")
+                        keyword_simcse_embedding = simcse_model(**keyword_inputs).pooler_output.detach().numpy()[0]
+                        
+                        max_sim = 0
+                        best_match = None
+                        
+                        for candidate in candidates:
+                            idx = desc_keywords.index(candidate)
+                            # SBERT와 SimCSE 유사도 결합
+                            sbert_sim = cosine_similarity([keyword_sbert_embedding], [desc_sbert_embeddings[idx]])[0][0]
+                            simcse_sim = cosine_similarity([keyword_simcse_embedding], [desc_simcse_embeddings[idx]])[0][0]
+                            combined_sim = (sbert_sim + simcse_sim) / 2
+                            
+                            if combined_sim > max_sim:
+                                max_sim = combined_sim
+                                best_match = candidate
+                        
+                        if max_sim >= SIMILARITY_THRESHOLD:
+                            keyword_mapping[keyword] = best_match
+                            node_sizes[best_match] = keyword_importance[keyword]
+                            final_keywords.add(best_match)
+                            continue
+                
+                # 매핑되지 않은 경우 원본 유지
                 keyword_mapping[keyword] = keyword
                 node_sizes[keyword] = keyword_importance[keyword]
                 final_keywords.add(keyword)
-                logger.info(f"키워드 유지: {keyword}")
         
         # 4. 네트워크 그래프 생성
         G = nx.Graph()
         
         # 노드 추가 (크기는 TF-IDF 기반)
         for keyword in final_keywords:
-            G.add_node(keyword, size=node_sizes.get(keyword, 0.5))
-            logger.info(f"노드 추가: {keyword} (크기: {node_sizes.get(keyword, 0.5):.3f})")
+            G.add_node(keyword, size=node_sizes[keyword])
         
         # 엣지 추가
         keywords = list(final_keywords)
-        if keywords:
+        if len(keywords) > 1:
             # 임베딩 일괄 계산
-            embeddings = sbert.encode(keywords)
+            embeddings = nlp_models['sbert'].encode(keywords)
             similarity_matrix = cosine_similarity(embeddings)
             
-            edge_count = 0
+            # 중심성이 가장 높은 노드 찾기
+            edge_weights = {}
             for i in range(len(keywords)):
                 for j in range(i + 1, len(keywords)):
                     similarity = similarity_matrix[i][j]
                     if similarity > 0.3:  # 엣지 임계값
-                        G.add_edge(keywords[i], keywords[j], weight=similarity)
-                        edge_count += 1
-                        logger.info(f"엣지 추가: {keywords[i]} - {keywords[j]} (유사도: {similarity:.3f})")
+                        # TF-IDF 가중치를 반영한 엣지 가중치 계산
+                        weight = similarity * (node_sizes[keywords[i]] + node_sizes[keywords[j]]) / 2
+                        edge_weights[(keywords[i], keywords[j])] = weight
+                        G.add_edge(keywords[i], keywords[j], weight=weight)
             
-            logger.info(f"총 엣지 수: {edge_count}")
+            # 중심성 계산
+            centrality = nx.degree_centrality(G)
+            central_node = max(centrality.items(), key=lambda x: x[1])[0]
+            
+            # 중심 노드와의 거리에 따라 레이아웃 조정을 위해 속성 추가
+            distances = nx.single_source_shortest_path_length(G, central_node)
+            nx.set_node_attributes(G, distances, 'distance_from_center')
         
         # 5. 연관어 쌍 추출
         word_pairs = []
@@ -418,8 +477,13 @@ def analyze_related_words(video_desc, video_transcript=None):
 def generate_network_graph(G):
     """네트워크 그래프 시각화"""
     try:
+        # 그래프가 비어있는지 확인
+        if len(G.nodes()) == 0:
+            logger.warning("그래프에 노드가 없습니다.")
+            return None
+            
         matplotlib.use('Agg')
-        plt.clf()  # 기존 그래프 초기화
+        plt.clf()
         
         # 한글 폰트 설정
         try:
@@ -430,93 +494,134 @@ def generate_network_graph(G):
             logger.warning("기본 폰트를 사용합니다.")
             plt.rcParams['font.family'] = 'Malgun Gothic'
         
-        plt.figure(figsize=(15, 12))
+        plt.figure(figsize=(16, 12), facecolor='white')
         
-        # 노드 크기 스케일링
-        sizes = [G.nodes[node]['size'] for node in G.nodes()]
-        if sizes:
-            min_size = min(sizes)
-            max_size = max(sizes)
-            if min_size == max_size:
-                scaled_sizes = [5000] * len(sizes)
-            else:
-                scaled_sizes = [
-                    2000 + (size - min_size) * 8000 / (max_size - min_size)
-                    for size in sizes
-                ]
+        # 노드 크기와 색상 계산
+        node_sizes = nx.get_node_attributes(G, 'size')
+        if not node_sizes:
+            logger.warning("노드 크기 정보가 없습니다.")
+            return None
+            
+        min_size = min(node_sizes.values())
+        max_size = max(node_sizes.values())
+        
+        # min_size와 max_size가 같은 경우 처리
+        if min_size == max_size:
+            scaled_sizes = {node: 7500 for node in G.nodes()}
+            node_colors = {node: plt.cm.Blues(0.75) for node in G.nodes()}
         else:
-            scaled_sizes = [5000] * len(G.nodes())
+            # 노드 크기 스케일링 (더 넓은 범위로)
+            scaled_sizes = {
+                node: 3000 + (node_sizes[node] - min_size) * 12000 / (max_size - min_size)
+                for node in G.nodes()
+            }
+            
+            # 노드 색상 계산 (중요도에 따라 파란색 계열로 그라데이션)
+            node_colors = {
+                node: plt.cm.Blues(0.5 + 0.5 * (node_sizes[node] - min_size) / (max_size - min_size))
+                for node in G.nodes()
+            }
         
-        # 레이아웃 계산 - 더 넓은 공간에 배치
-        pos = nx.spring_layout(G, k=1.5, iterations=100, seed=42)
+        # 중심성 기반 레이아웃 계산
+        if len(G.nodes()) > 1 and 'distance_from_center' in G.nodes[list(G.nodes())[0]]:
+            # 방사형 레이아웃 생성 (더 넓은 공간 활용)
+            pos = {}
+            max_distance = max(nx.get_node_attributes(G, 'distance_from_center').values())
+            central_node = min(G.nodes(), key=lambda n: G.nodes[n]['distance_from_center'])
+            
+            # 중심 노드는 가운데에 배치
+            pos[central_node] = (0, 0)
+            
+            # 나머지 노드들을 방사형으로 배치
+            other_nodes = [n for n in G.nodes() if n != central_node]
+            if other_nodes:  # 다른 노드가 있는 경우에만 각도 계산
+                angles = np.linspace(0, 2*np.pi, len(other_nodes), endpoint=False)
+                
+                for node, angle in zip(other_nodes, angles):
+                    distance = G.nodes[node]['distance_from_center']
+                    radius = 0.3 + (distance / max_distance) * 0.7  # 더 넓은 반경 사용
+                    pos[node] = (
+                        radius * np.cos(angle),
+                        radius * np.sin(angle)
+                    )
+        else:
+            pos = nx.spring_layout(G, k=2, iterations=100, seed=42)
         
-        # 엣지 그리기 - 유사도에 따른 색상 변화
-        edge_colors = []
-        edge_weights = []
-        for (u, v, d) in G.edges(data=True):
-            weight = d['weight']
-            edge_weights.append(weight * 5)  # 선 두께 증가
-            # 유사도에 따른 색상 (파란색 → 빨간색)
-            edge_colors.append((weight, 0, 1-weight))
+        # 엣지 그리기 (가중치에 따른 색상과 두께)
+        edge_weights = nx.get_edge_attributes(G, 'weight')
+        if edge_weights:  # 엣지가 있는 경우에만 처리
+            min_weight = min(edge_weights.values())
+            max_weight = max(edge_weights.values())
+            
+            # 엣지를 가중치 순으로 정렬하여 그리기 (중요한 연결이 위에 오도록)
+            sorted_edges = sorted(G.edges(data=True), key=lambda x: x[2]['weight'])
+            
+            for u, v, data in sorted_edges:
+                weight = data['weight']
+                # 가중치에 따른 색상 (연한 회색 → 진한 회색)
+                if min_weight == max_weight:
+                    alpha = 0.6
+                    width = 4
+                else:
+                    alpha = 0.3 + 0.6 * (weight - min_weight) / (max_weight - min_weight)
+                    width = 1 + 8 * (weight - min_weight) / (max_weight - min_weight)
+                
+                nx.draw_networkx_edges(G, pos,
+                                     edgelist=[(u, v)],
+                                     width=width,
+                                     edge_color='gray',
+                                     alpha=alpha,
+                                     style='solid')
         
-        # 엣지 그리기
-        nx.draw_networkx_edges(G, pos, 
-                             width=edge_weights,
-                             edge_color=edge_colors,
-                             alpha=0.5)
-        
-        # 노드 그리기 - 크기에 따른 색상 변화
-        node_colors = []
+        # 노드 그리기
         for node in G.nodes():
-            size = G.nodes[node]['size']
-            # 크기에 따른 색상 (연한 파랑 → 진한 파랑)
-            intensity = (size - min_size) / (max_size - min_size) if max_size != min_size else 0.5
-            node_colors.append((0.8-intensity*0.5, 0.8-intensity*0.5, 1))
+            nx.draw_networkx_nodes(G, pos,
+                                 nodelist=[node],
+                                 node_size=scaled_sizes[node],
+                                 node_color=[node_colors[node]],
+                                 alpha=0.9,
+                                 edgecolors='white',
+                                 linewidths=2)
         
-        nx.draw_networkx_nodes(G, pos,
-                             node_size=scaled_sizes,
-                             node_color=node_colors,
-                             alpha=0.6,
-                             edgecolors='white',
-                             linewidths=2)
-        
-        # 레이블 그리기 - 노드 크기에 비례하는 폰트 크기
-        labels = {node: node for node in G.nodes()}
-        font_sizes = {}
+        # 레이블 그리기 (크기에 따른 폰트 크기 차등)
         for node in G.nodes():
-            size = G.nodes[node]['size']
-            if max_size == min_size:
-                font_sizes[node] = 12
-            else:
-                font_sizes[node] = 10 + (size - min_size) * 14 / (max_size - min_size)
-        
-        # 레이블 배경 추가
-        for node, label in labels.items():
             x, y = pos[node]
+            size = scaled_sizes[node]
+            # 노드 크기에 비례하는 폰트 크기 (더 큰 차이)
+            fontsize = 12 + (size - 3000) * 16 / 12000
+            
+            # 중심 노드는 더 강조
+            if 'distance_from_center' in G.nodes[node] and G.nodes[node]['distance_from_center'] == 0:
+                fontsize *= 1.2
+                weight = 'bold'
+            else:
+                weight = 'normal'
+            
             plt.text(x, y,
-                    label,
-                    fontsize=font_sizes[node],
+                    node,
+                    fontsize=fontsize,
+                    fontweight=weight,
                     fontfamily=plt.rcParams['font.family'],
                     horizontalalignment='center',
                     verticalalignment='center',
                     bbox=dict(facecolor='white',
-                            alpha=0.7,
+                            alpha=0.8,
                             edgecolor='none',
                             boxstyle='round,pad=0.5'))
         
-        plt.title('연관어 네트워크', fontdict={'family': plt.rcParams['font.family'], 'size': 20}, pad=20)
+        plt.title('연관어 네트워크', fontdict={'family': plt.rcParams['font.family'], 'size': 24, 'weight': 'bold'}, pad=20)
         plt.axis('off')
         
         # 여백 조정
-        plt.tight_layout(pad=2.0)
+        plt.tight_layout(pad=1.5)
         
-        # 이미지로 변환 - 더 높은 DPI
+        # 고품질 이미지 저장
         buffer = BytesIO()
         plt.savefig(buffer, format='png', bbox_inches='tight', dpi=300, facecolor='white')
         buffer.seek(0)
         image_png = buffer.getvalue()
         buffer.close()
-        plt.close('all')  # 모든 그래프 창 닫기
+        plt.close('all')
         
         return base64.b64encode(image_png).decode('utf-8')
         
