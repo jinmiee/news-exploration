@@ -589,12 +589,11 @@ def relate(request):
     
     if video and video.transcript:
         try:
-            # 제목 불용어 처리
+            # 제목과 설명 불용어 처리
             cleaned_title = clean_title(video.title)
+            video_desc = f"{cleaned_title} {video.desc if video.desc else ''}"
             
             # transcript 데이터를 시간 단위로 구분하여 텍스트로 변환
-            transcript_text = ' '.join([item['text'] for item in video.transcript])
-            # 시간별 자막 데이터 생성
             transcript_segments = []
             for item in video.transcript:
                 if 'start' in item and 'text' in item:
@@ -607,7 +606,8 @@ def relate(request):
                         'text': item['text']
                     })
             
-            graph, top_pairs, important_keywords = analyze_related_words(transcript_text)
+            # 연관어 분석 수행
+            graph, top_pairs, important_keywords = analyze_related_words(video_desc, video.transcript)
             network_graph = generate_network_graph(graph)
             
             # 키워드별 관련 뉴스 분류
@@ -615,7 +615,8 @@ def relate(request):
             if important_keywords:
                 for keyword in important_keywords:
                     related_news = YouTubeData.objects.filter(
-                        title__icontains=keyword
+                        Q(title__icontains=keyword) | 
+                        Q(desc__icontains=keyword)
                     ).exclude(url=video_url)[:6]
                     
                     if related_news:
@@ -637,8 +638,7 @@ def relate(request):
                 'top_pairs': top_pairs,
                 'categorized_news': categorized_news,
                 'important_keywords': important_keywords,
-                'transcript_text': transcript_text,
-                'transcript_segments': transcript_segments  # 시간별 자막 데이터 추가
+                'transcript_segments': transcript_segments
             }
         except Exception as e:
             print(f"분석 중 오류 발생: {str(e)}")
