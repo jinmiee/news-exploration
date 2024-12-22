@@ -22,7 +22,7 @@ def clean_title(title):
     title = re.sub(r'\(.*?\)', '', title)
 
     # 특정 단어 제거 (예: TV, News, 8뉴스, 오대영 라이브)
-    title = re.sub(r'\b(TV|News|8뉴스|오대영 라이브)\b', '', title, flags=re.IGNORECASE)
+    title = re.sub(r'\b(TV|News|8뉴스|오대영 라이브|15시 뉴스|12시 뉴스)\b', '', title, flags=re.IGNORECASE)
 
     # '｜지금 이 뉴스' 또는 '| 지금 이 뉴스' 제거
     title = re.sub(r'[｜|]\s*지금 이 뉴스', '', title)

@@ -227,6 +227,30 @@
     });
 
     document.addEventListener('DOMContentLoaded', function() {
+        const sidebar = document.getElementById("sidebar");
+        const newsTitles = document.querySelectorAll(".news-title");
+
+        // 페이지 여백 클릭 시 사이드바 숨기기
+        document.addEventListener("click", function (event) {
+            // 사이드바가 열려 있을 때만 동작
+            if (sidebar.style.display === "block") {
+                // 클릭한 요소가 사이드바나 뉴스 제목이 아니면 사이드바 숨기기
+                if (!sidebar.contains(event.target) && !Array.from(newsTitles).some(title => title.contains(event.target))) {
+                    sidebar.style.display = "none";
+
+                    // 동영상 정지
+                    if (player) {
+                        player.stopVideo();
+                    }
+
+                    // 활성화된 뉴스 제목 클래스 제거
+                    document.querySelectorAll(".news-title.active").forEach(title => {
+                        title.classList.remove("active");
+                    });
+                }
+            }
+        });
+
         // CSRF 토큰을 가져오는 함수
         function getCSRFToken() {
             const cookies = document.cookie.split(';');
