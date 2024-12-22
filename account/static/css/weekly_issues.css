@@ -1,9 +1,13 @@
 main {
     display: flex;
     flex-direction: column;
-    align-items: center; /* 모든 자식 요소를 가로 중앙 정렬 */
-    justify-content: flex-start; /* 위쪽부터 정렬 시작 */
-    width: 100%;
+    align-items: center;
+    justify-content: flex-start;
+    width: calc(100% - 40px); /* 좌우 20px씩 여백 추가 */
+    max-width: 1140px;
+    margin: 0 auto;
+    padding: 0; /* 추가적인 패딩 제거 */
+    box-sizing: border-box; /* 여백 포함한 크기 계산 */
 }
 
 header {
@@ -31,15 +35,15 @@ header p {
     text-align: center;
 }
 
-
 .issue-container {
     display: grid;
-    grid-template-columns: repeat(3, 1fr); /* 한 줄에 3개의 카드 */
-    grid-template-rows: repeat(2, 1fr); /* 2줄로 배치 */
-    gap: 2rem; /* 카드 간 간격 */
-    margin: 2rem auto;
-    max-width: 1400px;
-    justify-items: center;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2rem;
+    margin: 0 auto;
+    max-width: 1140px;
+    padding: 0; /* 추가적인 패딩 제거 */
+    justify-content: center; /* 가운데 정렬 */
+    box-sizing: border-box; /* 여백 포함 크기 계산 */
 }
 
 .issue-card {
@@ -107,9 +111,9 @@ header p {
 }
 
 .issue-title {
-    font-weight: 300; /* 얇은 글씨 */
-    color: #333; /* 덜 진한 회색으로 변경 (기존 #000에서 더 연한 색상) */
-    font-size: 1rem; /* 텍스트 크기 */
+    font-weight: normal; /* 얇은 글씨 */
+    color: #666; /* 덜 진한 회색으로 변경 (기존 #000에서 더 연한 색상) */
+    font-size: 0.9rem; /* 텍스트 크기 */
     margin: 0;
     line-height: 1.5; /* 줄 간격 */
     white-space: nowrap; /* 텍스트를 한 줄로 제한 */
