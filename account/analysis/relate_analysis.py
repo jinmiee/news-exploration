@@ -531,30 +531,8 @@ def generate_network_graph(G):
                 for node in G.nodes()
             }
         
-        # 중심성 기반 레이아웃 계산
-        if len(G.nodes()) > 1 and 'distance_from_center' in G.nodes[list(G.nodes())[0]]:
-            # 방사형 레이아웃 생성 (더 넓은 공간 활용)
-            pos = {}
-            max_distance = max(nx.get_node_attributes(G, 'distance_from_center').values())
-            central_node = min(G.nodes(), key=lambda n: G.nodes[n]['distance_from_center'])
-            
-            # 중심 노드는 가운데에 배치
-            pos[central_node] = (0, 0)
-            
-            # 나머지 노드들을 방사형으로 배치
-            other_nodes = [n for n in G.nodes() if n != central_node]
-            if other_nodes:  # 다른 노드가 있는 경우에만 각도 계산
-                angles = np.linspace(0, 2*np.pi, len(other_nodes), endpoint=False)
-                
-                for node, angle in zip(other_nodes, angles):
-                    distance = G.nodes[node]['distance_from_center']
-                    radius = 0.3 + (distance / max_distance) * 0.7  # 더 넓은 반경 사용
-                    pos[node] = (
-                        radius * np.cos(angle),
-                        radius * np.sin(angle)
-                    )
-        else:
-            pos = nx.spring_layout(G, k=2, iterations=100, seed=42)
+        # 기본 spring_layout 사용 (시드값 고정)
+        pos = nx.spring_layout(G, k=2, iterations=100, seed=42)
         
         # 엣지 그리기 (가중치에 따른 색상과 두께)
         edge_weights = nx.get_edge_attributes(G, 'weight')
@@ -599,17 +577,10 @@ def generate_network_graph(G):
             # 노드 크기에 비례하는 폰트 크기 (더 큰 차이)
             fontsize = 12 + (size - 3000) * 16 / 12000
             
-            # 중심 노드는 더 강조
-            if 'distance_from_center' in G.nodes[node] and G.nodes[node]['distance_from_center'] == 0:
-                fontsize *= 1.2
-                weight = 'bold'
-            else:
-                weight = 'normal'
-            
             plt.text(x, y,
                     node,
                     fontsize=fontsize,
-                    fontweight=weight,
+                    fontweight='normal',
                     fontfamily=plt.rcParams['font.family'],
                     horizontalalignment='center',
                     verticalalignment='center',
