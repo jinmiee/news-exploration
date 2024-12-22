@@ -52,6 +52,7 @@ def start_scheduler():
     )
 
     print("스케줄러가 시작되었습니다.")
+    print("daily_top10 작업이 스케줄러에 등록되었습니다.")
     scheduler.start()
 
     # Django 서버 종료 시 스케줄러 중지
