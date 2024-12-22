@@ -223,7 +223,7 @@ def calculate_similarity(text1, text2):
 def calculate_tfidf(documents):
     """TF-IDF 점수 계산"""
     try:
-        vectorizer = TfidfVectorizer()
+        vectorizer = TfidfVectorizer(min_df=1, random_state=42)
         tfidf_matrix = vectorizer.fit_transform(documents)
         return vectorizer, tfidf_matrix
     except Exception as e:
@@ -354,11 +354,10 @@ def analyze_related_words(video_desc, video_transcript, clean_title_func=None):
                 tfidf_score = tfidf_scores.get(keyword, 0) / max_tfidf
                 keyword_importance[keyword] = 0.7 * freq_score + 0.3 * tfidf_score
             
-            # 상위 30개 키워드 선정
-            transcript_keywords = [k for k, _ in sorted(
+            # 상위 30개 키워드 선정 시 동점 처리
+            transcript_keywords = [k[0] for k in sorted(  # 튜플의 첫 번째 요소(키워드)만 사용
                 keyword_importance.items(),
-                key=lambda x: x[1],
-                reverse=True
+                key=lambda x: (-x[1], x[0])  # 중요도가 같을 경우 키워드 알파벳 순으로 정렬
             )[:TOP_KEYWORDS_COUNT]]
             
             print(f"자막에서 추출된 상위 {TOP_KEYWORDS_COUNT}개 키워드: {transcript_keywords}")
