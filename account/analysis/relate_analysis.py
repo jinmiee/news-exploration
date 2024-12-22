@@ -25,18 +25,19 @@ from ..models import YouTubeData
 from django.db.models import Q
 
 # 로깅 설정
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
+
+# 추가 로깅 설정
+logging.getLogger('sentence_transformers').setLevel(logging.ERROR)
+logging.getLogger('transformers').setLevel(logging.ERROR)
+logging.getLogger('gensim').setLevel(logging.ERROR)
 
 # 상수 정의
 API_KEY = "koba-5JNWNQI-MH5EQJY-QINVNIQ-2IOA5IY"
 SIMILARITY_THRESHOLD = 0.73
 TOP_KEYWORDS_COUNT = 30
 t = brn.Tagger(API_KEY, "localhost")
-
-# 파일 상단에 추가
-import logging
-logging.getLogger('sentence_transformers').setLevel(logging.WARNING)  # INFO 대신 WARNING으로 설정
 
 def load_pretrained_model():
     """
@@ -50,27 +51,16 @@ def load_pretrained_model():
             try:
                 # 바이너리 모드로 직접 읽기
                 with open(model_path, 'rb') as f:
-                    # 첫 4바이트는 매직 넘버일 수 있으므로 건너뛰기
+                    # 매직 넘버 확인
                     magic = f.read(4)
                     logger.info(f"File magic number: {magic.hex()}")
                     
-                    # 파일 포맷 확인
-                    if magic.startswith(b'\xba\x16O/'):  # 특정 매직 넘버 확인
-                        logger.info("파일 포맷 확인됨")
-                        # 헤더 정보 읽기
-                        header = f.readline().decode('utf-8', errors='ignore').strip()
-                        try:
-                            vocab_size, vector_size = map(int, header.split())
-                            logger.info(f"모델 정보 - 단어 수: {vocab_size}, 벡터 크기: {vector_size}")
-                        except ValueError:
-                            logger.warning("헤더 파싱 실패, 기본값 사용")
-                            vocab_size, vector_size = 100000, 300  # 기본값 설정
+                    if magic.startswith(b'\xba\x16O/'):
+                        # 바이너리 데이터를 직접 읽기
+                        vector_size = 300  # 고정된 벡터 크기 사용
+                        model = KeyedVectors(vector_size, count=100000)
                         
-                        # KeyedVectors 객체 생성
-                        model = KeyedVectors(vector_size)
-                        
-                        # 단어와 벡터 읽기
-                        for _ in range(vocab_size):
+                        while True:
                             try:
                                 # 단어 읽기
                                 word_bytes = bytearray()
@@ -83,15 +73,8 @@ def load_pretrained_model():
                                 if not word_bytes:
                                     break
                                 
-                                # 단어 디코딩 (여러 인코딩 시도)
-                                for encoding in ['utf-8', 'cp949', 'euc-kr']:
-                                    try:
-                                        word = word_bytes.decode(encoding)
-                                        break
-                                    except UnicodeDecodeError:
-                                        continue
-                                else:
-                                    word = word_bytes.decode('utf-8', errors='ignore')
+                                # 단어 디코딩
+                                word = word_bytes.decode('utf-8', errors='ignore')
                                 
                                 # 벡터 읽기
                                 vector = np.fromfile(f, dtype=np.float32, count=vector_size)
@@ -102,7 +85,7 @@ def load_pretrained_model():
                                 model.add_vector(word, vector)
                                 
                             except Exception as e:
-                                logger.error(f"단어 처리 중 오류: {str(e)}")
+                                logger.warning(f"단어 처리 중 오류 무시: {str(e)}")
                                 continue
                         
                         return model
@@ -113,13 +96,8 @@ def load_pretrained_model():
             except Exception as e:
                 logger.error(f"파일 읽기 실패: {str(e)}")
                 return None
-        else:
-            logger.error(f"모델 파일을 찾을 수 없습니다: {model_path}")
-            return None
-            
     except Exception as e:
-        logger.error(f"Word2Vec 모델 로드 중 오류 발생: {str(e)}")
-        logger.error(f"오류 타입: {type(e)}")
+        logger.error(f"모델 로드 중 예외 발생: {str(e)}")
         return None
 
 def load_sbert_model():
@@ -127,11 +105,29 @@ def load_sbert_model():
     한국어 SBERT와 KoSimCSE 모델을 로드하는 함수
     """
     try:
+        # 두 가지 모델을 딕셔너리 형태로 저장
         models = {
-            'sbert': SentenceTransformer('jhgan/ko-sbert-nli'),
+            # SBERT 모델 로드 - 한국어 문장 임베딩을 위한 모델
+            # CPU에서 실행되도록 device='cpu' 설정
+            'sbert': SentenceTransformer('jhgan/ko-sbert-nli', device='cpu'),
+            
+            # KoSimCSE 모델 로드 - 문장 유사도 계산을 위한 모델
+            # 모델과 토크나이저를 튜플 형태로 저장
             'simcse': (
-                AutoModel.from_pretrained('BM-K/KoSimCSE-roberta'),
-                AutoTokenizer.from_pretrained('BM-K/KoSimCSE-roberta')
+                # 사전학습된 RoBERTa 기반 모델 로드
+                # revision='main'은 최신 버전 사용
+                # use_auth_token=False로 인증 없이 사용
+                AutoModel.from_pretrained(
+                    'BM-K/KoSimCSE-roberta',
+                    revision='main',
+                    token=None
+                ),
+                # 해당 모델의 토크나이저 로드
+                AutoTokenizer.from_pretrained(
+                    'BM-K/KoSimCSE-roberta', 
+                    revision='main',
+                    token=None
+                )
             )
         }
         logger.info("SBERT와 KoSimCSE 모델 로드 완료")
@@ -295,7 +291,7 @@ def analyze_related_words(video_desc, video_transcript, clean_title_func=None):
     비디오 설명과 자막을 분석하여 연관 단어 네트워크 생성
     """
     try:
-        logger.info("연관어 분석 시작")
+        print("\n[연관어 분석 시작]")
         
         # clean_title_func가 전달되지 않았다면 원본 텍스트 사용
         if clean_title_func:
@@ -311,7 +307,7 @@ def analyze_related_words(video_desc, video_transcript, clean_title_func=None):
         
         # 1. 설명에서 모든 키워드 추출
         desc_keywords = extract_keywords_from_desc(cleaned_desc)
-        logger.info(f"설명에서 추출된 키워드: {desc_keywords}")
+        print(f"[설명 키워드] 추출된 키워드 ({len(desc_keywords)}개): {desc_keywords}")
         
         # 2. 자막 처리 및 상위 30개 키워드 추출
         transcript_keywords = []
@@ -325,9 +321,10 @@ def analyze_related_words(video_desc, video_transcript, clean_title_func=None):
                 
             # 자막에서 키워드 추출
             all_transcript_keywords = extract_keywords_from_desc(transcript_text)
+            print(f"[자막 키워드] 전체 추출 키워드 수: {len(all_transcript_keywords)}개")
             
             if not all_transcript_keywords:
-                logger.warning("자막에서 추출된 키워드가 없습니다.")
+                print("[경고] 자막에서 추출된 키워드가 없습니다")
                 return nx.Graph(), [], []
             
             # TF-IDF 계산을 위한 문서 생성
@@ -364,7 +361,7 @@ def analyze_related_words(video_desc, video_transcript, clean_title_func=None):
                 reverse=True
             )[:TOP_KEYWORDS_COUNT]]
             
-            logger.info(f"자막에서 추출된 상위 {TOP_KEYWORDS_COUNT}개 키워드: {transcript_keywords}")
+            print(f"자막에서 추출된 상위 {TOP_KEYWORDS_COUNT}개 키워드: {transcript_keywords}")
         
         if not transcript_keywords:
             logger.warning("처리할 키워드가 없습니다.")
