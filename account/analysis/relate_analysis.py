@@ -20,6 +20,9 @@ import torch
 from sklearn.feature_extraction.text import TfidfVectorizer
 from datasketch import MinHashLSH, MinHash
 import re
+from django.shortcuts import render
+from ..models import YouTubeData
+from django.db.models import Q
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -283,13 +286,19 @@ def find_similar_keywords_lsh(target_keyword, candidate_keywords, threshold=0.8)
         logger.error(f"LSH 검색 중 오류: {str(e)}")
         return []
 
-def analyze_related_words(video_desc, video_transcript=None):
+def analyze_related_words(video_desc, video_transcript, clean_title_func=None):
     """
     비디오 설명과 자막을 분석하여 연관 단어 네트워크 생성
     """
     try:
         logger.info("연관어 분석 시작")
         
+        # clean_title_func가 전달되지 않았다면 원본 텍스트 사용
+        if clean_title_func:
+            cleaned_desc = clean_title_func(video_desc)
+        else:
+            cleaned_desc = video_desc
+
         # 특정 키워드 매핑 정의
         special_mappings = {
             "윤성": "윤석열",
@@ -297,7 +306,7 @@ def analyze_related_words(video_desc, video_transcript=None):
         }
         
         # 1. 설명에서 모든 키워드 추출
-        desc_keywords = extract_keywords_from_desc(video_desc)
+        desc_keywords = extract_keywords_from_desc(cleaned_desc)
         logger.info(f"설명에서 추출된 키워드: {desc_keywords}")
         
         # 2. 자막 처리 및 상위 30개 키워드 추출
@@ -630,3 +639,84 @@ def generate_network_graph(G):
         import traceback
         logger.error(traceback.format_exc())
         return None
+
+def relate(request):
+    video_url = request.GET.get('url')
+    video_id = request.GET.get('id')
+    
+    video = YouTubeData.objects.filter(url=video_url).first()
+    
+    if video and video.transcript:
+        try:
+            # 함수 내부에서 동적으로 import
+            from ..views import clean_title
+            
+            # 제목과 설명 불용어 처리
+            cleaned_title = clean_title(video.title)
+            video_desc = f"{cleaned_title} {video.desc if video.desc else ''}"
+            
+            # transcript 데이터를 시간 단위로 구분하여 텍스트로 변환
+            transcript_segments = []
+            for item in video.transcript:
+                if 'start' in item and 'text' in item:
+                    start_time = int(float(item['start']))
+                    minutes = start_time // 60
+                    seconds = start_time % 60
+                    time_str = f"{minutes:02d}:{seconds:02d}"
+                    transcript_segments.append({
+                        'time': time_str,
+                        'text': item['text']
+                    })
+            
+            # clean_title 함수를 파라미터로 전달
+            graph, top_pairs, important_keywords = analyze_related_words(
+                video_desc, 
+                video.transcript,
+                clean_title_func=clean_title
+            )
+            
+            network_graph = generate_network_graph(graph)
+            
+            # 키워드별 관련 뉴스 분류 추가
+            categorized_news = {}
+            if important_keywords:
+                for keyword in important_keywords:
+                    related_news = YouTubeData.objects.filter(
+                        Q(title__icontains=keyword) | 
+                        Q(desc__icontains=keyword)
+                    ).exclude(url=video_url)[:6]
+                    
+                    if related_news:
+                        cleaned_news = []
+                        for news in related_news:
+                            news.title = clean_title(news.title)
+                            try:
+                                news.video_id = news.url.split('v=')[1].split('&')[0]
+                            except:
+                                news.video_id = None
+                            cleaned_news.append(news)
+                        categorized_news[keyword] = cleaned_news
+            
+            context = {
+                'section': 'relate',
+                'video': video,
+                'video_title': cleaned_title,
+                'network_graph': network_graph,
+                'top_pairs': top_pairs,
+                'categorized_news': categorized_news,
+                'important_keywords': important_keywords,
+                'transcript_segments': transcript_segments
+            }
+        except Exception as e:
+            print(f"분석 중 오류 발생: {str(e)}")
+            context = {
+                'section': 'relate',
+                'error_message': '분석 중 오류가 발생했습니다.'
+            }
+    else:
+        context = {
+            'section': 'relate',
+            'error_message': '비디오 자막이 없거나 비디오를 찾을 수 없습니다.'
+        }
+    
+    return render(request, 'analysis/relate.html', context)

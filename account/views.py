@@ -25,7 +25,7 @@ import matplotlib
 matplotlib.use('Agg')
 
 
-from .analysis.relate_analysis import analyze_related_words, generate_network_graph
+from .analysis.relate_analysis import analyze_related_words, generate_network_graph, relate
 from .analysis.emotion_analysis import (
     generate_wordcloud,
     generate_pie_chart,
@@ -588,83 +588,6 @@ def emotion(request):
         }
     
     return render(request, 'analysis/emotion.html', context)
-
-from django.db.models import Q
-from functools import reduce
-from operator import or_
-
-def relate(request):
-    video_url = request.GET.get('url')
-    video_id = request.GET.get('id')
-    
-    video = YouTubeData.objects.filter(url=video_url).first()
-    
-    if video and video.transcript:
-        try:
-            # 제목과 설명 불용어 처리
-            cleaned_title = clean_title(video.title)
-            video_desc = f"{cleaned_title} {video.desc if video.desc else ''}"
-            
-            # transcript 데이터를 시간 단위로 구분하여 텍스트로 변환
-            transcript_segments = []
-            for item in video.transcript:
-                if 'start' in item and 'text' in item:
-                    start_time = int(float(item['start']))
-                    minutes = start_time // 60
-                    seconds = start_time % 60
-                    time_str = f"{minutes:02d}:{seconds:02d}"
-                    transcript_segments.append({
-                        'time': time_str,
-                        'text': item['text']
-                    })
-            
-            # 연관어 분석 수행
-            graph, top_pairs, important_keywords = analyze_related_words(video_desc, video.transcript)
-            network_graph = generate_network_graph(graph)
-            
-            # 키워드별 관련 뉴스 분류
-            categorized_news = {}
-            if important_keywords:
-                for keyword in important_keywords:
-                    related_news = YouTubeData.objects.filter(
-                        Q(title__icontains=keyword) | 
-                        Q(desc__icontains=keyword)
-                    ).exclude(url=video_url)[:6]
-                    
-                    if related_news:
-                        cleaned_news = []
-                        for news in related_news:
-                            news.title = clean_title(news.title)
-                            try:
-                                news.video_id = news.url.split('v=')[1].split('&')[0]
-                            except:
-                                news.video_id = None
-                            cleaned_news.append(news)
-                        categorized_news[keyword] = cleaned_news
-            
-            context = {
-                'section': 'relate',
-                'video': video,
-                'video_title': cleaned_title,
-                'network_graph': network_graph,
-                'top_pairs': top_pairs,
-                'categorized_news': categorized_news,
-                'important_keywords': important_keywords,
-                'transcript_segments': transcript_segments
-            }
-        except Exception as e:
-            print(f"분석 중 오류 발생: {str(e)}")
-            context = {
-                'section': 'relate',
-                'error_message': '분석 중 오류가 발생했습니다.'
-            }
-    else:
-        context = {
-            'section': 'relate',
-            'error_message': '비디오 자막이 없거나 비디오를 찾을 수 없습니다.'
-        }
-    
-    return render(request, 'analysis/relate.html', context)
 
 @login_required
 def mypage(request):
