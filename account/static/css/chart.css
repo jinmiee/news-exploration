@@ -1,56 +1,117 @@
-.chart-container {
-    background: white;
-    border-radius: 12px;
-    padding: 2rem;
-    box-shadow: var(--card-shadow);
+/* ===== 공통 변수 ===== */
+:root {
+    --primary-color: #007bff;
+    --accent-color: #ff4757;
+    --text-color: #333;
+    --background-color: #f8f9fa;
+    --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --card-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.12);
+    --border-radius: 12px;
+    --transition-duration: 0.3s;
 }
 
+/* ===== 기본 스타일 ===== */
+body {
+    margin: 0;
+    font-family: 'Arial', sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    line-height: 1.6;
+}
+
+/* ===== 컨테이너 스타일 ===== */
+.chart-container {
+    background: white;
+    border-radius: var(--border-radius);
+    padding: 2rem;
+    box-shadow: var(--card-shadow);
+    max-width: 1140px;
+    margin: 0 auto;
+    box-sizing: border-box;
+}
+
+.chart-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.chart-header h1 {
+    font-size: 2.5rem;
+    color: var(--text-color);
+    margin-bottom: 0.5rem;
+}
+
+.subtitle {
+    color: #666;
+    font-size: 1.1rem;
+}
+
+/* ===== 뉴스 리스트 ===== */
 .news-list {
     display: grid;
     gap: 1.5rem;
     margin-top: 2rem;
+    list-style: none;
+    padding: 0;
 }
 
 .news-item {
-    background: white;
-    border-radius: 12px;
-    padding: 1.5rem;
     display: flex;
     align-items: flex-start;
-    gap: 1.5rem;
+    padding: 1rem; /* 기존 1.5rem에서 1rem으로 줄임 */
+    margin-bottom: 0.5rem; /* 기존 1rem에서 0.5rem으로 줄임 */
+    background: white;
+    border-radius: var(--border-radius);
     box-shadow: var(--card-shadow);
-    transition: transform 0.3s ease;
+    transition: transform var(--transition-duration), box-shadow var(--transition-duration);
+    text-align: left; /* 텍스트 정렬을 왼쪽으로 */
 }
 
 .news-item:hover {
     transform: translateY(-4px);
+    box-shadow: var(--card-shadow-hover);
 }
 
 .rank-badge {
-    background: var(--primary-color);
+    background: #007bff; /* 직접 파란색 지정 */
     color: white;
-    width: 40px;
-    height: 40px;
+    width: 35px;
+    height: 35px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: bold;
-    font-size: 1.2rem;
+    font-size: 1rem;
     flex-shrink: 0;
+    margin-right: 0.8rem;
 }
 
 .news-content {
-    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%; /* 찜하기 버튼을 포함한 전체 영역 */
+    min-width: 0;
 }
 
 .news-title {
-    font-size: 1.1rem;
+    font-size: 1rem;
     font-weight: 600;
     color: var(--text-color);
-    margin-bottom: 0.8rem;
     text-decoration: none;
-    display: block;
+    margin-right: 1rem; /* 찜하기 버튼과 간격 */
+    line-height: 1.2;
+    flex-grow: 1; /* 남은 공간 차지 */
+    white-space: nowrap; /* 텍스트 줄바꿈 방지 */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center; /* Add this to center align titles */
+}
+
+.news-title:hover {
+    color: var(--primary-color); /* 파란색으로 변경 */
+    text-decoration: underline; /* 마우스 올렸을 때 밑줄 추가 (선택사항) */
 }
 
 .news-info {
@@ -58,8 +119,10 @@
     gap: 1rem;
     color: #666;
     font-size: 0.9rem;
+    flex-wrap: wrap;
 }
 
+/* ===== 버튼 스타일 ===== */
 .like-button {
     background: none;
     border: none;
@@ -67,12 +130,177 @@
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
     padding: 0.5rem;
     border-radius: 6px;
-    transition: all 0.3s ease;
+    transition: background-color var(--transition-duration);
+    flex-shrink: 0; /* 찜하기 버튼 크기 고정 */
 }
 
 .like-button:hover {
     background: rgba(255, 64, 129, 0.1);
+}
+
+/* ===== 동영상 사이드바 ===== */
+.video-sidebar {
+    position: fixed; /* 고정 위치 */
+    top: 10%; /* 화면 상단에서 약간 떨어지게 설정 */
+    right: 0; /* 화면 오른쪽에 고정 */
+    width: 500px; /* 너비를 더 크게 설정 */
+    background: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
+    padding: 2rem; /* 여백 증가 */
+    z-index: 1000; /* 다른 요소 위에 나타나도록 설정 */
+    display: none; /* 기본값: 보이지 않음 */
+}
+
+.sidebar-header {
+    margin-bottom: 1rem;
+}
+
+.sidebar-header h2 {
+    font-size: 1.5rem;
+    color: var(--text-color);
+}
+
+#player-wrapper {
+    width: 100%; /* 플레이어가 사이드바 전체 너비를 차지 */
+    position: relative;
+    padding-top: 56.25%; /* 16:9 비율 */
+    margin-bottom: 1.5rem;
+    border-radius: var(--border-radius);
+    overflow: hidden;
+}
+
+#youtube-player,
+#thumbnail-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.thumbnail-wrapper {
+    display: block;
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+#thumbnail-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.play-button-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    transition: background-color var(--transition-duration);
+}
+
+.play-button-overlay:hover {
+    background: rgba(0, 0, 0, 0.9);
+}
+
+/* ===== 분석 버튼 ===== */
+.analysis-buttons {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+
+.btn-analysis {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.8rem;
+    background: var(--background-color);
+    color: var(--text-color);
+    text-decoration: none;
+    border-radius: 8px;
+    transition: all var(--transition-duration);
+}
+
+.btn-analysis:hover {
+    background: var(--primary-color);
+    color: white;
+}
+
+/* ===== 반응형 디자인 ===== */
+@media (max-width: 768px) {
+    .content-container {
+        flex-direction: column;
+    }
+
+    .video-sidebar {
+        position: fixed;
+        bottom: 0;
+        right: 0;
+        width: 100%;
+        top: auto;
+        border-radius: 0;
+    }
+}
+
+@media (max-width: 768px) {
+    .chart-header h1 {
+        font-size: 2rem;
+    }
+
+    .news-item {
+        padding: 1rem;
+    }
+
+    .rank-badge {
+        width: 28px;
+        height: 28px;
+        font-size: 0.9rem;
+    }
+
+    .news-title {
+        font-size: 1rem;
+    }
+
+    .news-info {
+        font-size: 0.8rem;
+    }
+
+    .analysis-buttons {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .chart-container {
+        padding: 10px;
+    }
+
+    .news-info {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .navbar-menu {
+        gap: 1rem;
+    }
+
+    .auth-buttons {
+        flex-direction: column;
+    }
 }

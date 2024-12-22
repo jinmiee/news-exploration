@@ -6,165 +6,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{% endblock %}</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/base.css' %}">
     {% block head %}{% endblock %}
-    <style>
-        :root {
-            --primary-color: #2c3e50;
-            --secondary-color: #3498db;
-            --accent-color: #e74c3c;
-            --text-color: #2c3e50;
-            --background-color: #ecf0f1;
-        }
-
-        body {
-            margin: 0;
-            font-family: 'Noto Sans KR', sans-serif;
-            background-color: var(--background-color);
-        }
-
-        .navbar {
-            background-color: white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            padding: 1rem 2rem;
-        }
-
-        .navbar-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .navbar-brand {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: var(--primary-color);
-            text-decoration: none;
-        }
-
-        .navbar-menu {
-            display: flex;
-            gap: 2rem;
-            align-items: center;
-        }
-
-        .nav-link {
-            color: var(--text-color);
-            text-decoration: none;
-            font-weight: 500;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            transition: all 0.3s ease;
-        }
-
-        .nav-link:hover {
-            background-color: var(--secondary-color);
-            color: white;
-        }
-
-        .nav-link.active {
-            background-color: var(--secondary-color);
-            color: white;
-        }
-
-        .auth-buttons {
-            display: flex;
-            gap: 1rem;
-        }
-
-        .btn-login, .btn-signup {
-            padding: 0.5rem 1.5rem;
-            border-radius: 4px;
-            text-decoration: none;
-            font-weight: 500;
-            transition: all 0.3s ease;
-        }
-
-        .btn-login {
-            background-color: var(--secondary-color);
-            color: white;
-        }
-
-        .btn-signup {
-            border: 2px solid var(--secondary-color);
-            color: var(--secondary-color);
-        }
-
-        .btn-login:hover, .btn-signup:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .user-menu {
-            position: relative;
-        }
-
-        .dropdown-menu {
-            position: absolute;
-            top: 100%;
-            right: 0;
-            background-color: white;
-            border-radius: 4px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            padding: 0.5rem 0;
-            display: none;
-        }
-
-        .dropdown-menu.show {
-            display: block;
-        }
-
-        .dropdown-item {
-            display: flex;
-            align-items: center;
-            padding: 0.5rem 1rem;
-            color: var(--text-color);
-            text-decoration: none;
-            gap: 0.5rem;
-        }
-
-        .dropdown-item:hover {
-            background-color: var(--background-color);
-        }
-
-        @media (max-width: 768px) {
-            .navbar-menu {
-                gap: 1rem;
-            }
-
-            .auth-buttons {
-                flex-direction: column;
-            }
-        }
-    </style>
 </head>
 <body>
-    <nav class="navbar">
-        <div class="navbar-container">
-            <a href="{% url 'account:chart' %}" class="navbar-brand">뉴스 분석</a>
-            <div class="navbar-menu">
-                <a href="{% url 'account:chart' %}" class="nav-link {% if section == 'chart' %}active{% endif %}">차트</a>
-                <a href="{% url 'account:weekly_issues' %}" class="nav-link {% if section == 'weekly_issues' %}active{% endif %}">주간 이슈</a>
-                <a href="{% url 'account:mypage' %}" class="nav-link {% if section == 'mypage' %}active{% endif %}">마이페이지</a>
-
-                {% if user.is_authenticated %}
-                    <div class="user-menu">
-                        <span>{{ user.username }}</span>
-                        <a href="{% url 'account:logout' %}" class="btn-login">로그아웃</a>
-                    </div>
-                {% else %}
-                    <div class="auth-buttons">
-                        <a href="{% url 'account:login' %}" class="btn-login">로그인</a>
-                    </div>
-                {% endif %}
+    <div class="container">
+        <nav class="navbar">
+            <div class="navbar-container">
+                <a href="{% url 'account:chart' %}" class="navbar-brand">뉴스 분석</a>
+                <div class="navbar-menu">
+                    <a href="{% url 'account:chart' %}" class="nav-link {% if section == 'chart' %}active{% endif %}">차트</a>
+                    <a href="{% url 'account:weekly_issues' %}" class="nav-link {% if section == 'weekly_issues' %}active{% endif %}">주간 이슈</a>
+                    <a href="{% url 'account:mypage' %}" class="nav-link {% if section == 'mypage' %}active{% endif %}">마이페이지</a>
+                    {% if user.is_authenticated %}
+                        <div class="user-menu">
+                            <span>{{ user.username }}</span>
+                            <a href="{% url 'account:logout' %}" class="btn-login">로그아웃</a>
+                        </div>
+                    {% else %}
+                        <div class="auth-buttons">
+                            <a href="{% url 'account:login' %}" class="btn-login">로그인</a>
+                        </div>
+                    {% endif %}
+                </div>
             </div>
-        </div>
-    </nav>
+        </nav>
 
-    <main>
-        {% block content %}
-        {% endblock %}
-    </main>
+        <main>
+            {% block content %}
+            {% endblock %}
+        </main>
+    </div>
 </body>
 </html>

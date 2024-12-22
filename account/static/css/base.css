@@ -1,59 +1,58 @@
-/* 기본 변수 설정 */
+/* ===== CSS 변수 ===== */
 :root {
-    --primary-color: #2196F3;
-    --secondary-color: #1976D2;
-    --accent-color: #FF4081;
-    --text-color: #333333;
-    --background-color: #F5F7FA;
-    --border-color: #E0E6ED;
-    --card-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    --primary-color: #2c3e50; /* 기존 색상 유지 */
+    --secondary-color: #3498db; /* 기존 색상 유지 */
+    --accent-color: #e74c3c;
+    --text-color: #2c3e50;
+    --background-color: #ecf0f1;
 }
 
-/* 기본 스타일 */
+/* 전체 페이지의 최대 너비 설정 */
+.container {
+    max-width: 1200px; /* 페이지 최대 너비를 1440픽셀로 설정 */
+    margin: 0 auto;    /* 중앙 정렬 */
+    padding: 0 1rem;   /* 좌우 여백 추가 (모바일 대비) */
+}
+
+/* ===== 본문 여백 조정 ===== */
 body {
     margin: 0;
+    margin-top: 56px; /* 네비게이션 바의 높이와 동일한 여백 추가 */
     font-family: 'Noto Sans KR', sans-serif;
     background-color: var(--background-color);
-    color: var(--text-color);
-    line-height: 1.6;
 }
 
-/* 네비게이션 바 */
+/* ===== 네비게이션 바 수정 ===== */
 .navbar {
-    background-color: white;
-    box-shadow: var(--card-shadow);
-    position: fixed;
-    top: 0;
-    width: 100%;
-    z-index: 1000;
-    height: 70px;
+    position: fixed; /* 네비게이션 바를 화면에 고정 */
+    top: 0;          /* 화면 상단에 위치 */
+    left: 0;         /* 화면 좌측에 위치 */
+    width: 100%;     /* 너비를 화면 전체로 확장 */
+    z-index: 1000;   /* 다른 요소 위에 표시되도록 z-index 설정 */
+    background-color: white; /* 배경색 유지 */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding: 0.5rem 1rem; /* 패딩을 사용해 높이를 적절히 설정 */
+    height: auto; /* 네비게이션 바 높이를 자동 조정 */
 }
 
 .navbar-container {
-    max-width: 1200px;
+    max-width: 1140px;
     margin: 0 auto;
-    padding: 0 2rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    height: 100%;
 }
 
 .navbar-brand {
     font-size: 1.5rem;
-    font-weight: 700;
+    font-weight: bold;
     color: var(--primary-color);
     text-decoration: none;
-    transition: color 0.3s ease;
-}
-
-.navbar-brand:hover {
-    color: var(--secondary-color);
 }
 
 .navbar-menu {
     display: flex;
-    gap: 1.5rem;
+    gap: 2rem;
     align-items: center;
 }
 
@@ -61,77 +60,89 @@ body {
     color: var(--text-color);
     text-decoration: none;
     font-weight: 500;
-    padding: 0.7rem 1.2rem;
-    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
     transition: all 0.3s ease;
 }
 
 .nav-link:hover {
-    background-color: var(--primary-color);
+    background-color: var(--secondary-color);
     color: white;
 }
 
 .nav-link.active {
-    background-color: var(--primary-color);
-    color: white;
-}
-
-/* 메인 컨텐츠 */
-main {
-    margin-top: 90px;
-    padding: 2rem;
-    max-width: 1200px;
-    margin-left: auto;
-    margin-right: auto;
-}
-
-/* 카드 스타일 */
-.card {
-    background: white;
-    border-radius: 12px;
-    padding: 1.5rem;
-    box-shadow: var(--card-shadow);
-    margin-bottom: 1.5rem;
-}
-
-/* 버튼 스타일 */
-.btn {
-    display: inline-block;
-    padding: 0.8rem 1.5rem;
-    border-radius: 8px;
-    font-weight: 500;
-    text-decoration: none;
-    transition: all 0.3s ease;
-    border: none;
-    cursor: pointer;
-}
-
-.btn-primary {
-    background-color: var(--primary-color);
-    color: white;
-}
-
-.btn-primary:hover {
     background-color: var(--secondary-color);
+    color: white;
+}
+
+.auth-buttons {
+    display: flex;
+    gap: 1rem;
+}
+
+.btn-login,
+.btn-signup {
+    padding: 0.5rem 1.5rem;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-login {
+    background-color: var(--secondary-color);
+    color: white;
+}
+
+.btn-signup {
+    border: 2px solid var(--secondary-color);
+    color: var(--secondary-color);
+}
+
+.btn-login:hover,
+.btn-signup:hover {
     transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* 반응형 디자인 */
+.user-menu {
+    position: relative;
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background-color: white;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    padding: 0.5rem 0;
+    display: none;
+}
+
+.dropdown-menu.show {
+    display: block;
+}
+
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    color: var(--text-color);
+    text-decoration: none;
+    gap: 0.5rem;
+}
+
+.dropdown-item:hover {
+    background-color: var(--background-color);
+}
+
 @media (max-width: 768px) {
-    .navbar-container {
-        padding: 0 1rem;
-    }
-    
     .navbar-menu {
-        gap: 0.8rem;
+        gap: 1rem;
     }
-    
-    .nav-link {
-        padding: 0.5rem 0.8rem;
-    }
-    
-    main {
-        padding: 1rem;
+
+    .auth-buttons {
+        flex-direction: column;
     }
 }
-
