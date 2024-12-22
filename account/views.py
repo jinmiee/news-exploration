@@ -4,38 +4,25 @@ pip install konlpy networkx matplotlib pandas
 from collections import defaultdict
 from datetime import timedelta, datetime
 
-from django.db.models.functions import TruncDate
 from django.http import JsonResponse
 from django.utils import timezone
-from django.shortcuts import render, get_object_or_404, redirect
+
 from django.utils.timezone import localtime, make_aware, is_aware
 from django.views.decorators.csrf import csrf_exempt
 import json
-from datetime import date
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponseBadRequest
 from bson import ObjectId
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 from .forms import UserRegistrationForm
 from .models import YouTubeData, Like, WeeklyIssue
 from urllib.parse import urlparse, parse_qs
-import re
+
 import pytz
-from dateutil.parser import parse
 
-from wordcloud import WordCloud
-import matplotlib.pyplot as plt
-from io import BytesIO
-import base64
-from transformers import pipeline
-
-from konlpy.tag import Okt
-from collections import Counter
-import networkx as nx
 import matplotlib
 matplotlib.use('Agg')
-import matplotlib.font_manager
+
 
 from .analysis.relate_analysis import analyze_related_words, generate_network_graph
 from .analysis.emotion_analysis import (
@@ -99,6 +86,25 @@ def clean_title(title):
 
     # 'YYYY년 MM월 DD일'형식 날짜 제거
     title = re.sub(r'\d{4}년\s*\d{1,2}월\s*\d{1,2}일', '', title)
+
+    title = re.sub(r'-\s*MBC\s*뉴스', '', title, flags=re.IGNORECASE)
+
+    # 6시 뉴스 | 12/22 - 제거
+    title = re.sub(r'6시\s*뉴스\s*\|', '', title, flags=re.IGNORECASE)
+
+    # 특정 단어 제거 (예: MBC 뉴스, TV, News, 6시 뉴스 등)
+    title = re.sub(r'\b(MBC\s*뉴스|6시\s*뉴스|TV|News|8뉴스|오대영\s*라이브)\b', '', title, flags=re.IGNORECASE)
+
+    # 날짜 형식 제거 (예: 2024.12.05, 12/22, (일) 등)
+    title = re.sub(r'\d{4}\.\d{2}\.\d{2}', '', title)
+    title = re.sub(r'\d{1,2}/\d{1,2}', '', title)
+    title = re.sub(r'\(\S+\)', '', title)  # 괄호 안의 내용 제거 (예: (일))
+
+    # | 밀착카메라 2024 결산 제거
+    title = re.sub(r'\|\s*밀착카메라\s*\d{4}\s*결산', '', title, flags=re.IGNORECASE)
+
+    # | - 패턴 제거
+    title = re.sub(r'\|\s*-\s*', '', title)
 
     # 앞뒤 공백 제거
     return title.strip()
@@ -258,6 +264,8 @@ def save_all_historical_top10():
         all_videos = YouTubeData.objects.all().order_by('upload_date')
         grouped_videos = defaultdict(list)
 
+        seoul_tz = timezone('Asia/Seoul')
+
         for video in all_videos:
             # Null 또는 None 체크
             if not video.upload_date:
@@ -272,37 +280,27 @@ def save_all_historical_top10():
                     print(f"Invalid date format for video {video.title}. Skipping...")
                     continue
 
-            # 날짜별 그룹화
-            try:
-                date_key = video.upload_date.date()
-                grouped_videos[date_key].append(video)
-            except AttributeError as e:
-                print(f"Error processing video {video.title}: {e}")
-                continue
+            # UTC → KST 변환 후 날짜별 그룹화
+            date_key = video.upload_date.astimezone(seoul_tz).date()
+            grouped_videos[date_key].append(video)
 
         # 상위 10개 선정
         for date_key, videos in grouped_videos.items():
             top_videos = get_top10_chart_based(videos)
 
             for video in top_videos:
-                # 원본 댓글과 스크립트 데이터를 그대로 저장
-                original_comments = video.comments if isinstance(video.comments, list) else []
-                original_transcript = video.transcript if isinstance(video.transcript, list) else []
-
-                # 데이터 저장
                 WeeklyIssue.objects.update_or_create(
                     _id=video._id,
                     defaults={
                         'title': video.title,
                         'channel_name': video.channel_name,
                         'views': video.views,
-                        'upload_date': video.upload_date,
+                        'upload_date': video.upload_date,  # 이미 UTC로 저장됨
                         'url': video.url,
                         'channel': video.channel,
                         'thumbnail': video.thumbnail,
-                        # 원본 데이터를 그대로 저장
-                        'comments': original_comments,
-                        'transcript': original_transcript,
+                        'comments': video.comments or [],
+                        'transcript': video.transcript or []
                     }
                 )
         print("All historical top 10 videos saved successfully.")
@@ -316,37 +314,26 @@ def save_daily_top10():
     """
     어제 날짜 데이터를 기반으로 상위 10개 비디오를 선정하고 저장
     """
+    print("save_daily_top10 함수가 호출되었습니다.")  # 로그 추가
     try:
-        today = localtime().date()
+        # 오늘과 어제 날짜를 KST(Asia/Seoul) 기준으로 가져오기
+        seoul_tz = timezone('Asia/Seoul')
+        today = datetime.now(seoul_tz).date()
         yesterday = today - timedelta(days=1)
 
+        # 어제의 시작과 끝을 UTC로 변환
+        start_date = datetime.combine(yesterday, datetime.min.time()).replace(tzinfo=seoul_tz).astimezone(pytz.UTC)
+        end_date = datetime.combine(yesterday, datetime.max.time()).replace(tzinfo=seoul_tz).astimezone(pytz.UTC)
+
         # 어제 날짜 데이터 필터링
-        daily_videos = YouTubeData.objects.filter(upload_date__date=yesterday)
+        daily_videos = YouTubeData.objects.filter(upload_date__gte=start_date, upload_date__lt=end_date)
 
         if not daily_videos.exists():
             logger.warning("No videos found for yesterday.")
             return
 
-        # 데이터 처리
-        valid_videos = []
-        for video in daily_videos:
-            # Null 또는 None 체크
-            if not video.upload_date:
-                logger.warning(f"Video {video.title} has no upload_date. Skipping...")
-                continue
-
-            # 문자열인 경우 datetime으로 변환
-            if isinstance(video.upload_date, str):
-                try:
-                    video.upload_date = datetime.fromisoformat(video.upload_date)
-                except ValueError:
-                    logger.warning(f"Invalid date format for video {video.title}. Skipping...")
-                    continue
-
-            valid_videos.append(video)
-
         # 상위 10개 선정 (중복 제거 포함)
-        top_videos = get_top10_chart_based(valid_videos)
+        top_videos = get_top10_chart_based(daily_videos)
 
         # 데이터 저장
         for video in top_videos:
@@ -356,7 +343,7 @@ def save_daily_top10():
                     'title': video.title,
                     'channel_name': video.channel_name,
                     'views': video.views,
-                    'upload_date': video.upload_date,
+                    'upload_date': video.upload_date,  # 이미 UTC로 저장됨
                     'url': video.url,
                     'channel': video.channel,
                     'thumbnail': video.thumbnail,
@@ -368,59 +355,62 @@ def save_daily_top10():
     except Exception as e:
         logger.error(f"save_daily_top10 failed: {e}")
 
-def get_date_range(target_date=None, days=7):
-    """
-    특정 날짜 또는 최근 N일간의 시작 및 종료 시간 반환
-    """
-    if target_date:
-        start = make_aware(datetime.combine(target_date, datetime.min.time()))
-        end = make_aware(datetime.combine(target_date + timedelta(days=1), datetime.min.time()))
-    else:
-        today = localtime().date()
-        start = make_aware(datetime.combine(today - timedelta(days=days), datetime.min.time()))
-        end = make_aware(datetime.combine(today + timedelta(days=1), datetime.min.time()))
-    return start, end
+from datetime import timedelta
 
 def weekly_issues(request):
     date_str = request.GET.get('date')
+    seoul_tz = pytz.timezone('Asia/Seoul')
+    today = datetime.now(seoul_tz).date()
+    yesterday = today - timedelta(days=1)  # 어제 날짜 계산
+
+    # 날짜 처리
     if date_str:
         try:
             target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
         except ValueError:
-            target_date = None
+            target_date = yesterday  # 잘못된 날짜 입력 시 어제 날짜로 설정
     else:
-        target_date = None
+        target_date = yesterday  # 기본값: 어제 날짜
 
-    # 데이터 가져오기
-    if target_date:
-        start_date = make_aware(datetime.combine(target_date, datetime.min.time()))
-        end_date = make_aware(datetime.combine(target_date + timedelta(days=1), datetime.min.time()))
-        issues = WeeklyIssue.objects.filter(upload_date__gte=start_date, upload_date__lt=end_date)
-        print(f"MongoDB에서 가져온 데이터 개수: {issues.count()}")
-    else:
-        today = datetime.now(pytz.timezone('Asia/Seoul')).date()
-        start_date = make_aware(datetime.combine(today - timedelta(days=7), datetime.min.time()))
-        end_date = make_aware(datetime.combine(today + timedelta(days=1), datetime.min.time()))
-        issues = WeeklyIssue.objects.filter(upload_date__gte=start_date, upload_date__lt=end_date)
-        print(f"MongoDB에서 가져온 데이터 개수: {issues.count()}")
+    # target_date가 어제보다 크다면 강제로 어제 날짜로 설정
+    if target_date > yesterday:
+        target_date = yesterday
 
-    # 날짜별 그룹화
+    # 검색한 날짜 기준으로 내림차순 최근 6일 범위 계산
+    start_date = target_date - timedelta(days=5)
+    end_date = target_date + timedelta(days=1)
+
+    # UTC 변환
+    start_date_utc = datetime.combine(start_date, datetime.min.time()).astimezone(pytz.UTC)
+    end_date_utc = datetime.combine(end_date, datetime.min.time()).astimezone(pytz.UTC)
+
+    # 데이터 필터링
+    issues = WeeklyIssue.objects.filter(
+        upload_date__gte=start_date_utc,
+        upload_date__lt=end_date_utc
+    ).order_by('-upload_date')
+
+    # 날짜별로 그룹화
     grouped_issues = defaultdict(list)
     for issue in issues:
-        date_key = issue.upload_date.astimezone(pytz.timezone('Asia/Seoul')).date()
-        grouped_issues[date_key].append(issue)
+        issue_date = issue.upload_date.astimezone(seoul_tz).date()
+        weekday = issue_date.strftime("%Y년 %m월 %d일 (%a)").replace("Mon", "월").replace("Tue", "화").replace("Wed", "수").replace("Thu", "목").replace("Fri", "금").replace("Sat", "토").replace("Sun", "일")
+        grouped_issues[weekday].append({
+            'rank': len(grouped_issues[weekday]) + 1,
+            'title': clean_title(issue.title),
+            'views': issue.views,
+            'url': issue.url,
+        })
 
-    # 날짜별 상위 10개로 제한
-    for date_key in grouped_issues:
-        grouped_issues[date_key] = grouped_issues[date_key][:10]
-
-    # 데이터 정렬
-    sorted_issues = sorted(grouped_issues.items(), key=lambda x: x[0], reverse=True)
+    # 정렬 및 최대 6개만 유지
+    sorted_issues = sorted(grouped_issues.items(), key=lambda x: x[0], reverse=True)[:6]
 
     context = {
         'sorted_issues': sorted_issues,
         'target_date': target_date,
+        'yesterday': yesterday,  # 어제 날짜를 템플릿에 전달
     }
+
     return render(request, 'analysis/weekly_issues.html', context)
 
 #상세분석
@@ -429,13 +419,42 @@ def detail(request):
     video_url = request.GET.get('url')
     video_id = request.GET.get('id')
 
-    # 데이터베이스에서 값 가져오기
+    # 선택된 비디오 데이터 가져오기
     video = YouTubeData.objects.filter(url=video_url).first()
-    video_views = video.views if video else None  # 조회수
-    video_likes = video.likes if video else None  # 좋아요 수
-    video_comments = video.comments if video else None  # 댓글 수
-    video_title = video.title if video else None  # 동영상 제목
-    # 컨텍스트 구성
+    video_views = video.views if video else None
+    video_likes = video.likes if video else None
+    video_comments = video.comments if video else None
+    video_title = video.title if video else None
+
+    # 관련 비디오 처리
+    all_videos = YouTubeData.objects.all()
+
+    def process_for_similarity(video_data):
+        title = clean_title(video_data.title)
+        transcript = " ".join([item['text'] for item in video_data.transcript]) if video_data.transcript else ""
+        return f"{title} {transcript}"
+
+    # TF-IDF 벡터화
+    corpus = [process_for_similarity(v) for v in all_videos]
+    vectorizer = TfidfVectorizer(max_features=5000, stop_words='english')
+    tfidf_matrix = vectorizer.fit_transform(corpus)
+
+    target_index = list(all_videos).index(video)
+    similarity_scores = cosine_similarity(tfidf_matrix[target_index:target_index+1], tfidf_matrix).flatten()
+
+    # 유사도가 높은 비디오 필터링
+    threshold = 0.7
+    related_videos = [
+        {
+            "url": v.url,
+            "video_id": v.url.split('v=')[1].split('&')[0],  # 여기서 ID를 추출
+            "thumbnail": v.thumbnail,
+            "title": v.title,
+        }
+        for i, v in enumerate(all_videos)
+        if similarity_scores[i] > threshold and i != target_index
+    ]
+
     context = {
         'video': video,
         'video_id': video_id,
@@ -444,19 +463,13 @@ def detail(request):
         'video_views': video_views,
         'video_likes': video_likes,
         'video_comments': video_comments,
+        'related_videos': related_videos,  # 유사한 비디오들
     }
 
     return render(request, 'analysis/detail.html', context)
 
-
-
-import matplotlib.pyplot as plt
-from io import BytesIO
-import base64
-from wordcloud import WordCloud
 from transformers import pipeline
 from django.shortcuts import render
-from collections import Counter
 from konlpy.tag import Okt
 from .models import YouTubeData
 
