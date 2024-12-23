@@ -197,83 +197,61 @@ def generate_network_graph(G, node_clusters=None):
         logger.error(traceback.format_exc())
         return None
 
-def visualize_performance_metrics(performance_metrics=None):
+def visualize_performance_metrics(metrics_list):
     """성능 메트릭 시각화"""
     try:
-        # 데이터가 없을 때 기본 데이터 생성
-        if not performance_metrics:
-            # 기본 성능 데이터 생성
-            default_metrics = {
-                'processing_time': [0.5, 0.6, 0.4, 0.5],
-                'memory_usage': [100, 110, 95, 105],
-                'keyword_count': [15, 18, 12, 16],
-                'silhouette_score': [0.7, 0.75, 0.8, 0.85]
-            }
-            df = pd.DataFrame(default_metrics)
-        else:
-            df = pd.DataFrame(performance_metrics)
-
-        # 한글 폰트 설정
-        try:
-            font_path = "C:/Windows/Fonts/malgun.ttf"  # Windows
-            font_prop = matplotlib.font_manager.FontProperties(fname=font_path)
-            plt.rcParams['font.family'] = font_prop.get_name()
-        except:
-            logger.warning("기본 폰트를 사용합니다.")
-            plt.rcParams['font.family'] = 'Malgun Gothic'
-
-        # seaborn 스타일 대신 matplotlib 내장 스타일 사용
-        plt.style.use('bmh')
+        if not metrics_list:
+            logger.warning("성능 메트릭 데이터가 없습니다.")
+            return None
+            
+        # 리스트를 DataFrame으로 변환
+        df = pd.DataFrame(metrics_list)
+        
+        # 시간순 정렬
+        df = df.sort_values('timestamp')
         
         plt.figure(figsize=(15, 10), facecolor='white')
         
-        # 전체 그래프 스타일 설정
-        plt.rcParams['axes.facecolor'] = '#f8f9fa'
-        plt.rcParams['axes.grid'] = True
-        plt.rcParams['grid.alpha'] = 0.3
-        plt.rcParams['grid.color'] = '#cccccc'
-        
         # 처리 시간 추이
         plt.subplot(2, 2, 1)
-        plt.plot(range(len(df)), df['processing_time'], 'b-', linewidth=2, color='#2196F3')
+        plt.plot(df['timestamp'], df['processing_time'], 'b-', 
+                linewidth=2, color='#2196F3')
         plt.title('처리 시간 추이', fontsize=12, pad=10)
-        plt.xlabel('분석 횟수', fontsize=10)
+        plt.xlabel('분석 시간', fontsize=10)
         plt.ylabel('처리 시간(초)', fontsize=10)
+        plt.xticks(rotation=45)
         
         # 메모리 사용량 추이
         plt.subplot(2, 2, 2)
-        plt.plot(range(len(df)), df['memory_usage'], '-', linewidth=2, color='#4CAF50')
+        plt.plot(df['timestamp'], df['memory_usage'], '-', 
+                linewidth=2, color='#4CAF50')
         plt.title('메모리 사용량 추이', fontsize=12, pad=10)
-        plt.xlabel('분석 횟수', fontsize=10)
+        plt.xlabel('분석 시간', fontsize=10)
         plt.ylabel('메모리(MB)', fontsize=10)
+        plt.xticks(rotation=45)
         
         # 키워드 수 분포
         plt.subplot(2, 2, 3)
-        plt.hist(df['keyword_count'], bins=20, color='#42A5F5', edgecolor='white')
+        plt.hist(df['keyword_count'], bins=20, color='#42A5F5', 
+                edgecolor='white')
         plt.title('키워드 수 분포', fontsize=12, pad=10)
         plt.xlabel('키워드 수', fontsize=10)
         plt.ylabel('빈도', fontsize=10)
         
         # 실루엣 점수 추이
         plt.subplot(2, 2, 4)
-        valid_scores = df[df['silhouette_score'] > 0]['silhouette_score']
-        if not valid_scores.empty:
-            plt.plot(range(len(valid_scores)), valid_scores, '-', 
-                    linewidth=2, color='#F44336')
-            plt.title('실루엣 점수 추이', fontsize=12, pad=10)
-            plt.xlabel('분석 횟수', fontsize=10)
-            plt.ylabel('실루엣 점수', fontsize=10)
-        else:
-            plt.text(0.5, 0.5, '유효한 실루엣 점수 없음', 
-                    horizontalalignment='center',
-                    verticalalignment='center',
-                    transform=plt.gca().transAxes)
+        plt.plot(df['timestamp'], df['silhouette_score'], '-', 
+                linewidth=2, color='#F44336')
+        plt.title('실루엣 점수 추이', fontsize=12, pad=10)
+        plt.xlabel('분석 시간', fontsize=10)
+        plt.ylabel('실루엣 점수', fontsize=10)
+        plt.xticks(rotation=45)
         
         plt.tight_layout(pad=3.0)
         
         # 이미지 저장
         buffer = BytesIO()
-        plt.savefig(buffer, format='png', dpi=300, bbox_inches='tight', 
+        plt.savefig(buffer, format='png', dpi=300, bbox_inches='tight',
                    facecolor='white', edgecolor='none')
         buffer.seek(0)
         image_png = buffer.getvalue()
@@ -284,6 +262,5 @@ def visualize_performance_metrics(performance_metrics=None):
         
     except Exception as e:
         logger.error(f"성능 메트릭 시각화 중 오류: {str(e)}")
-        import traceback
-        logger.error(traceback.format_exc())
-        return None 
+        return None
+  

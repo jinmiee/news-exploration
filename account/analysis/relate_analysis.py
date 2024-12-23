@@ -19,6 +19,7 @@ from time import time
 import pandas as pd
 from .clustering import find_optimal_k, evaluate_model_performance
 from .visualization import generate_network_graph, visualize_performance_metrics
+from django.http import JsonResponse
 
 
 
@@ -45,17 +46,17 @@ COMMON_WORDS = {
     '최근', '기존', '향후', '대부분', '일부', '전체', '기타', '가운데', '간주'
 }
 
-# 성능 메트릭을 저장할 전역 변수
-performance_metrics = defaultdict(list)
+# 성능 메트릭을 저장할 전역 변수를 딕셔너리 리스트로 변경
+performance_metrics = []
 
-# def log_performance_metrics(metrics):
-#     """성능 지표를 기록하는 함수"""
-#     for key, value in metrics.items():
-#         performance_metrics[key].append(value)
+def log_performance_metrics(metrics):
+    """성능 지표를 기록하는 함수"""
+    global performance_metrics
+    performance_metrics.append(metrics)
     
-#     # 주기적으로 CSV 파일로 저장
-#     if len(performance_metrics['timestamp']) % 100 == 0:  # 100 단위로 저장
-#         pd.DataFrame(performance_metrics).to_csv('analysis_performance_metrics.csv', index=False)
+    # 최근 100개만 유지
+    if len(performance_metrics) > 100:
+        performance_metrics.pop(0)
 
 def load_sbert_model():
     """
@@ -140,7 +141,7 @@ def extract_keywords_from_desc(text):
                         # 키워드 필터링 조건 강화
                         if (len(keyword) > 1 and  # 2글자 이상
                             keyword not in stopwords and  # 불용어 아님
-                            not keyword.isdigit() and  # 숫자만으로 구성되지 않음
+                            not keyword.isdigit() and  # 숫자만��로 구성되지 않음
                             not any(c.isdigit() for c in keyword) and  # 숫자 포함하지 않음
                             not any(c.isspace() for c in keyword) and  # 공백 포함하지 않음
                             not any(c in '습니다.,' for c in keyword) and  # 조사/어미 제외
@@ -239,18 +240,18 @@ def find_similar_keywords_lsh(target_keyword, candidate_keywords, threshold=0.8)
         logger.error(f"LSH 검색 중 오류: {str(e)}")
         return []
 
-def analyze_related_words(text, transcript, clean_title_func=None):
-    """
-    텍스트와 자막에서 연관어를 분석하는 함수
-    """
+def analyze_related_words(video_desc, transcript, clean_title_func=None):
+    start_time = time()
+    initial_memory = get_memory_usage()
+    
     try:
         print("\n[연관어 분석 시작]")
         
         # clean_title_func가 전달되지 않았다면 원본 텍스트 사용
         if clean_title_func:
-            cleaned_desc = clean_title_func(text)
+            cleaned_desc = clean_title_func(video_desc)
         else:
-            cleaned_desc = text
+            cleaned_desc = video_desc
 
         # 특정 키워드 매핑 정의
         special_mappings = {
@@ -335,7 +336,7 @@ def analyze_related_words(text, transcript, clean_title_func=None):
                         weighted_score *= 0.4
                     
                     # # 4. 고유명사나 특정 주제어는 가중치 증가
-                    # if any(topic in keyword for topic in ['탄핵', '대통령', '윤석열', '민주당', '국회']):
+                    # if any(topic in keyword for topic in ['탄', '대통령', '윤석열', '민주당', '국회']):
                     #     weighted_score *= 1.8
                     
                     # 5. TF-IDF 점수가 빈도수보다 현저히 높은 경우 (문맥적 중요성)
@@ -382,7 +383,7 @@ def analyze_related_words(text, transcript, clean_title_func=None):
                     desc_minhashes[keyword] = m
                     lsh.insert(keyword, m)
             
-            # SBERT와 SimCSE 임베딩 미리 계산
+            # SBERT와 SimCSE 베딩 미리 계산
             sbert = nlp_models['sbert']
             simcse_model, simcse_tokenizer = nlp_models['simcse']
             
@@ -486,18 +487,34 @@ def analyze_related_words(text, transcript, clean_title_func=None):
         if G.number_of_nodes() > 1:
             node_embeddings = nlp_models['sbert'].encode(list(G.nodes()))
             
-            # 최적의 클러스터 수 찾기 및 차원 축소
-            optimal_k, reduced_embeddings, cluster_labels, sil_score = find_optimal_k(node_embeddings)
+            # 클러스터링 수행
+            optimal_k, reduced_embeddings, labels, sil_score = find_optimal_k(node_embeddings)
             
-            # 클러스터링 결과 시각화
-            performance_graph = evaluate_model_performance(
-                reduced_embeddings, 
-                cluster_labels,
-                sil_score
-            )
+            # 성능 메트릭 기록
+            end_time = time()
+            processing_time = end_time - start_time
+            memory_used = get_memory_usage() - initial_memory
+            
+            metrics = {
+                'timestamp': pd.Timestamp.now(),
+                'processing_time': round(processing_time, 2),  # 소수점 2자리까지
+                'memory_usage': round(memory_used, 2),
+                'keyword_count': len(keywords),
+                'silhouette_score': float(sil_score),
+                'cluster_count': optimal_k,
+                'data_size': len(node_embeddings),
+                'edge_count': G.number_of_edges()
+            }
+            
+            # 메트릭 로깅
+            logger.info(f"성능 메트릭: {metrics}")
+            log_performance_metrics(metrics)
+            
+            # 성능 평가 그래프 생성
+            performance_graph = evaluate_model_performance(reduced_embeddings, labels, sil_score)
             
             # 네트워크 그래프에 클러스터 정보 반영
-            network_graph = generate_network_graph(G, cluster_labels)
+            network_graph = generate_network_graph(G, labels)
             
         else:
             performance_graph = None
@@ -506,10 +523,14 @@ def analyze_related_words(text, transcript, clean_title_func=None):
         return G, sorted(word_pairs, key=lambda x: x[1], reverse=True)[:20], top_10_keywords, performance_graph
         
     except Exception as e:
-        logger.error(f"연관어 분석 중 오류 발생: {str(e)}")
-        import traceback
-        logger.error(traceback.format_exc())
-        return nx.Graph(), [], [], None
+        logger.error(f"연관어 분석 중 오류: {str(e)}")
+        return None, None, None, None
+
+def get_memory_usage():
+    """현재 프로세스의 메모리 사용량을 MB 단위로 반환"""
+    import psutil
+    process = psutil.Process()
+    return process.memory_info().rss / 1024 / 1024
 
 def relate(request):
     video_url = request.GET.get('url')
@@ -548,7 +569,7 @@ def relate(request):
             
             network_graph = generate_network_graph(graph)
             
-            # 키워드별 관련 뉴스 분류 추가
+            # 키드별 관련 뉴스 분류 추가
             categorized_news = {}
             if important_keywords:
                 for keyword in important_keywords:
@@ -595,3 +616,35 @@ def relate(request):
         }
     
     return render(request, 'analysis/relate.html', context)
+
+def get_performance_metrics(request):
+    """성능 메트릭 데이터를 반환하는 API 엔드포인트"""
+    try:
+        global performance_metrics
+        
+        # 성능 메트릭이 없는 경우
+        if not performance_metrics:
+            return JsonResponse({
+                'error': '성능 평가 데이터가 없습니다.'
+            }, status=404)
+            
+        # 성능 메트릭 시각화
+        graph = visualize_performance_metrics(performance_metrics)
+        
+        if graph is None:
+            return JsonResponse({
+                'error': '성능 평가 그래프 생성에 실패했습니다.'
+            }, status=500)
+            
+        return JsonResponse({
+            'success': True,
+            'performance_graph': graph
+        })
+        
+    except Exception as e:
+        logger.error(f"성능 메트릭 API 오류: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return JsonResponse({
+            'error': '성능 메트릭을 가져오는 중 오류가 발생했습니다.'
+        }, status=500)
