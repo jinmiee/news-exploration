@@ -321,57 +321,55 @@ def weekly_issues(request):
     date_str = request.GET.get('date')
     seoul_tz = pytz.timezone('Asia/Seoul')
     today = datetime.now(seoul_tz).date()
-    yesterday = today - timedelta(days=1)  # 어제 날짜 계산
+    yesterday = today - timedelta(days=1)
 
-    # 날짜 처리
     if date_str:
         try:
             target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
         except ValueError:
-            target_date = yesterday  # 잘못된 날짜 입력 시 어제 날짜로 설정
+            target_date = yesterday
     else:
-        target_date = yesterday  # 기본값: 어제 날짜
+        target_date = yesterday
 
-    # target_date가 어제보다 크다면 강제로 어제 날짜로 설정
     if target_date > yesterday:
         target_date = yesterday
 
-    # 검색한 날짜 기준으로 내림차순 최근 6일 범위 계산
     start_date = target_date - timedelta(days=5)
     end_date = target_date + timedelta(days=1)
 
-    # UTC 변환
     start_date_utc = datetime.combine(start_date, datetime.min.time()).astimezone(pytz.UTC)
     end_date_utc = datetime.combine(end_date, datetime.min.time()).astimezone(pytz.UTC)
 
-    # 데이터 필터링
-    issues = WeeklyIssue.objects.filter(
-        upload_date__gte=start_date_utc,
-        upload_date__lt=end_date_utc
-    ).order_by('-upload_date')
+    try:
+        issues = WeeklyIssue.objects.filter(
+            upload_date__gte=start_date_utc,
+            upload_date__lt=end_date_utc
+        )
+        issues = sorted(issues, key=lambda x: x.upload_date, reverse=True)
 
-    # 날짜별로 그룹화
-    grouped_issues = defaultdict(list)
-    for issue in issues:
-        issue_date = issue.upload_date.astimezone(seoul_tz).date()
-        weekday = issue_date.strftime("%Y년 %m월 %d일 (%a)").replace("Mon", "월").replace("Tue", "화").replace("Wed", "수").replace("Thu", "목").replace("Fri", "금").replace("Sat", "토").replace("Sun", "일")
-        grouped_issues[weekday].append({
-            'rank': len(grouped_issues[weekday]) + 1,
-            'title': clean_title(issue.title),
-            'views': issue.views,
-            'url': issue.url,
-        })
+        grouped_issues = defaultdict(list)
+        for issue in issues:
+            issue_date = issue.upload_date.astimezone(seoul_tz).date()
+            weekday = issue_date.strftime("%Y년 %m월 %d일 (%a)").replace("Mon", "월").replace("Tue", "화").replace("Wed", "수").replace("Thu", "목").replace("Fri", "금").replace("Sat", "토").replace("Sun", "일")
+            grouped_issues[weekday].append({
+                'rank': len(grouped_issues[weekday]) + 1,
+                'title': clean_title(issue.title),
+                'views': issue.views,
+                'url': issue.url,
+            })
 
-    # 정렬 및 최대 6개만 유지
-    sorted_issues = sorted(grouped_issues.items(), key=lambda x: x[0], reverse=True)[:6]
+        sorted_issues = sorted(grouped_issues.items(), key=lambda x: x[0], reverse=True)[:6]
 
-    context = {
-        'sorted_issues': sorted_issues,
-        'target_date': target_date,
-        'yesterday': yesterday,  # 어제 날짜를 템플릿에 전달
-    }
+        context = {
+            'sorted_issues': sorted_issues,
+            'target_date': target_date,
+            'yesterday': yesterday,
+        }
+        return render(request, 'analysis/weekly_issues.html', context)
 
-    return render(request, 'analysis/weekly_issues.html', context)
+    except Exception as e:
+        print(f"Error in weekly_issues function: {e}")
+        return JsonResponse({"error": str(e)}, status=500)
 
 #상세분석
 # @login_required
