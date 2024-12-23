@@ -72,7 +72,9 @@
                     <h3>키워드별 관련 뉴스</h3>
                     <div class="keyword-tabs">
                         {% for keyword in important_keywords %}
-                            <button class="keyword-tab" onclick="showCategory('{{ keyword }}')">{{ keyword }}</button>
+                            {% if keyword in categorized_news %}
+                                <button class="keyword-tab" onclick="showCategory('{{ keyword }}')">{{ keyword }}</button>
+                            {% endif %}
                         {% endfor %}
                     </div>
                     
@@ -99,6 +101,13 @@
                         </div>
                     </div>
                     {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <div class="related-news-wrapper">
+                <div class="related-news-section">
+                    <h3>키워드별 관련 뉴스</h3>
+                    <p class="no-news-message">관련 동영상이 없습니다.</p>
                 </div>
             </div>
             {% endif %}
@@ -355,6 +364,13 @@
 
 .word-pairs th {
     background-color: #f0f0f0;
+}
+
+.no-news-message {
+    text-align: center;
+    padding: 2rem;
+    color: #666;
+    font-size: 1.1rem;
 }
 </style>
 

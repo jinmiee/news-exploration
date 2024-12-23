@@ -36,7 +36,8 @@ logging.getLogger('gensim').setLevel(logging.ERROR)
 # 상수 정의
 API_KEY = "koba-5JNWNQI-MH5EQJY-QINVNIQ-2IOA5IY"
 SIMILARITY_THRESHOLD = 0.73
-TOP_KEYWORDS_COUNT = 30
+EDGE_THRESHOLD = 0.5
+TOP_KEYWORDS_COUNT = 25
 t = brn.Tagger(API_KEY, "localhost")
 
 def load_pretrained_model():
@@ -159,6 +160,7 @@ except Exception as e:
 
 # 불용어 로드
 def load_stopwords():
+    """불용어 사전 로드"""
     try:
         with open('account/static/불용어.txt', 'r', encoding='utf-8') as f:
             return set(f.read().splitlines())
@@ -166,6 +168,7 @@ def load_stopwords():
         logger.error(f"불용어 파일 로드 실패: {str(e)}")
         return set()
 
+# 전역 변수로 불용어 로드
 stopwords = load_stopwords()
 
 def extract_keywords_from_desc(text):
@@ -187,11 +190,14 @@ def extract_keywords_from_desc(text):
                         keyword = morph.text.content
                         if isinstance(keyword, bytes):
                             keyword = keyword.decode('utf-8')
-                        # 2글자 이상, 불용어 아님, 숫자만으로 구성되지 않음
-                        if (len(keyword) > 1 and 
-                            keyword not in stopwords and 
-                            not keyword.isdigit() and
-                            not any(c.isdigit() for c in keyword)):
+                        # 키워드 필터링 조건 강화
+                        if (len(keyword) > 1 and  # 2글자 이상
+                            keyword not in stopwords and  # 불용어 아님
+                            not keyword.isdigit() and  # 숫자만으로 구성되지 않음
+                            not any(c.isdigit() for c in keyword) and  # 숫자 포함하지 않음
+                            not any(c.isspace() for c in keyword) and  # 공백 포함하지 않음
+                            not any(c in '습니다.,' for c in keyword) and  # 조사/어미 제외
+                            not keyword.endswith(('는', '을', '를', '이', '가', '의', '로', '에', '도'))):  # 조사로 끝나지 않음
                             keywords.append(keyword)
         
         # 중복 제거하여 반환
@@ -309,7 +315,7 @@ def analyze_related_words(video_desc, video_transcript, clean_title_func=None):
         desc_keywords = extract_keywords_from_desc(cleaned_desc)
         print(f"[설명 키워드] 추출된 키워드 ({len(desc_keywords)}개): {desc_keywords}")
         
-        # 2. 자막 처리 및 상위 30개 키워드 추출
+        # 2. 자막 처리 및 상위 키워드 추출
         transcript_keywords = []
         keyword_importance = {}
         if video_transcript:
@@ -321,46 +327,80 @@ def analyze_related_words(video_desc, video_transcript, clean_title_func=None):
                 
             # 자막에서 키워드 추출
             all_transcript_keywords = extract_keywords_from_desc(transcript_text)
-            print(f"[자막 키워드] 전체 추출 키워드 수: {len(all_transcript_keywords)}개")
+            print(f"[자막] 전체 추출 키워드 수: {len(all_transcript_keywords)}개")
+            print(f"[자막] 추출된 전체 키워드: {all_transcript_keywords}")  # 디버깅용
             
             if not all_transcript_keywords:
                 print("[경고] 자막에서 추출된 키워드가 없습니다")
                 return nx.Graph(), [], []
             
-            # TF-IDF 계산을 위한 문서 생성
-            documents = [' '.join([k] * all_transcript_keywords.count(k)) for k in set(all_transcript_keywords)]
-            if not documents:
-                logger.warning("TF-IDF 계산을 위한 문서가 없습니다.")
-                return nx.Graph(), [], []
-                
-            # TF-IDF 계산
+            # TF-IDF 계산 부분 수정
             try:
-                vectorizer = TfidfVectorizer(min_df=1)  # 최소 문서 빈도를 1로 설정
+                # 문서 생성 방식 변경
+                documents = []
+                for sentence in transcript_text.split('.'):
+                    if sentence.strip():
+                        documents.append(sentence.strip())
+                
+                # TF-IDF 계산
+                vectorizer = TfidfVectorizer(min_df=1)
                 tfidf_matrix = vectorizer.fit_transform(documents)
-                tfidf_scores = dict(zip(vectorizer.get_feature_names_out(), tfidf_matrix.toarray().sum(axis=0)))
+                
+                # 각 단어별 TF-IDF 점수 계산 (문서 전체에서의 중요도)
+                feature_names = vectorizer.get_feature_names_out()
+                tfidf_scores = {}
+                for keyword in set(all_transcript_keywords):
+                    if keyword in feature_names:
+                        idx = feature_names.tolist().index(keyword)
+                        # 모든 문서에서의 TF-IDF 점수 평균
+                        tfidf_scores[keyword] = np.mean(tfidf_matrix[:, idx].toarray())
+                
+                # 빈도수 계산
+                keyword_freq = Counter(all_transcript_keywords)
+                
+                # 정규화를 위한 최대값 계산
+                max_freq = max(keyword_freq.values())
+                max_tfidf = max(tfidf_scores.values()) if tfidf_scores else 1.0
+                
+                # 중요도 점수 계산
+                keyword_importance = {}
+                for keyword in set(all_transcript_keywords):
+                    # 빈도수 점수 (0~1)
+                    freq_score = keyword_freq[keyword] / max_freq
+                    
+                    # TF-IDF 점수 (0~1)
+                    tfidf_score = tfidf_scores.get(keyword, 0) / max_tfidf
+                    
+                    # 기본 가중치 적용 (40:60)
+                    weighted_score = 0.4 * freq_score + 0.6 * tfidf_score
+                    
+                    # 특정 조건에 따른 가중치 보정
+                    # 1. 제목/설명에 있는 키워드는 가중치 증가
+                    if keyword in desc_keywords:
+                        weighted_score *= 1.5
+                    
+                    # 2. 2음절 이하의 일반적인 단어는 가중치 감소
+                    if len(keyword) <= 2 and keyword not in desc_keywords:
+                        weighted_score *= 0.5
+                    
+                    # 3. TF-IDF 점수가 빈도수보다 현저히 높은 경우 (문맥적 중요성)
+                    if tfidf_score > freq_score * 2:
+                        weighted_score *= 1.3
+                    
+                    keyword_importance[keyword] = weighted_score
+                
+                # 상위 25개 키워드 선정
+                transcript_keywords = [k[0] for k in sorted(
+                    keyword_importance.items(),
+                    key=lambda x: (-x[1], x[0])
+                )[:TOP_KEYWORDS_COUNT]]
+                
+                print(f"[자막] 선정된 상위 {TOP_KEYWORDS_COUNT}개 키워드: {transcript_keywords}")
+                print(f"[자막] 각 키워드의 중요도 점수: {[(k, round(keyword_importance[k], 3)) for k in transcript_keywords]}")
+                
             except Exception as e:
                 logger.error(f"TF-IDF 계산 중 오류: {str(e)}")
                 return nx.Graph(), [], []
-            
-            # 빈도수 계산
-            keyword_freq = Counter(all_transcript_keywords)
-            
-            # 중요도 점수 계산 (TF-IDF + 빈도)
-            max_freq = max(keyword_freq.values())
-            max_tfidf = max(tfidf_scores.values()) if tfidf_scores else 1.0
-            
-            for keyword in set(all_transcript_keywords):
-                freq_score = keyword_freq[keyword] / max_freq
-                tfidf_score = tfidf_scores.get(keyword, 0) / max_tfidf
-                keyword_importance[keyword] = 0.7 * freq_score + 0.3 * tfidf_score
-            
-            # 상위 30개 키워드 선정 시 동점 처리
-            transcript_keywords = [k[0] for k in sorted(  # 튜플의 첫 번째 요소(키워드)만 사용
-                keyword_importance.items(),
-                key=lambda x: (-x[1], x[0])  # 중요도가 같을 경우 키워드 알파벳 순으로 정렬
-            )[:TOP_KEYWORDS_COUNT]]
-            
-            print(f"자막에서 추출된 상위 {TOP_KEYWORDS_COUNT}개 키워드: {transcript_keywords}")
         
         if not transcript_keywords:
             logger.warning("처리할 키워드가 없습니다.")
@@ -396,11 +436,10 @@ def analyze_related_words(video_desc, video_transcript, clean_title_func=None):
                 # 특정 키워드 매핑 체크
                 if keyword in special_mappings:
                     mapped_keyword = special_mappings[keyword]
-                    if mapped_keyword in desc_keywords:
-                        keyword_mapping[keyword] = mapped_keyword
-                        node_sizes[mapped_keyword] = keyword_importance[keyword]
-                        final_keywords.add(mapped_keyword)
-                        continue
+                    keyword_mapping[keyword] = mapped_keyword
+                    node_sizes[mapped_keyword] = keyword_importance[keyword]
+                    final_keywords.add(mapped_keyword)
+                    continue
                 
                 # LSH로 후보 키워드 추출
                 m = create_minhash(keyword)
@@ -447,35 +486,44 @@ def analyze_related_words(video_desc, video_transcript, clean_title_func=None):
         # 엣지 추가
         keywords = list(final_keywords)
         if len(keywords) > 1:
-            # 임베딩 일괄 계산
-            embeddings = nlp_models['sbert'].encode(keywords)
-            similarity_matrix = cosine_similarity(embeddings)
-            
-            # 중심성이 가장 높은 노드 찾기
-            edge_weights = {}
-            for i in range(len(keywords)):
-                for j in range(i + 1, len(keywords)):
-                    similarity = similarity_matrix[i][j]
-                    if similarity > 0.3:  # 엣지 임계값
-                        # TF-IDF 가중치를 반영한 엣지 가중치 계산
-                        weight = similarity * (node_sizes[keywords[i]] + node_sizes[keywords[j]]) / 2
-                        edge_weights[(keywords[i], keywords[j])] = weight
-                        G.add_edge(keywords[i], keywords[j], weight=weight)
-            
-            # 중심성 계산
-            centrality = nx.degree_centrality(G)
-            central_node = max(centrality.items(), key=lambda x: x[1])[0]
-            
-            # 중심 노드와의 거리에 따라 레이아웃 조정을 위해 속성 추가
-            distances = nx.single_source_shortest_path_length(G, central_node)
-            nx.set_node_attributes(G, distances, 'distance_from_center')
+            try:
+                # 임베딩 일괄 계산
+                embeddings = nlp_models['sbert'].encode(keywords)
+                similarity_matrix = cosine_similarity(embeddings)
+                
+                # 엣지 추가 및 중심성 계산
+                edge_weights = {}
+                for i in range(len(keywords)):
+                    for j in range(i + 1, len(keywords)):
+                        similarity = similarity_matrix[i][j]
+                        if similarity > EDGE_THRESHOLD:  # 엣지 임계값 상향 (0.3 → 0.5)
+                            weight = similarity * (node_sizes[keywords[i]] + node_sizes[keywords[j]]) / 2
+                            edge_weights[(keywords[i], keywords[j])] = weight
+                            G.add_edge(keywords[i], keywords[j], weight=weight)
+                
+                if G.number_of_edges() > 0:  # 엣지가 있는 경우만 중심성 계산
+                    centrality = nx.degree_centrality(G)
+                    top_10_keywords = sorted(centrality.items(), key=lambda x: x[1], reverse=True)[:10]
+                    top_10_keywords = [k[0] for k in top_10_keywords]
+                else:
+                    # 엣지가 없는 경우 기존 키워드에서 상위 10개 선택
+                    top_10_keywords = list(keywords)[:10]
+                
+                # 중심 노드 설정
+                central_node = top_10_keywords[0] if top_10_keywords else keywords[0]
+                distances = nx.single_source_shortest_path_length(G, central_node)
+                nx.set_node_attributes(G, distances, 'distance_from_center')
+                
+            except Exception as e:
+                logger.error(f"중심성 계산 중 오류: {str(e)}")
+                top_10_keywords = list(keywords)[:10]
         
         # 5. 연관어 쌍 추출
         word_pairs = []
         for u, v, data in G.edges(data=True):
             word_pairs.append(((u, v), data['weight']))
         
-        return G, sorted(word_pairs, key=lambda x: x[1], reverse=True)[:20], list(final_keywords)
+        return G, sorted(word_pairs, key=lambda x: x[1], reverse=True)[:20], top_10_keywords
         
     except Exception as e:
         logger.error(f"연관어 분석 중 오류 발생: {str(e)}")
@@ -553,7 +601,7 @@ def generate_network_graph(G):
             min_weight = min(edge_weights.values())
             max_weight = max(edge_weights.values())
             
-            # 엣지를 가중치 순으로 정렬하여 그리기 (중요한 연결이 위에 오도록)
+            # 엣지를 가중치 순으로 정렬하여 그리기 (중요한 연결 위에 오도록)
             sorted_edges = sorted(G.edges(data=True), key=lambda x: x[2]['weight'])
             
             for u, v, data in sorted_edges:
