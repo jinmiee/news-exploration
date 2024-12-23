@@ -456,25 +456,32 @@ def relate(request):
             graph, top_pairs, important_keywords = analyze_related_words(video_desc, video.transcript)
             network_graph = generate_network_graph(graph)
             
-            # 키워드별 관련 뉴스 분류
+            # 키워드별 관련 뉴스 분류 (상위 10개 키워드만)
             categorized_news = {}
-            if important_keywords:
+            if important_keywords:  # important_keywords는 이제 상위 10개
                 for keyword in important_keywords:
-                    related_news = YouTubeData.objects.filter(
-                        Q(title__icontains=keyword) | 
-                        Q(desc__icontains=keyword)
-                    ).exclude(url=video_url)[:6]
-                    
-                    if related_news:
-                        cleaned_news = []
-                        for news in related_news:
-                            news.title = clean_title(news.title)
-                            try:
-                                news.video_id = news.url.split('v=')[1].split('&')[0]
-                            except:
-                                news.video_id = None
-                            cleaned_news.append(news)
-                        categorized_news[keyword] = cleaned_news
+                    try:
+                        related_news = YouTubeData.objects.filter(
+                            Q(title__icontains=keyword) | 
+                            Q(desc__icontains=keyword)
+                        ).exclude(url=video_url)[:6]
+                        
+                        # 관련 뉴스가 있는 경우에만 추가
+                        if related_news.exists():
+                            cleaned_news = []
+                            for news in related_news:
+                                if news.title:  # title이 None이 아닌 경우만 처리
+                                    news.title = clean_title(news.title)
+                                    try:
+                                        news.video_id = news.url.split('v=')[1].split('&')[0]
+                                    except:
+                                        news.video_id = None
+                                    cleaned_news.append(news)
+                            if cleaned_news:  # 정제된 뉴스가 있는 경우만 추가
+                                categorized_news[keyword] = cleaned_news
+                    except Exception as e:
+                        print(f"키워드 '{keyword}' 처리 중 오류: {str(e)}")
+                        continue
             
             context = {
                 'section': 'relate',
@@ -484,8 +491,10 @@ def relate(request):
                 'top_pairs': top_pairs,
                 'categorized_news': categorized_news,
                 'important_keywords': important_keywords,
-                'transcript_segments': transcript_segments
+                'transcript_segments': transcript_segments,
+                'has_related_news': bool(categorized_news)  # 관련 뉴스 존재 여부
             }
+            
         except Exception as e:
             print(f"분석 중 오류 발생: {str(e)}")
             context = {
