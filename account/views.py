@@ -192,6 +192,7 @@ def chart(request):
                     "url": chart.url,
                     "upload_date": chart.upload_date,
                     "thumbnail": chart.thumbnail,
+                    "id": str(chart._id)  # _id를 id로 매핑
                 })
             except Exception as e:
                 print(f"Error processing chart data: {e}")
