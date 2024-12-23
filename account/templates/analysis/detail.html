@@ -15,30 +15,50 @@
 
             <!-- Views와 Likes -->
             <div style="margin-top: 20px;">
-                <p style="font-size: 20px; font-weight: bold; color: #FF5733;">
-                    <i class="fas fa-eye" style="color: #FF5733; margin-right: 10px;"></i>
-                    Views: <span style="font-size: 24px; color: #FF5733;">{{ video_views }}</span>
-                </p>
-
-                <p style="font-size: 20px; font-weight: bold; color: #FF9800;">
-                    <i class="fas fa-thumbs-up" style="color: #FF9800; margin-right: 10px;"></i>
-                    Likes: <span style="font-size: 24px; color: #FF9800;">{{ video_likes }}</span>
+                <p style="font-size: 20px; font-weight: bold; color: #333;">
+                    <i class="fas fa-eye" style="color: #3498db; margin-right: 10px;"></i>
+                    Views: <span style="font-size: 24px; color: #333; margin-right: 40px;">{{ video_views }}</span>
+                    <i class="fas fa-thumbs-up" style="color: #3498db; margin-right: 10px;"></i>
+                    Likes: <span style="font-size: 24px; color: #333;">{{ video_likes }}</span>
                 </p>
             </div>
         </div>
 
         <!-- 오른쪽: 댓글 -->
         <div style="flex: 1 1 35%; max-width: 35%; border-left: 2px solid #ddd; padding-left: 20px;">
-            <h3 style="font-size: 22px; color: #4CAF50;">Comments</h3>
-            <ul style="list-style-type: none; padding: 0; margin: 0; font-size: 16px;">
-                {% for comment in video_comments %}
-                    <li style="margin-bottom: 10px; color: #4CAF50;">{{ comment.comment }}</li>
-                {% empty %}
-                    <li>No comments available.</li>
-                {% endfor %}
-            </ul>
+            <h3 style="font-size: 22px; color: #333;">Comments</h3>
+            <div class="unique-comments-container">
+                <ul class="unique-comments-list">
+                    {% for comment in video_comments %}
+                        <li class="unique-comment-item">{{ comment.comment }}</li>
+                    {% empty %}
+                        <li class="unique-comment-item">No comments available.</li>
+                    {% endfor %}
+                </ul>
+            </div>
         </div>
     </div>
+
+
+
+    
+        
+    <div class="relate-container">
+            <div class="rating">
+                <h3>별점 평가</h3>
+                <div class="stars">
+                    <span class="star" data-rating="1">★</span>
+                    <span class="star" data-rating="2">★</span>
+                    <span class="star" data-rating="3">★</span>
+                    <span class="star" data-rating="4">★</span>
+                    <span class="star" data-rating="5">★</span>
+                </div>
+                <p>선택된 별점: <span id="selected-rating">0</span></p>
+            </div>
+    </div>
+    
+
+  
 
     <!-- 관련 기사 섹션 -->
     <div style="margin-top: 40px;">
@@ -63,4 +83,97 @@
     <p style="margin-top: 20px;">
         <a href="{% url 'account:chart' %}">Back to Chart</a>
     </p>
+
+    <!-- 스타일 -->
+    <style>
+        /* 댓글 창 스타일 */
+        .unique-comments-container {
+            max-height: 200px; /* 최대 높이 설정 */
+            overflow-y: auto; /* 스크롤 활성화 */
+            border: 1px solid #ddd; /* 테두리 */
+            border-radius: 8px; /* 테두리 둥글게 */
+            padding: 10px; /* 내부 여백 */
+            background-color: #f9f9f9; /* 배경색 */
+        }
+        
+        /* 댓글 목록 스타일 */
+        .unique-comments-list {
+            list-style-type: none; /* 목록 점 제거 */
+            margin: 0; /* 외부 여백 제거 */
+            padding: 0; /* 내부 여백 제거 */
+        }
+        
+        /* 댓글 아이템 스타일 */
+        .unique-comment-item {
+            color: #333; /* 글자 색상 */
+            font-size: 16px; /* 글자 크기 */
+            margin-bottom: 10px; /* 각 댓글 간 간격 */
+            border-bottom: 1px solid #e0e0e0; /* 아래 테두리 */
+            padding-bottom: 5px; /* 아래 여백 */
+        }
+        
+        .unique-comment-item:last-child {
+            border-bottom: none; /* 마지막 댓글은 테두리 제거 */
+        }
+
+        .rating {
+            margin: 2rem 0;
+            padding: 1rem;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stars {
+            display: flex;
+            gap: 0.5rem;
+            margin: 1rem 0;
+            justify-content: center;
+        }
+        
+        .star {
+            font-size: 2rem;
+            cursor: pointer;
+            color: #ddd;
+            transition: color 0.2s ease;
+        }
+        
+        .star:hover,
+        .star.active {
+            color: #ffd700;
+        }
+        
+        .rating h3, 
+        .rating p {
+            text-align: center;
+            margin: 0.5rem 0;
+        }
+    </style>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const firstKeyword = document.querySelector('.keyword-tab');
+            if (firstKeyword) {
+                firstKeyword.click();
+            }
+        
+            const stars = document.querySelectorAll('.star');
+            const ratingDisplay = document.getElementById('selected-rating');
+            
+            stars.forEach(star => {
+                star.addEventListener('click', function() {
+                    const rating = this.dataset.rating;
+                    ratingDisplay.textContent = rating;
+                    
+                    stars.forEach(s => {
+                        s.classList.remove('active');
+                        if (s.dataset.rating <= rating) {
+                            s.classList.add('active');
+                        }
+                    });
+                });
+            });
+        });
+    </script>
+
 {% endblock %}

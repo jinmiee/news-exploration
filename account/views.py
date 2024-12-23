@@ -61,8 +61,10 @@ def chart(request):
 
     # 상위 10개 데이터 선정 (중복 제거 포함)
     top_titles = get_top10_chart_based(all_data)
+    print(top_titles)
     for item in top_titles:
         item.id = str(item._id)  # 직접 _id 값을 id로 할당
+        print(item.id)
     
     context = {
         "top_news": top_titles,
