@@ -4,6 +4,10 @@ import bareunpy as brn
 import unicodedata
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.metrics import silhouette_score, silhouette_samples
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import DBSCAN, KMeans
+from umap import UMAP
 import os
 import logging
 from sentence_transformers import SentenceTransformer
@@ -17,9 +21,9 @@ from ..models import YouTubeData
 from django.db.models import Q
 from time import time
 import pandas as pd
-from .clustering import find_optimal_k, evaluate_model_performance
 from .visualization import generate_network_graph, visualize_performance_metrics
 from django.http import JsonResponse
+import psutil
 
 
 
@@ -60,7 +64,7 @@ def log_performance_metrics(metrics):
 
 def load_sbert_model():
     """
-    한국어 SBERT와 KoSimCSE 모델을 로드하는 함수
+    한국 SBERT와 KoSimCSE 모델을 로드하는 함수
     """
     try:
         # 두 가지 모델을 딕셔너리 형태로 저장
@@ -91,7 +95,7 @@ def load_sbert_model():
         logger.info("SBERT와 KoSimCSE 모델 로드 완료")
         return models
     except Exception as e:
-        logger.error(f"모델 로드 중 오류 발생: {str(e)}")
+        logger.error(f"모델 로��� 중 오류 발생: {str(e)}")
         return None
 
 # NLP 모델 로드
@@ -141,7 +145,7 @@ def extract_keywords_from_desc(text):
                         # 키워드 필터링 조건 강화
                         if (len(keyword) > 1 and  # 2글자 이상
                             keyword not in stopwords and  # 불용어 아님
-                            not keyword.isdigit() and  # 숫자만��로 구성되지 않음
+                            not keyword.isdigit() and  # 숫자만로 구성되지 않음
                             not any(c.isdigit() for c in keyword) and  # 숫자 포함하지 않음
                             not any(c.isspace() for c in keyword) and  # 공백 포함하지 않음
                             not any(c in '습니다.,' for c in keyword) and  # 조사/어미 제외
@@ -240,9 +244,109 @@ def find_similar_keywords_lsh(target_keyword, candidate_keywords, threshold=0.8)
         logger.error(f"LSH 검색 중 오류: {str(e)}")
         return []
 
+def find_optimal_k(embeddings, max_k=10):
+    """
+    엘보우 방법과 실루엣 점수를 모두 고려하여 최적의 클러스터 수 찾기
+    """
+    try:
+        if len(embeddings) < 3:
+            logger.warning("데이터가 너무 적어 클러스터링을 수행할 수 없습니다.")
+            return 2, embeddings, np.zeros(len(embeddings)), 0.0
+
+        # 1. 데이터 전처리
+        scaler = StandardScaler()
+        scaled_embeddings = scaler.fit_transform(embeddings)
+        
+        # 2. UMAP으로 차원 축소
+        n_neighbors = min(3, len(embeddings)-1)
+        umap_reducer = UMAP(
+            n_neighbors=n_neighbors,
+            min_dist=0.0,
+            n_components=2,
+            metric='cosine',
+            random_state=42,
+            spread=0.5,
+            local_connectivity=2
+        )
+        reduced_embeddings = umap_reducer.fit_transform(scaled_embeddings)
+        
+        # 3. DBSCAN으로 이상치 제거
+        dbscan = DBSCAN(eps=0.5, min_samples=2, metric='cosine')
+        dbscan_labels = dbscan.fit_predict(reduced_embeddings)
+        inlier_mask = dbscan_labels != -1
+        clean_embeddings = reduced_embeddings[inlier_mask]
+        
+        if len(clean_embeddings) < 3:
+            return 2, reduced_embeddings, np.zeros(len(reduced_embeddings)), 0.0
+        
+        # 4. 최적의 클러스터 수 찾기
+        best_score = -1
+        optimal_k = 2
+        best_labels = None
+        
+        for k in range(2, min(4, len(clean_embeddings))):
+            for seed in range(20):
+                kmeans = KMeans(
+                    n_clusters=k,
+                    random_state=seed*42,
+                    init='k-means++',
+                    n_init=50,
+                    max_iter=1000
+                )
+                
+                cluster_labels = kmeans.fit_predict(clean_embeddings)
+                
+                # 클러스터 크기 검증
+                cluster_sizes = np.bincount(cluster_labels)
+                if min(cluster_sizes) < 2:
+                    continue
+                
+                # 실루엣 점수 계산
+                sil_score = silhouette_score(
+                    clean_embeddings, 
+                    cluster_labels,
+                    metric='cosine'
+                )
+                
+                # 개별 실루엣 점수 검증
+                sample_sil_scores = silhouette_samples(
+                    clean_embeddings, 
+                    cluster_labels,
+                    metric='cosine'
+                )
+                
+                if (np.mean(sample_sil_scores < 0) > 0.3 or 
+                    np.min(sample_sil_scores) < -0.1):
+                    continue
+                
+                if sil_score > best_score:
+                    best_score = sil_score
+                    optimal_k = k
+                    best_labels = cluster_labels
+        
+        # 5. 전체 레이블 생성
+        full_labels = np.full(len(reduced_embeddings), -1)
+        full_labels[inlier_mask] = best_labels
+        
+        # 6. 이상치 처리
+        if np.any(~inlier_mask):
+            outlier_points = reduced_embeddings[~inlier_mask]
+            for idx, point in zip(np.where(~inlier_mask)[0], outlier_points):
+                distances = [np.mean([np.linalg.norm(point - clean_embeddings[i]) 
+                           for i in np.where(best_labels == label)[0]])
+                           for label in range(optimal_k)]
+                full_labels[idx] = np.argmin(distances)
+        
+        logger.info(f"클러스터링 완료 - 클러스터 수: {optimal_k}, 실루엣 점수: {best_score:.3f}")
+        return optimal_k, reduced_embeddings, full_labels, best_score
+        
+    except Exception as e:
+        logger.error(f"최적 클러스터 수 계산 중 오류: {str(e)}")
+        return 2, embeddings, np.zeros(len(embeddings)), 0.0
+
 def analyze_related_words(video_desc, transcript, clean_title_func=None):
     start_time = time()
-    initial_memory = get_memory_usage()
+    initial_memory = psutil.Process().memory_info().rss / 1024 / 1024  # MB 단위
     
     try:
         print("\n[연관어 분석 시작]")
@@ -483,22 +587,19 @@ def analyze_related_words(video_desc, transcript, clean_title_func=None):
         for u, v, data in G.edges(data=True):
             word_pairs.append(((u, v), data['weight']))
         
-        # 성능 평가 그래프 생성
+        # 클러스터링 수행
         if G.number_of_nodes() > 1:
             node_embeddings = nlp_models['sbert'].encode(list(G.nodes()))
             
-            # 클러스터링 수행
+            # 클러스터링 및 ���능 평가
             optimal_k, reduced_embeddings, labels, sil_score = find_optimal_k(node_embeddings)
             
             # 성능 메트릭 기록
             end_time = time()
-            processing_time = end_time - start_time
-            memory_used = get_memory_usage() - initial_memory
-            
             metrics = {
                 'timestamp': pd.Timestamp.now(),
-                'processing_time': round(processing_time, 2),  # 소수점 2자리까지
-                'memory_usage': round(memory_used, 2),
+                'processing_time': round(end_time - start_time, 2),
+                'memory_usage': round(psutil.Process().memory_info().rss / 1024 / 1024 - initial_memory, 2),
                 'keyword_count': len(keywords),
                 'silhouette_score': float(sil_score),
                 'cluster_count': optimal_k,
@@ -506,21 +607,15 @@ def analyze_related_words(video_desc, transcript, clean_title_func=None):
                 'edge_count': G.number_of_edges()
             }
             
-            # 메트릭 로깅
-            logger.info(f"성능 메트릭: {metrics}")
             log_performance_metrics(metrics)
             
-            # 성능 평가 그래프 생성
-            performance_graph = evaluate_model_performance(reduced_embeddings, labels, sil_score)
-            
-            # 네트워크 그래프에 클러스터 정보 반영
+            # 그래프 생성
             network_graph = generate_network_graph(G, labels)
             
         else:
-            performance_graph = None
             network_graph = generate_network_graph(G)
-        
-        return G, sorted(word_pairs, key=lambda x: x[1], reverse=True)[:20], top_10_keywords, performance_graph
+            
+        return G, sorted(word_pairs, key=lambda x: x[1], reverse=True)[:20], top_10_keywords, network_graph
         
     except Exception as e:
         logger.error(f"연관어 분석 중 오류: {str(e)}")
@@ -618,7 +713,7 @@ def relate(request):
     return render(request, 'analysis/relate.html', context)
 
 def get_performance_metrics(request):
-    """성능 메트릭 데이터를 반환하는 API 엔드포인트"""
+    """성능 메트릭 데이터를 환하는 API 엔드포인트"""
     try:
         global performance_metrics
         
