@@ -22,7 +22,7 @@
                 <div id="performanceMetricsSection" class="performance-metrics-section" style="display: none;">
                     <h2>연관어 클러스터링 품질 평가</h2>
                     <div class="performance-graph">
-                        <div id="loadingSpinner" class="spinner" style="display: none;">
+                        <div id="loadingSpinner" class="loading-spinner">
                             <div class="spinner"></div>
                             <p>분석 중입니다...</p>
                         </div>
@@ -442,17 +442,18 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    const loadPerformanceBtn = document.getElementById('loadPerformanceBtn');
-    const performanceSection = document.getElementById('performanceMetricsSection');
-    const loadingSpinner = document.getElementById('loadingSpinner');
-    const performanceGraph = document.getElementById('performanceGraph');
-    const performanceError = document.getElementById('performanceError');
-    
-    loadPerformanceBtn.addEventListener('click', function() {
+    // 성능 평가 로딩 함수 개선
+    function loadPerformanceMetrics() {
+        const performanceSection = document.getElementById('performanceMetricsSection');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const performanceGraph = document.getElementById('performanceGraph');
+        const performanceError = document.getElementById('performanceError');
+        const btn = document.getElementById('loadPerformanceBtn');
+
         // 이미 로드된 경우 토글
         if (performanceSection.style.display !== 'none' && performanceGraph.src) {
             performanceSection.style.display = 'none';
-            loadPerformanceBtn.textContent = '클러스터링 품질 평가 보기';
+            btn.textContent = '클러스터링 품질 평가 보기';
             return;
         }
 
@@ -461,11 +462,16 @@ document.addEventListener('DOMContentLoaded', function() {
         loadingSpinner.style.display = 'block';
         performanceGraph.style.display = 'none';
         performanceError.style.display = 'none';
-        loadPerformanceBtn.disabled = true;
-        loadPerformanceBtn.textContent = '분석 중...';
+        btn.disabled = true;
+        btn.textContent = '분석 중...';
 
-        // AJAX 요청
-        fetch(`/account/analysis/get_performance_metrics/?url={{ video.url }}`)
+        // AJAX 요청에 타임아웃 추가
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30초 타임아웃
+
+        fetch(`/account/analysis/get_performance_metrics/?url={{ video.url }}`, {
+            signal: controller.signal
+        })
             .then(response => {
                 if (!response.ok) throw new Error('서버 응답 오류');
                 return response.json();
@@ -474,7 +480,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.performance_graph) {
                     performanceGraph.src = 'data:image/png;base64,' + data.performance_graph;
                     performanceGraph.style.display = 'block';
-                    loadPerformanceBtn.textContent = '클러스터링 품질 평가 숨기기';
+                    btn.textContent = '클러스터링 품질 평가 숨기기';
                 } else {
                     throw new Error('성능 평가 데이터가 없습니다.');
                 }
@@ -482,18 +488,23 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(error => {
                 console.error('성능 평가 로딩 오류:', error);
                 performanceError.style.display = 'block';
-                loadPerformanceBtn.textContent = '클러스터링 품질 평가 보기';
+                btn.textContent = '클러스터링 품질 평가 보기';
             })
             .finally(() => {
+                clearTimeout(timeoutId);
                 loadingSpinner.style.display = 'none';
-                loadPerformanceBtn.disabled = false;
+                btn.disabled = false;
             });
-    });
-});
+    }
 
-function retryLoadPerformance() {
-    document.getElementById('loadPerformanceBtn').click();
-}
+    // 재시도 함수
+    function retryLoadPerformance() {
+        document.getElementById('performanceError').style.display = 'none';
+        loadPerformanceMetrics();
+    }
+
+    document.getElementById('loadPerformanceBtn').addEventListener('click', loadPerformanceMetrics);
+});
 
 function showCategory(keyword) {
     document.querySelectorAll('.news-category').forEach(cat => {

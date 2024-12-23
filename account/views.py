@@ -338,7 +338,7 @@ def weekly_issues(request):
     start_date_utc = datetime.combine(start_date, datetime.min.time()).astimezone(pytz.UTC)
     end_date_utc = datetime.combine(end_date, datetime.min.time()).astimezone(pytz.UTC)
 
-    # 데��터 필터링
+    # 데이터 필터링
     issues = WeeklyIssue.objects.filter(
         upload_date__gte=start_date_utc,
         upload_date__lt=end_date_utc
@@ -548,7 +548,7 @@ def relate(request):
             cleaned_title = clean_title(video.title)
             video_desc = f"{cleaned_title} {video.desc if video.desc else ''}"
             
-            # transcript 데이터를 시간 단위로 구분하여 텍스트로 변환
+            # transcript 데이터 처리
             transcript_segments = []
             for item in video.transcript:
                 if 'start' in item and 'text' in item:
@@ -573,11 +573,11 @@ def relate(request):
             # 키워드별 관련 뉴스 분류
             categorized_news = {}
             if important_keywords:
-                for keyword in important_keywords:
+                for keyword in important_keywords[:10]:  # 상위 5개 키워드만 처리
                     related_news = YouTubeData.objects.filter(
                         Q(title__icontains=keyword) | 
                         Q(desc__icontains=keyword)
-                    ).exclude(url=video_url)[:6]
+                    ).exclude(url=video_url)[:6]  # 뉴스 개수 제한
                     
                     if related_news:
                         cleaned_news = []
