@@ -334,35 +334,69 @@ def analyze_related_words(video_desc, video_transcript, clean_title_func=None):
                 print("[경고] 자막에서 추출된 키워드가 없습니다")
                 return nx.Graph(), [], []
             
-            # TF-IDF 계산을 위한 문서 생성
-            documents = [' '.join([k] * all_transcript_keywords.count(k)) for k in set(all_transcript_keywords)]
-            
-            # TF-IDF 계산
+            # TF-IDF 계산 부분 수정
             try:
-                vectorizer = TfidfVectorizer(min_df=1)  # 최소 문서 빈도를 1로 설정
+                # 문서 생성 방식 변경
+                documents = []
+                for sentence in transcript_text.split('.'):
+                    if sentence.strip():
+                        documents.append(sentence.strip())
+                
+                # TF-IDF 계산
+                vectorizer = TfidfVectorizer(min_df=1)
                 tfidf_matrix = vectorizer.fit_transform(documents)
-                tfidf_scores = dict(zip(vectorizer.get_feature_names_out(), tfidf_matrix.toarray().sum(axis=0)))
+                
+                # 각 단어별 TF-IDF 점수 계산 (문서 전체에서의 중요도)
+                feature_names = vectorizer.get_feature_names_out()
+                tfidf_scores = {}
+                for keyword in set(all_transcript_keywords):
+                    if keyword in feature_names:
+                        idx = feature_names.tolist().index(keyword)
+                        # 모든 문서에서의 TF-IDF 점수 평균
+                        tfidf_scores[keyword] = np.mean(tfidf_matrix[:, idx].toarray())
                 
                 # 빈도수 계산
                 keyword_freq = Counter(all_transcript_keywords)
                 
-                # 중요도 점수 계산 (TF-IDF + 빈도)
+                # 정규화를 위한 최대값 계산
                 max_freq = max(keyword_freq.values())
                 max_tfidf = max(tfidf_scores.values()) if tfidf_scores else 1.0
                 
+                # 중요도 점수 계산
+                keyword_importance = {}
                 for keyword in set(all_transcript_keywords):
+                    # 빈도수 점수 (0~1)
                     freq_score = keyword_freq[keyword] / max_freq
+                    
+                    # TF-IDF 점수 (0~1)
                     tfidf_score = tfidf_scores.get(keyword, 0) / max_tfidf
-                    keyword_importance[keyword] = 0.7 * freq_score + 0.3 * tfidf_score
+                    
+                    # 기본 가중치 적용 (40:60)
+                    weighted_score = 0.4 * freq_score + 0.6 * tfidf_score
+                    
+                    # 특정 조건에 따른 가중치 보정
+                    # 1. 제목/설명에 있는 키워드는 가중치 증가
+                    if keyword in desc_keywords:
+                        weighted_score *= 1.5
+                    
+                    # 2. 2음절 이하의 일반적인 단어는 가중치 감소
+                    if len(keyword) <= 2 and keyword not in desc_keywords:
+                        weighted_score *= 0.5
+                    
+                    # 3. TF-IDF 점수가 빈도수보다 현저히 높은 경우 (문맥적 중요성)
+                    if tfidf_score > freq_score * 2:
+                        weighted_score *= 1.3
+                    
+                    keyword_importance[keyword] = weighted_score
                 
                 # 상위 25개 키워드 선정
                 transcript_keywords = [k[0] for k in sorted(
                     keyword_importance.items(),
-                    key=lambda x: (-x[1], x[0])  # 중요도 내림차순, 같으면 알파벳 순
+                    key=lambda x: (-x[1], x[0])
                 )[:TOP_KEYWORDS_COUNT]]
                 
                 print(f"[자막] 선정된 상위 {TOP_KEYWORDS_COUNT}개 키워드: {transcript_keywords}")
-                print(f"[자막] 각 키워드의 중요도 점수: {[(k, keyword_importance[k]) for k in transcript_keywords]}")  # 디버깅용
+                print(f"[자막] 각 키워드의 중요도 점수: {[(k, round(keyword_importance[k], 3)) for k in transcript_keywords]}")
                 
             except Exception as e:
                 logger.error(f"TF-IDF 계산 중 오류: {str(e)}")
