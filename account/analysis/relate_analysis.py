@@ -3,7 +3,7 @@ import networkx as nx
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-import matplotlib.font_manager
+import matplotlib.font_manager as fm
 from io import BytesIO
 import base64
 import bareunpy as brn
@@ -496,12 +496,25 @@ def generate_network_graph(G):
         
         # 한글 폰트 설정
         try:
-            font_path = "C:/Windows/Fonts/malgun.ttf"
-            font_prop = matplotlib.font_manager.FontProperties(fname=font_path)
-            plt.rcParams['font.family'] = font_prop.get_name()
-        except:
-            logger.warning("기본 폰트를 사용합니다.")
-            plt.rcParams['font.family'] = 'Malgun Gothic'
+            # 나눔고딕 폰트 경로 지정
+# 폰트 경로 직접 지정
+            font_path = '/usr/share/fonts/truetype/nanum/NanumGothic.ttf'
+            font_prop = fm.FontProperties(fname=font_path)
+            plt.rc('font', family=font_prop.get_name())
+            plt.rcParams['axes.unicode_minus'] = False
+        except Exception as e:
+            logger.error(f"나눔고딕 폰트 로드 실패: {e}")
+            try:
+                # 대체 경로 시도
+                font_path = '/usr/share/fonts/nanum/NanumGothic.ttf'
+                font_prop = fm.FontProperties(fname=font_path)
+                plt.rc('font', family=font_prop.get_name())
+                plt.rcParams['axes.unicode_minus'] = False
+            except Exception as e:
+                logger.error(f"대체 폰트 로드도 실패: {e}")
+                # 기본 폰트 사용
+                plt.rcParams['font.family'] = 'DejaVu Sans'
+                plt.rcParams['axes.unicode_minus'] = False
         
         plt.figure(figsize=(16, 12), facecolor='white')
         
@@ -589,7 +602,7 @@ def generate_network_graph(G):
                             edgecolor='none',
                             boxstyle='round,pad=0.5'))
         
-        plt.title('연관어 네트워크', fontdict={'family': plt.rcParams['font.family'], 'size': 24, 'weight': 'bold'}, pad=20)
+        plt.title('연관어 네트워크', fontsize=24, fontweight='bold', pad=20)
         plt.axis('off')
         
         # 여백 조정
