@@ -799,10 +799,7 @@ def generate_network_graph(G):
                           'weight': 'bold'}, 
                  pad=50)
         
-<<<<<<< HEAD
         plt.title('연관어 네트워크', fontsize=24, fontweight='bold', pad=20)
-=======
->>>>>>> f3fbd8ca6f6e0f853f86ca1dcb286a25f7664a3a
         plt.axis('off')
         plt.tight_layout(pad=50)
         
