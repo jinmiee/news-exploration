@@ -168,19 +168,25 @@ def chart(request):
         chart_data = Chart.objects.filter(
             chart_date__gte=analysis_start_utc,
             chart_date__lt=analysis_end_utc
-        ).order_by('rank')
+        )
+        chart_data = sorted(chart_data, key=lambda x: x.rank)
 
-        # 데이터 확인
-        print("DEBUG: chart_data count:", chart_data.count())
+        # QuerySet 개수를 확인하려면 .count()를 사용
+        print("DEBUG: QuerySet count before sorting:", Chart.objects.filter(
+            chart_date__gte=analysis_start_utc,
+            chart_date__lt=analysis_end_utc
+        ).count())
 
-        # 제목 정제를 포함한 데이터 가공
+        # 리스트의 길이를 확인하려면 len()을 사용
+        print("DEBUG: chart_data count after sorting:", len(chart_data))
+
         processed_chart_data = []
         for chart in chart_data:
             try:
                 processed_chart_data.append({
                     "rank": chart.rank,
                     "title": chart.title,
-                    "cleaned_title": clean_title(chart.title),  # 정제된 제목 추가
+                    "cleaned_title": clean_title(chart.title),
                     "views": chart.views,
                     "channel_name": chart.channel_name,
                     "url": chart.url,
