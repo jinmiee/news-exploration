@@ -2,9 +2,11 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.jobstores.mongodb import MongoDBJobStore
 from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 from django.core.mail import send_mail
 from pymongo import MongoClient
-from .views import save_daily_top10
+from .views import save_daily_top10, delete_expired_charts, save_top10_to_chart
+
 
 def send_email_task():
     from django.contrib.auth.models import User  # 함수 내부에서 import하여 초기화 시점 문제 방지
@@ -17,7 +19,7 @@ def send_email_task():
     send_mail(subject, message, from_email, recipient_list)
 
 
-def start_scheduler():
+def start_scheduler(save_chart_to_mongo=None):
     jobstores = {
         'default': MongoDBJobStore(
             database='youtube_data',
@@ -50,9 +52,29 @@ def start_scheduler():
         id='daily_top10',
         replace_existing=True
     )
+    print("daily_top10 작업이 스케줄러에 등록되었습니다.")
+
+    # 차트 저장 작업 추가 (오전 11시 5분, 오후 11시 5분)
+    scheduler.add_job(
+        save_top10_to_chart,
+        trigger=CronTrigger(hour='11,23', minute=5),
+        id='save_top10_to_chart',
+        replace_existing=True
+    )
+    print("스케줄러가 시작되었습니다: 오전 11시 5분, 오후 11시 5분에 차트 저장.")
+
+    # 24시간 지난 Chart 데이터를 삭제하는 작업 추가
+    scheduler.add_job(
+        delete_expired_charts,
+        trigger=IntervalTrigger(hours=1),  # 매 1시간마다 실행
+        id="delete_expired_charts",
+        replace_existing=True
+    )
+
+    print("스케줄러가 시작되었습니다: 24시간 지난 Chart 데이터를 삭제합니다.")
+
 
     print("스케줄러가 시작되었습니다.")
-    print("daily_top10 작업이 스케줄러에 등록되었습니다.")
     scheduler.start()
 
     # Django 서버 종료 시 스케줄러 중지

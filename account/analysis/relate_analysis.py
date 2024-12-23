@@ -8,8 +8,10 @@ from io import BytesIO
 import base64
 import bareunpy as brn
 import unicodedata
+from gensim.models import Word2Vec
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
+from gensim.models import KeyedVectors
 import os
 import logging
 from sentence_transformers import SentenceTransformer
@@ -31,7 +33,7 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_samples
 from kneed import KneeLocator
 from sklearn.decomposition import PCA
-from umap import UMAP
+from umap.umap_ import UMAP
 from sklearn.preprocessing import StandardScaler
 from sklearn.covariance import EllipticEnvelope
 from sklearn.cluster import DBSCAN
@@ -70,8 +72,69 @@ def log_performance_metrics(metrics):
         performance_metrics[key].append(value)
     
     # 주기적으로 CSV 파일로 저장
-    if len(performance_metrics['timestamp']) % 100 == 0:  # 100 단위 저장
+    if len(performance_metrics['timestamp']) % 100 == 0:  # 100개 단위 저장
         pd.DataFrame(performance_metrics).to_csv('analysis_performance_metrics.csv', index=False)
+
+def load_pretrained_model():
+    """
+    사전 학습된 한국어 Word2Vec 모델을 로드하는 함수
+    """
+    try:
+        # 모델 파일 경로 설정
+        model_path = 'account/static/ko.bin'
+        
+        if os.path.exists(model_path):
+            try:
+                # 바이너리 모드로 직접 읽기
+                with open(model_path, 'rb') as f:
+                    # 매직 넘버 확인
+                    magic = f.read(4)
+                    logger.info(f"File magic number: {magic.hex()}")
+                    
+                    if magic.startswith(b'\xba\x16O/'):
+                        # 바이너리 데이터를 직접 읽기
+                        vector_size = 300  # 고정된 벡터 크기 사용
+                        model = KeyedVectors(vector_size, count=100000)
+                        
+                        while True:
+                            try:
+                                # 단어 읽기
+                                word_bytes = bytearray()
+                                while True:
+                                    b = f.read(1)
+                                    if not b or b == b' ':
+                                        break
+                                    word_bytes.extend(b)
+                                
+                                if not word_bytes:
+                                    break
+                                
+                                # 단어 디코딩
+                                word = word_bytes.decode('utf-8', errors='ignore')
+                                
+                                # 벡터 읽기
+                                vector = np.fromfile(f, dtype=np.float32, count=vector_size)
+                                if len(vector) != vector_size:
+                                    break
+                                
+                                # 단어와 벡터 추가
+                                model.add_vector(word, vector)
+                                
+                            except Exception as e:
+                                logger.warning(f"단어 처리 중 오류 무시: {str(e)}")
+                                continue
+                        
+                        return model
+                    else:
+                        logger.error("알 수 없는 파일 포맷")
+                        return None
+                        
+            except Exception as e:
+                logger.error(f"파일 읽기 실패: {str(e)}")
+                return None
+    except Exception as e:
+        logger.error(f"모델 로드 중 예외 발생: {str(e)}")
+        return None
 
 def load_sbert_model():
     """
@@ -109,16 +172,25 @@ def load_sbert_model():
         logger.error(f"모델 로드 중 오류 발생: {str(e)}")
         return None
 
-# NLP 모델 로드
+# Word2Vec 모델 로드
 try:
-    logger.info("NLP 모델 로딩 시작...")
-    nlp_models = load_sbert_model()
-    if nlp_models is not None:
-        logger.info("NLP 모델 로딩 완료")
+    logger.info("Word2Vec 모델 로딩 시작...")
+    # logger.info(f"현재 작업 디렉토리: {os.getcwd()}")
+    word2vec_model = load_pretrained_model()
+    if word2vec_model is not None:
+        logger.info("Word2Vec 모델 로딩 완료")
+        # logger.info(f"모델 크기: {len(word2vec_model.key_to_index)} ")
     else:
-        logger.warning("NLP 모델 로딩 실패")
+        logger.warning("Word2Vec 모델 로딩 실패")
 except Exception as e:
     logger.error(f"모델 로드 중 예외 발생: {str(e)}")
+    word2vec_model = None
+
+# NLP 모델 로드
+try:
+    nlp_models = load_sbert_model()
+except Exception as e:
+    logger.error(f"NLP 모델 로드 중 오류: {str(e)}")
     nlp_models = None
 
 # 불용어 로드
@@ -238,7 +310,7 @@ def find_similar_keywords_lsh(target_keyword, candidate_keywords, threshold=0.8)
         if not target_hash:
             return []
         
-        # LSH로 유사한 키워드 찾기
+        # LSH로 유사한 키워드 ���기
         similar_keywords = lsh.query(target_hash)
         
         # 정확한 유사도 계산 및 필터링
@@ -438,18 +510,18 @@ def evaluate_model_performance(embeddings, labels):
         logger.error(traceback.format_exc())
         return None
 
-def analyze_related_words(text, transcript, clean_title_func=None):
+def analyze_related_words(video_desc, video_transcript, clean_title_func=None):
     """
-    텍스트와 자막에서 연관어를 분석하는 함수
+    비디오 설명과 자막을 분석하여 연관 단어 네트워크 생성
     """
     try:
         print("\n[연관어 분석 시작]")
         
         # clean_title_func가 전달되지 않았다면 원본 텍스트 사용
         if clean_title_func:
-            cleaned_desc = clean_title_func(text)
+            cleaned_desc = clean_title_func(video_desc)
         else:
-            cleaned_desc = text
+            cleaned_desc = video_desc
 
         # 특정 키워드 매핑 정의
         special_mappings = {
@@ -464,12 +536,12 @@ def analyze_related_words(text, transcript, clean_title_func=None):
         # 2. 자막 처리 및 상위 키워드 추출
         transcript_keywords = []
         keyword_importance = {}
-        if transcript:
+        if video_transcript:
             # 자막 텍스트 결합
-            if isinstance(transcript, list):
-                transcript_text = ' '.join([item['text'] for item in transcript])
+            if isinstance(video_transcript, list):
+                transcript_text = ' '.join([item['text'] for item in video_transcript])
             else:
-                transcript_text = transcript
+                transcript_text = video_transcript
                 
             # 자막에서 키워드 추출
             all_transcript_keywords = extract_keywords_from_desc(transcript_text)
@@ -488,7 +560,7 @@ def analyze_related_words(text, transcript, clean_title_func=None):
                     if sentence.strip():
                         documents.append(sentence.strip())
                 
-                # TF-IDF 계
+                # TF-IDF 계산
                 vectorizer = TfidfVectorizer(min_df=1)
                 tfidf_matrix = vectorizer.fit_transform(documents)
                 
@@ -541,7 +613,7 @@ def analyze_related_words(text, transcript, clean_title_func=None):
                     if tfidf_score > freq_score * 2:
                         weighted_score *= 1.5
                     
-                    # 6. 숫자나 특수자가 포함된 경우 가중치 감소
+                    # 6. 숫자나 특수문자가 포함된 경우 가중치 감소
                     if any(c.isdigit() or not c.isalnum() for c in keyword):
                         weighted_score *= 0.5
                     
@@ -710,23 +782,52 @@ def analyze_related_words(text, transcript, clean_title_func=None):
 def generate_network_graph(G):
     """네트워크 그래프 시각화"""
     try:
-        # 투명한 배경으로 figure 생성
-        plt.figure(figsize=(16, 12), facecolor='none')
+        # 그래프가 비어있는지 확인
+        if len(G.nodes()) == 0:
+            logger.warning("그래프에 노드가 없습니다.")
+            return None
+            
+        matplotlib.use('Agg')
+        plt.clf()
         
-        # 축의 배경도 투명하게 설정
-        ax = plt.gca()
-        ax.set_facecolor('none')
+        # 한글 폰트 설정
+        try:
+            font_path = "C:/Windows/Fonts/malgun.ttf"
+            font_prop = matplotlib.font_manager.FontProperties(fname=font_path)
+            plt.rcParams['font.family'] = font_prop.get_name()
+        except:
+            logger.warning("기본 폰트를 사용합니다.")
+            plt.rcParams['font.family'] = 'Malgun Gothic'
+        
+        plt.figure(figsize=(16, 12), facecolor='white')
         
         # 노드 크기와 색상 계산
-        node_sizes = []
-        node_colors = []
-        for node in G.nodes():
-            size = G.degree(node) * 500  # 연결 수에 따른 크기
-            node_sizes.append(size)
-            # 노드별 색상 설정
-            node_colors.append('#1f77b4')  # 파란색 계열
+        node_sizes = nx.get_node_attributes(G, 'size')
+        if not node_sizes:
+            logger.warning("노드 크기 정보가 없습니다.")
+            return None
+            
+        min_size = min(node_sizes.values())
+        max_size = max(node_sizes.values())
         
-        # 스프링 레이아웃으로 노드 위치 설정
+        # min_size와 max_size가 같은 경우 처리
+        if min_size == max_size:
+            scaled_sizes = {node: 7500 for node in G.nodes()}
+            node_colors = {node: plt.cm.Blues(0.75) for node in G.nodes()}
+        else:
+            # 노드 크기 스케일링 (더 넓은 범위로)
+            scaled_sizes = {
+                node: 3000 + (node_sizes[node] - min_size) * 12000 / (max_size - min_size)
+                for node in G.nodes()
+            }
+            
+            # 노드 색상 계산 (중요도에 따라 파란색 계열로 그라데이션)
+            node_colors = {
+                node: plt.cm.Blues(0.5 + 0.5 * (node_sizes[node] - min_size) / (max_size - min_size))
+                for node in G.nodes()
+            }
+        
+        # 기본 spring_layout 사용 (시드값 고정)
         pos = nx.spring_layout(G, k=2, iterations=100, seed=42)
         
         # 엣지 그리기 (가중치에 따른 색상과 두께)
@@ -740,7 +841,7 @@ def generate_network_graph(G):
             
             for u, v, data in sorted_edges:
                 weight = data['weight']
-                # 가중치에 따른 색상 (연한 보라색 → 진한 보라색)
+                # 가중치에 따른 색상 (연한 회색 → 진한 회색)
                 if min_weight == max_weight:
                     alpha = 0.6
                     width = 4
@@ -751,36 +852,48 @@ def generate_network_graph(G):
                 nx.draw_networkx_edges(G, pos,
                                      edgelist=[(u, v)],
                                      width=width,
-                                     edge_color='purple',  # 보라색으로 변경
+                                     edge_color='gray',
                                      alpha=alpha,
                                      style='solid')
         
-        # 노드와 레이블 그리기
-        nx.draw_networkx_nodes(G, pos, node_size=node_sizes, node_color=node_colors, alpha=0.7)
-        nx.draw_networkx_labels(G, pos, 
-                              font_family=plt.rcParams['font.family'],
-                              font_size=12, 
-                              font_weight='bold',
-                              font_color='white')  # 글씨 색상을 하얀색으로 변경
+        # 노드 그리기
+        for node in G.nodes():
+            nx.draw_networkx_nodes(G, pos,
+                                 nodelist=[node],
+                                 node_size=scaled_sizes[node],
+                                 node_color=[node_colors[node]],
+                                 alpha=0.9,
+                                 edgecolors='white',
+                                 linewidths=2)
         
-        # 제목 추가
-        plt.title('연관어 키워드 TOP 20', 
-                 fontdict={'family': plt.rcParams['font.family'], 
-                          'size': 24, 
-                          'weight': 'bold'}, 
-                 pad=50)
+        # 레이블 그리기 (크기에 따른 폰트 크기 차등)
+        for node in G.nodes():
+            x, y = pos[node]
+            size = scaled_sizes[node]
+            # 노드 크기에 비례하는 폰트 크기 (더 큰 차이)
+            fontsize = 12 + (size - 3000) * 16 / 12000
+            
+            plt.text(x, y,
+                    node,
+                    fontsize=fontsize,
+                    fontweight='normal',
+                    fontfamily=plt.rcParams['font.family'],
+                    horizontalalignment='center',
+                    verticalalignment='center',
+                    bbox=dict(facecolor='white',
+                            alpha=0.8,
+                            edgecolor='none',
+                            boxstyle='round,pad=0.5'))
         
+        plt.title('연관어 네트워크', fontdict={'family': plt.rcParams['font.family'], 'size': 24, 'weight': 'bold'}, pad=20)
         plt.axis('off')
-        plt.tight_layout(pad=50)
         
-        # 투명 배경으로 이미지 저장
+        # 여백 조정
+        plt.tight_layout(pad=1.5)
+        
+        # 고품질 이미지 저장
         buffer = BytesIO()
-        plt.savefig(buffer, format='png', 
-                   bbox_inches='tight', 
-                   dpi=300, 
-                   facecolor='none',
-                   edgecolor='none',
-                   transparent=True)
+        plt.savefig(buffer, format='png', bbox_inches='tight', dpi=300, facecolor='white')
         buffer.seek(0)
         image_png = buffer.getvalue()
         buffer.close()
@@ -883,19 +996,11 @@ def relate(request):
 def visualize_performance_metrics():
     """성능 메트릭 시각화"""
     try:
-        # 데이터가 없을 때 기본 데이터 생성
-        if not performance_metrics:
-            # 기본 성능 데이터 생성
-            default_metrics = {
-                'processing_time': [0.5, 0.6, 0.4, 0.5],
-                'memory_usage': [100, 110, 95, 105],
-                'keyword_count': [15, 18, 12, 16],
-                'silhouette_score': [0.7, 0.75, 0.8, 0.85]
-            }
-            df = pd.DataFrame(default_metrics)
-        else:
-            df = pd.DataFrame(performance_metrics)
-
+        df = pd.DataFrame(performance_metrics)
+        if df.empty:
+            logger.warning("성능 메트릭 데이터가 없습니다.")
+            return None
+            
         # 한글 폰트 설정
         try:
             font_path = "C:/Windows/Fonts/malgun.ttf"  # Windows
@@ -906,7 +1011,7 @@ def visualize_performance_metrics():
             plt.rcParams['font.family'] = 'Malgun Gothic'
 
         # seaborn 스타일 대신 matplotlib 내장 스타일 사용
-        plt.style.use('bmh')
+        plt.style.use('bmh')  # 또는 'ggplot', 'fivethirtyeight' 등
         
         plt.figure(figsize=(15, 10), facecolor='white')
         

@@ -91,3 +91,32 @@ class WeeklyIssue(models.Model):
 
     class Meta:
         db_table = "weekly_issues"  # MongoDB 컬렉션 이름
+
+class Chart(models.Model):
+    _id = models.ObjectIdField(primary_key=True, default=ObjectId)  # MongoDB ObjectId를 기본 키로 설정
+    chart_date = models.DateTimeField()  # 차트 생성 날짜
+    rank = models.IntegerField()  # 순위
+    channel_name = models.CharField(max_length=255)  # 채널 이름
+    title = models.TextField()  # 동영상 제목
+    views = models.BigIntegerField()  # 조회수
+    upload_date = models.DateTimeField()  # 업로드 날짜
+    url = models.URLField(unique=True)  # 동영상 URL
+    channel = models.CharField(max_length=255)  # 채널 제목
+    desc = models.TextField(blank=True, null=True)  # 동영상 설명
+    likes = models.BigIntegerField(blank=True, null=True)  # 좋아요 수
+    thumbnail = models.URLField(blank=True, null=True)  # 썸네일 URL
+    comments = models.ArrayField(
+        model_container=YouTubeComment,
+        blank=True,
+        null=False,
+        default=list
+    )
+    transcript = models.ArrayField(
+        model_container=Transcript,
+        blank=True,
+        null=False,
+        default=list
+    )
+
+    class Meta:
+        db_table = "chart"  # MongoDB 컬렉션 이름

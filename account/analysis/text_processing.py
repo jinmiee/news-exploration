@@ -114,13 +114,8 @@ def process_text(title, transcript=None):
 def get_top10_chart_based(videos):
     """
     TF-IDF와 조회수 정규화를 기반으로 상위 10개 영상을 선정하고,
-    코사인 유사도로 중복 제거. 캐싱을 추가하여 성능 개선.
+    코사인 유사도로 중복 제거.
     """
-    cache_key = "top10_chart"
-    cached_data = cache.get(cache_key)
-    if cached_data:
-        return cached_data
-
     corpus = []
     views_list = []
     processed_videos = []
@@ -135,7 +130,7 @@ def get_top10_chart_based(videos):
         processed_videos.append(video)
 
     # TF-IDF 계산
-    vectorizer = TfidfVectorizer(max_features=500, stop_words='english')
+    vectorizer = TfidfVectorizer(max_features=5000, stop_words='english')
     tfidf_matrix = vectorizer.fit_transform(corpus)
 
     # 조회수 정규화
@@ -174,6 +169,4 @@ def get_top10_chart_based(videos):
         if len(selected_videos) >= 10:
             break
 
-    # 캐싱 저장
-    cache.set(cache_key, selected_videos, timeout=3600)  # 1시간 동안 캐싱
     return selected_videos
