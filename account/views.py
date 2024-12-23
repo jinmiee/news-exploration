@@ -1,6 +1,3 @@
-'''
-pip install konlpy networkx matplotlib pandas
-'''
 from collections import defaultdict
 from datetime import timedelta, datetime
 
@@ -25,7 +22,7 @@ import matplotlib
 matplotlib.use('Agg')
 
 
-from .analysis.relate_analysis import analyze_related_words, generate_network_graph
+from .analysis.relate_analysis import analyze_related_words, generate_network_graph, visualize_performance_metrics
 from .analysis.emotion_analysis import (
     generate_wordcloud,
     generate_pie_chart,
@@ -61,8 +58,10 @@ def chart(request):
 
     # 상위 10개 데이터 선정 (중복 제거 포함)
     top_titles = get_top10_chart_based(all_data)
+    print(top_titles)
     for item in top_titles:
         item.id = str(item._id)  # 직접 _id 값을 id로 할당
+        print(item.id)
     
     context = {
         "top_news": top_titles,
@@ -427,6 +426,7 @@ from django.db.models import Q
 from functools import reduce
 from operator import or_
 
+
 def relate(request):
     video_url = request.GET.get('url')
     video_id = request.GET.get('id')
@@ -439,7 +439,7 @@ def relate(request):
             cleaned_title = clean_title(video.title)
             video_desc = f"{cleaned_title} {video.desc if video.desc else ''}"
             
-            # transcript 데이터를 시간 단위로 구분하여 텍스트로 변환
+            # transcript 데이터 처리
             transcript_segments = []
             for item in video.transcript:
                 if 'start' in item and 'text' in item:
@@ -452,36 +452,34 @@ def relate(request):
                         'text': item['text']
                     })
             
-            # 연관어 분석 수행
-            graph, top_pairs, important_keywords = analyze_related_words(video_desc, video.transcript)
+            # 성능 평가를 제외한 기본 분석 수행
+            graph, top_pairs, important_keywords, _ = analyze_related_words(
+                video_desc, 
+                video.transcript,
+                clean_title_func=clean_title
+            )
+            
             network_graph = generate_network_graph(graph)
             
-            # 키워드별 관련 뉴스 분류 (상위 10개 키워드만)
+            # 키워드별 관련 뉴스 분류
             categorized_news = {}
-            if important_keywords:  # important_keywords는 이제 상위 10개
-                for keyword in important_keywords:
-                    try:
-                        related_news = YouTubeData.objects.filter(
-                            Q(title__icontains=keyword) | 
-                            Q(desc__icontains=keyword)
-                        ).exclude(url=video_url)[:6]
-                        
-                        # 관련 뉴스가 있는 경우에만 추가
-                        if related_news.exists():
-                            cleaned_news = []
-                            for news in related_news:
-                                if news.title:  # title이 None이 아닌 경우만 처리
-                                    news.title = clean_title(news.title)
-                                    try:
-                                        news.video_id = news.url.split('v=')[1].split('&')[0]
-                                    except:
-                                        news.video_id = None
-                                    cleaned_news.append(news)
-                            if cleaned_news:  # 정제된 뉴스가 있는 경우만 추가
-                                categorized_news[keyword] = cleaned_news
-                    except Exception as e:
-                        print(f"키워드 '{keyword}' 처리 중 오류: {str(e)}")
-                        continue
+            if important_keywords:
+                for keyword in important_keywords[:10]:  # 상위 5개 키워드만 처리
+                    related_news = YouTubeData.objects.filter(
+                        Q(title__icontains=keyword) | 
+                        Q(desc__icontains=keyword)
+                    ).exclude(url=video_url)[:6]  # 뉴스 개수 제한
+                    
+                    if related_news:
+                        cleaned_news = []
+                        for news in related_news:
+                            news.title = clean_title(news.title)
+                            try:
+                                news.video_id = news.url.split('v=')[1].split('&')[0]
+                            except:
+                                news.video_id = None
+                            cleaned_news.append(news)
+                        categorized_news[keyword] = cleaned_news
             
             context = {
                 'section': 'relate',
@@ -491,8 +489,7 @@ def relate(request):
                 'top_pairs': top_pairs,
                 'categorized_news': categorized_news,
                 'important_keywords': important_keywords,
-                'transcript_segments': transcript_segments,
-                'has_related_news': bool(categorized_news)  # 관련 뉴스 존재 여부
+                'transcript_segments': transcript_segments
             }
             
         except Exception as e:
@@ -508,6 +505,51 @@ def relate(request):
         }
     
     return render(request, 'analysis/relate.html', context)
+
+
+
+def get_performance_metrics(request):
+    try:
+        video_url = request.GET.get('url')
+        video = YouTubeData.objects.filter(url=video_url).first()
+        
+        if not video:
+            return JsonResponse({'error': '비디오를 찾을 수 없습니다.'}, status=404)
+        
+        # 캐시 키 생성
+        cache_key = f'performance_metrics_{video.url}'
+        
+        # 캐시된 결과가 있는지 확인
+        from django.core.cache import cache
+        cached_result = cache.get(cache_key)
+        
+        if cached_result:
+            return JsonResponse({'performance_graph': cached_result})
+            
+        # 성능 평가 그래프 생성
+        performance_graph = visualize_performance_metrics()
+        
+        if not performance_graph:
+            return JsonResponse({'error': '성능 평가 데이터를 생성할 수 없습니다.'}, status=500)
+            
+        # 결과 캐시에 저장 (1시간)
+        cache.set(cache_key, performance_graph, 3600)
+        
+        return JsonResponse({
+            'performance_graph': performance_graph
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+
+
+
+
+
+
+
+
 
 @login_required
 def mypage(request):
@@ -555,11 +597,6 @@ def my_liked_videos(request):
     return render(request, 'analysis/mypage/my_liked_videos.html', context)
 
 
-
-
-    
-
-
 def register(request):
     if request.method == 'POST':
         user_form = UserRegistrationForm(request.POST)
@@ -590,7 +627,7 @@ def find_username(request):
 from django.core.mail import send_mail
 
 def send_password_reset_email(user, temp_password):
-    subject = "비밀번호 초기화 안내"
+    subject = "비밀번호 초기화 내"
     message = f"안녕하세요 {user.username}님,\n\n초기화된 임시 비밀번호는 다음과 같습니다: {temp_password}\n로그인 후 비밀번호를 변경해주세요."
     from_email = "namsugb99@gmail.com"
     recipient_list = [user.email]
@@ -614,6 +651,4 @@ def find_password(request):
             error = "사용자를 찾을 수 없습니다."
     
     return render(request, 'registration/find_password.html', {"error": error})
-
-
 

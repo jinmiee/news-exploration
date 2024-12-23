@@ -597,6 +597,7 @@ com
 net
 org
 kr
+kbc
 News
 TV
 VuCJMi
@@ -622,3 +623,4 @@ jebo
 당시
 사실
 대통
+
