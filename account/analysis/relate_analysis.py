@@ -270,7 +270,7 @@ def find_optimal_k(embeddings, max_k=10):
             min_dist=0.0,         # 클러스터 더 조밀하게
             n_components=2,
             metric='cosine',      # 코사인 유사도 사용
-            random_state=42,
+            random_state=None,    # 랜덤 시드 고정
             spread=0.5,           # 클러스터 간 거리 조절
             local_connectivity=2   # 지역 연결성 강화
         )
@@ -366,8 +366,9 @@ def evaluate_model_performance(embeddings, labels):
         
         # 한글 폰트 설정
         try:
-            plt.rcParams['font.family'] = 'Malgun Gothic'
-            plt.rcParams['axes.unicode_minus'] = False
+            font_path = "C:/Windows/Fonts/malgun.ttf"  # Windows
+            font_prop = matplotlib.font_manager.FontProperties(fname=font_path)
+            plt.rcParams['font.family'] = font_prop.get_name()
         except:
             logger.warning("Malgun Gothic 폰트를 찾을 수 없습니다.")
 
@@ -771,7 +772,7 @@ def generate_network_graph(G):
                  pad=50)
         
         plt.axis('off')
-        plt.tight_layout(pad=50)
+        plt.tight_layout(pad=20)
         
         # 투명 배경으로 이미지 저장
         buffer = BytesIO()
