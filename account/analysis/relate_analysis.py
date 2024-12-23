@@ -487,19 +487,22 @@ def analyze_related_words(text, transcript, clean_title_func=None):
             node_embeddings = nlp_models['sbert'].encode(list(G.nodes()))
             
             # 최적의 클러스터 수 찾기 및 차원 축소
-            optimal_k, reduced_embeddings, cluster_labels = find_optimal_k(node_embeddings)
+            optimal_k, reduced_embeddings, cluster_labels, sil_score = find_optimal_k(node_embeddings)
             
-            if cluster_labels is not None:
-                # 실루엣 점수 그래프 생성
-                performance_graph = evaluate_model_performance(
-                    reduced_embeddings, 
-                    cluster_labels
-                )
-            else:
-                performance_graph = None
+            # 클러스터링 결과 시각화
+            performance_graph = evaluate_model_performance(
+                reduced_embeddings, 
+                cluster_labels,
+                sil_score
+            )
+            
+            # 네트워크 그래프에 클러스터 정보 반영
+            network_graph = generate_network_graph(G, cluster_labels)
+            
         else:
             performance_graph = None
-            
+            network_graph = generate_network_graph(G)
+        
         return G, sorted(word_pairs, key=lambda x: x[1], reverse=True)[:20], top_10_keywords, performance_graph
         
     except Exception as e:
