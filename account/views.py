@@ -1,3 +1,6 @@
+'''
+pip install konlpy networkx matplotlib pandas
+'''
 from collections import defaultdict
 from datetime import timedelta, datetime
 
@@ -12,7 +15,7 @@ from bson import ObjectId
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 from .forms import UserRegistrationForm
-from .models import YouTubeData, Like, WeeklyIssue
+from .models import YouTubeData, Like, WeeklyIssue, Chart
 from urllib.parse import urlparse, parse_qs
 
 from pytz import timezone
@@ -20,6 +23,7 @@ import pytz
 
 import matplotlib
 matplotlib.use('Agg')
+from django.utils.timezone import localtime, utc
 
 
 from .analysis.relate_analysis import analyze_related_words, generate_network_graph, visualize_performance_metrics
@@ -33,65 +37,215 @@ from django.contrib.auth.models import User
 
 from sklearn.metrics.pairwise import cosine_similarity
 from .analysis.text_processing import clean_title, process_text, get_top10_chart_based
+from pymongo import MongoClient
+from pymongo.errors import DuplicateKeyError
+from django.utils.timezone import localtime
+from datetime import timedelta
 
+def save_top_videos(start_time, end_time, model):
+    """
+    특정 시간대의 상위 10개 동영상을 지정된 모델에 저장
+    :param start_time: 데이터 필터링 시작 시간
+    :param end_time: 데이터 필터링 종료 시간
+    :param model: 데이터를 저장할 Django 모델 (Chart, WeeklyIssue 등)
+    """
+    try:
+        # 데이터베이스에서 시간 범위에 해당하는 데이터 가져오기
+        all_data = YouTubeData.objects.filter(
+            upload_date__gte=start_time,
+            upload_date__lt=end_time
+        ).order_by('-views')
+
+        if not all_data.exists():
+            print(f"해당 시간 범위에 데이터가 없습니다. {start_time} ~ {end_time}")
+            return
+
+        # 상위 10개 데이터 선정
+        top_videos = get_top10_chart_based(all_data)
+
+        # 상위 10개 데이터를 지정된 모델에 저장
+        for rank, video in enumerate(top_videos, start=1):
+            try:
+                video_id = ObjectId(video._id) if isinstance(video._id, str) else video._id
+                model.objects.update_or_create(
+                    _id=video_id,  # MongoDB ObjectId
+                    defaults={
+                        "chart_date": localtime(),
+                        "rank": rank,
+                        "channel_name": video.channel_name,
+                        "title": video.title,
+                        "views": video.views,
+                        "upload_date": video.upload_date,
+                        "url": video.url,
+                        "channel": video.channel,
+                        "desc": video.desc,
+                        "likes": video.likes,
+                        "thumbnail": video.thumbnail,
+                        "comments": video.comments,
+                        "transcript": video.transcript,
+                    }
+                )
+            except Exception as e:
+                print(f"Error saving video {video._id}: {e}")
+
+        print(f"데이터 저장 완료: {start_time} ~ {end_time}")
+    except Exception as e:
+        print(f"Error in save_top_videos: {e}")
+
+def save_top10_to_chart():
+    """
+    상위 10개의 동영상 데이터를 Chart 컬렉션에 저장.
+    """
+    try:
+        now = localtime()
+
+        # 기준 시간 설정
+        if now.hour < 11:  # 현재 시간이 오전 11시 이전
+            analysis_start = (now - timedelta(days=1)).replace(hour=11, minute=0, second=0, microsecond=0)
+            analysis_end = (now - timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)
+        elif now.hour < 23:  # 현재 시간이 오전 11시 이후, 오늘 오후 11시 이전
+            analysis_start = (now - timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)
+            analysis_end = now.replace(hour=11, minute=0, second=0, microsecond=0)
+        else:  # 현재 시간이 오후 11시 이후
+            analysis_start = now.replace(hour=11, minute=0, second=0, microsecond=0)
+            analysis_end = now.replace(hour=23, minute=0, second=0, microsecond=0)
+
+        # 시간대를 UTC로 변환
+        analysis_start = analysis_start.astimezone(utc)
+        analysis_end = analysis_end.astimezone(utc)
+
+        print(f"Analysis start(UTC): {analysis_start}, Analysis end(UTC): {analysis_end}")
+
+        # 데이터 저장 로직
+        save_top_videos(analysis_start, analysis_end, Chart)
+
+    except Exception as e:
+        print(f"Error in save_top10_to_chart: {e}")
+
+import logging
+
+logger = logging.getLogger('chart_cleanup')
+
+def delete_expired_charts():
+    """
+    Chart 데이터에서 24시간이 지난 항목만 삭제
+    """
+    try:
+        # 현재 시간 기준으로 24시간 전 시간 계산
+        now = localtime()
+        expiration_time = now - timedelta(hours=24)
+
+        # 24시간 이전의 데이터를 필터링하여 삭제
+        expired_charts = Chart.objects.filter(chart_date__lt=expiration_time)
+        deleted_count, _ = expired_charts.delete()
+
+        logger.info(f"{deleted_count}개의 24시간 지난 Chart 데이터가 삭제되었습니다.")
+    except Exception as e:
+        logger.error(f"delete_expired_charts 실행 중 오류 발생: {e}")
 
 def chart(request):
-    # 현재 시간 가져오기
-    now = localtime()
+    """
+    Chart 데이터를 템플릿으로 전달
+    """
+    try:
+        now = localtime()
 
-    # 기준 시간 설정
-    if now.hour < 11:  # 현재 시간이 오전 11시 이전
-        analysis_start = (now - timedelta(days=1)).replace(hour=11, minute=0, second=0, microsecond=0)
-        analysis_end = (now - timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)
-    elif now.hour < 23:  # 현재 시간이 오전 11시 이후, 오늘 오후 11시 이전
-        analysis_start = (now - timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)
-        analysis_end = now.replace(hour=11, minute=0, second=0, microsecond=0)
-    else:  # 현재 시간이 오후 11시 이후
-        analysis_start = now.replace(hour=11, minute=0, second=0, microsecond=0)
-        analysis_end = now.replace(hour=23, minute=0, second=0, microsecond=0)
+        # 기준 시간 설정
+        if now.hour < 11:
+            analysis_start = (now - timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)
+            analysis_end = now.replace(hour=11, minute=0, second=0, microsecond=0)
+        elif now.hour < 23:
+            analysis_start = now.replace(hour=11, minute=0, second=0, microsecond=0)
+            analysis_end = now.replace(hour=23, minute=0, second=0, microsecond=0)
+        else:
+            analysis_start = now.replace(hour=23, minute=0, second=0, microsecond=0)
+            analysis_end = (now + timedelta(days=1)).replace(hour=11, minute=0, second=0, microsecond=0)
 
-    # 데이터베이스에서 분석 시간에 해당하는 데이터 가져오기
-    all_data = YouTubeData.objects.filter(
-        upload_date__gte=analysis_start,
-        upload_date__lt=analysis_end
-    ).order_by('-views')
+        analysis_start_utc = analysis_start.astimezone(utc)
+        analysis_end_utc = analysis_end.astimezone(utc)
 
-    # 상위 10개 데이터 선정 (중복 제거 포함)
-    top_titles = get_top10_chart_based(all_data)
-    print(top_titles)
-    for item in top_titles:
-        item.id = str(item._id)  # 직접 _id 값을 id로 할당
-        print(item.id)
-    
-    context = {
-        "top_news": top_titles,
-        "analysis_start": analysis_start,
-        "analysis_end": analysis_end,
-        "section": "chart"
-    }
-    return render(request, 'analysis/chart.html', context)
+        # MongoDB에서 데이터 필터링
+        chart_data = Chart.objects.filter(
+            chart_date__gte=analysis_start_utc,
+            chart_date__lt=analysis_end_utc
+        ).order_by('rank')
 
-# 동영상 세부 정보 조회 API
-@csrf_exempt # CSRF 검사 비활성화(POST 요청 허용)
+        # 데이터 확인
+        print("DEBUG: chart_data count:", chart_data.count())
+
+        # 제목 정제를 포함한 데이터 가공
+        processed_chart_data = []
+        for chart in chart_data:
+            try:
+                processed_chart_data.append({
+                    "rank": chart.rank,
+                    "title": chart.title,
+                    "cleaned_title": clean_title(chart.title),  # 정제된 제목 추가
+                    "views": chart.views,
+                    "channel_name": chart.channel_name,
+                    "url": chart.url,
+                    "upload_date": chart.upload_date,
+                    "thumbnail": chart.thumbnail,
+                })
+            except Exception as e:
+                print(f"Error processing chart data: {e}")
+
+        # 템플릿에 전달할 데이터 구성
+        context = {
+            "top_news": processed_chart_data,
+            "analysis_start": analysis_start,
+            "analysis_end": analysis_end
+        }
+
+        print("DEBUG: context", context)  # 전달 데이터 확인
+        return render(request, 'analysis/chart.html', context)
+    except Exception as e:
+        import traceback
+        print(f"Error in chart function: {e}")
+        print(traceback.format_exc())
+        return JsonResponse({"error": str(e)}, status=500)
+
+@csrf_exempt  # CSRF 검사 비활성화(POST 요청 허용)
 def video_details(request):
+    """
+    Chart 컬렉션에서 특정 동영상의 세부 정보를 반환하는 API
+    """
     if request.method == 'POST':
-        data = json.loads(request.body) # 요청 본문에서 JSON 데이터 로드
-        video_url = data.get('url') # JSON 데이터에서 URL 추출
-        video_title = data.get('title') # JSON 데이터에서 목 추출
-        video_id = parse_qs(urlparse(video_url).query)['v'][0] # 동영상 ID 추출
+        try:
+            # 요청 본문에서 JSON 데이터 로드
+            data = json.loads(request.body)
+            video_url = data.get('url')  # JSON 데이터에서 URL 추출
 
-        # 데이터베이스에서 URL로 YouTubeData 검색
-        video = YouTubeData.objects.filter(url=video_url).first()
+            # MongoDB Chart 컬렉션에서 URL로 데이터 검색
+            video = Chart.objects.filter(url=video_url).first()
 
-        # 검색된 데이터가 없을 경우 에러 응답
-        if not video:
-            return JsonResponse({"error": "Video not found."}, status=404)
+            # 검색된 데이터가 없을 경우 에러 응답
+            if not video:
+                return JsonResponse({"error": "Video not found in the chart."}, status=404)
 
-        # 검색된 데이터가 있을 경우 URL 정보를 JSON 응답으로 반환
-        return JsonResponse({"video_url": video_url, 'video_title': video_title, 'video_id': video_id})
+            # 검색된 데이터가 있을 경우 JSON 응답 생성
+            response_data = {
+                "video_url": video.url,
+                "video_title": video.title,
+                "video_id": parse_qs(urlparse(video.url).query).get('v', [None])[0] or video.url.split('/')[-1],  # 유연한 ID 추출
+                "views": video.views,
+                "likes": video.likes,
+                "thumbnail": video.thumbnail,
+                "upload_date": video.upload_date.isoformat() if video.upload_date else None,
+                "channel_name": video.channel_name,
+                "description": video.desc,
+                "comments": video.comments if isinstance(video.comments, list) else [],
+                "transcript": video.transcript if isinstance(video.transcript, list) else [],
+            }
+
+            return JsonResponse(response_data, safe=False, status=200)
+
+        except Exception as e:
+            print(f"Error in video_details function: {e}")
+            return JsonResponse({"error": str(e)}, status=500)
 
     # 요청이 POST 방식이 아닐 경우 에러 응답
-    return JsonResponse({"error": "Invalid request method."}, status=400)
+    return JsonResponse({"error": "Invalid request method. Only POST is allowed."}, status=405)
 
 def save_all_historical_top10():
     try:
@@ -143,64 +297,19 @@ def save_all_historical_top10():
 
 def save_daily_top10():
     """
-    어제 날짜 데이터를 기반으로 상위 10개 비디오를 선정하고 저장
+    어제 날짜 데이터를 기반으로 상위 10개 비디오를 WeeklyIssue 컬렉션에 저장
     """
-    print("save_daily_top10 함수가 호출되었습니다.")  # 디버깅 로그
     try:
-        # KST(한국 시간대) 기준 어제 날짜 가져오기
-        seoul_tz = timezone('Asia/Seoul')  # pytz의 timezone 함수 사용
+        seoul_tz = timezone('Asia/Seoul')  # 한국 시간대
         today = datetime.now(seoul_tz).date()
         yesterday = today - timedelta(days=1)
 
-        print(f"어제 날짜: {yesterday}")  # 디버깅 로그
+        start_time = datetime.combine(yesterday, datetime.min.time()).replace(tzinfo=seoul_tz).astimezone(pytz.UTC)
+        end_time = datetime.combine(yesterday, datetime.max.time()).replace(tzinfo=seoul_tz).astimezone(pytz.UTC)
 
-        # 어제 날짜의 동영상 필터링
-        all_videos = YouTubeData.objects.filter(
-            upload_date__gte=datetime.combine(yesterday, datetime.min.time()).replace(tzinfo=seoul_tz).astimezone(pytz.UTC),
-            upload_date__lt=datetime.combine(yesterday, datetime.max.time()).replace(tzinfo=seoul_tz).astimezone(pytz.UTC)
-        ).order_by('upload_date')
-
-        if not all_videos.exists():
-            print("어제 날짜에 해당하는 동영상이 없습니다.")  # 디버깅 로그
-            return
-
-        print(f"어제 날짜의 동영상 수: {all_videos.count()}")  # 디버깅 로그
-
-        # 상위 10개 선정
-        top_videos = get_top10_chart_based(all_videos)
-
-        for video in top_videos:
-            print(f"Saving video: {video.title}, ID: {video._id}")  # 디버깅 로그
-
-            # _id가 문자열인 경우 ObjectId로 변환
-            video_id = video._id
-            if isinstance(video._id, str):
-                try:
-                    video_id = ObjectId(video._id)
-                except Exception as e:
-                    print(f"ObjectId 변환 실패: {e}")
-                    continue
-
-            # 데이터 저장
-            WeeklyIssue.objects.update_or_create(
-                _id=video_id,
-                defaults={
-                    'title': video.title,
-                    'channel_name': video.channel_name,
-                    'views': video.views,
-                    'upload_date': video.upload_date,  # 이미 UTC로 저장됨
-                    'url': video.url,
-                    'channel': video.channel,
-                    'thumbnail': video.thumbnail,
-                    'comments': video.comments or [],
-                    'transcript': video.transcript or []
-                }
-            )
-        print("Daily top 10 videos saved successfully.")
+        save_top_videos(start_time, end_time, WeeklyIssue)
     except Exception as e:
-        import traceback
-        print("".join(traceback.format_exc()))  # 전체 스택 트레이스 출력
-        print(f"save_daily_top10 failed: {e}")  # 디버깅 로그
+        print(f"Error in save_daily_top10: {e}")
 
 def weekly_issues(request):
     date_str = request.GET.get('date')
