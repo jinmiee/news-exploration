@@ -46,5 +46,6 @@ urlpatterns = [
 
     path('signup/', views.register, name='signup'),
     path('find-password/', views.find_password, name='find_password'),
+    path('analysis/get_performance_metrics/', views.get_performance_metrics, name='get_performance_metrics'),
 
 ]

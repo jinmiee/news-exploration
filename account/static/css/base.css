@@ -10,14 +10,15 @@
 /* 전체 페이지의 최대 너비 설정 */
 .container {
     padding: 0;
-    margin: 0 auto; /* 좌우 여백 자동으로 맞춤 */
-    max-width: 1140px; /* 최대 너비를 지정 */
+    margin: 0 auto;
+    max-width: 1600px; /* 1140px에서 1600px로 증가 */
 }
 
 /* ===== 본문 여백 조정 ===== */
 body {
     margin: 0;
-    margin-top: 56px; /* 네비게이션 바의 높이와 동일한 여백 추가 */
+    margin-top: 56px;
+    padding: 0 10px; /* 좌우 여백 최소화 */
     font-family: 'Noto Sans KR', sans-serif;
     background-color: var(--background-color);
 }
@@ -36,8 +37,9 @@ body {
 }
 
 .navbar-container {
-    max-width: 1140px;
+    max-width: 1600px; /* 1140px에서 1600px로 증가 */
     margin: 0 auto;
+    padding: 0 10px; /* 좌우 여백 최소화 */
     display: flex;
     justify-content: space-between;
     align-items: center;

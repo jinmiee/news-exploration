@@ -11,35 +11,32 @@
         <h1>{{ video_title }}</h1>
         
         <div class="content-wrapper">
-            <!-- 왼쪽 섹션: 네트워크 그래프와 연관어 쌍 -->
+            <!-- 왼쪽: 네트워크 그래프 -->
             <div class="left-section">
                 <div class="network-graph">
                     <img src="data:image/png;base64,{{ network_graph }}" alt="연관어 네트워크 그래프" class="responsive-image">
                 </div>
-            </div>
-
-            <!-- 오른쪽 섹션: 영상 스크립트 -->
-            <div class="right-section">
-                <div class="transcript-container">
-                    <h3>영상 스크립트</h3>
-                    {% if transcript_segments %}
-                        {% for segment in transcript_segments %}
-                            <div class="transcript-segment">
-                                <span class="timestamp">{{ segment.time }}</span>
-                                <span class="text">{{ segment.text }}</span>
-                            </div>
-                        {% endfor %}
-                    {% else %}
-                        <p>자막이 없습니다.</p>
-                    {% endif %}
+                <button id="loadPerformanceBtn" class="performance-btn">클러스터링 품질 평가 보기</button>
+                
+                <!-- 성능 평가 섹션 -->
+                <div id="performanceMetricsSection" class="performance-metrics-section" style="display: none;">
+                    <h2>연관어 클러스터링 품질 평가</h2>
+                    <div class="performance-graph">
+                        <div id="loadingSpinner" class="loading-spinner">
+                            <div class="spinner"></div>
+                            <p>분석 중입니다...</p>
+                        </div>
+                        <div id="performanceError" style="display: none;" class="error-message">
+                            <p>성능 평가 데이터를 불러오는데 실패했습니다.</p>
+                            <button onclick="retryLoadPerformance()">다시 시도</button>
+                        </div>
+                        <img id="performanceGraph" style="display: none;" alt="실루엣 분석 그래프" class="responsive-image">
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <!-- 하단 섹션: 연관어 쌍과 관련 뉴스 -->
-        <div class="bottom-content-wrapper">
-            <!-- 왼쪽: 상위 연관어 쌍 -->
-            <div class="word-pairs-section">
+            <!-- 오른쪽: 상위 연관어 쌍 -->
+            <div class="right-section">
                 <div class="word-pairs">
                     <h2>상위 연관어 쌍</h2>
                     <table>
@@ -57,60 +54,69 @@
                                 <td>{{ forloop.counter }}</td>
                                 <td>{{ pair.0.0 }}</td>
                                 <td>{{ pair.0.1 }}</td>
-                                <td>{{ pair.1 }}</td>
+                                <td>{{ pair.1|floatformat:2 }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
             </div>
+        </div>
 
-            <!-- 오른쪽: 키워드별 관련 뉴스 -->
-            {% if categorized_news %}
-            <div class="related-news-wrapper">
-                <div class="related-news-section">
-                    <h3>키워드별 관련 뉴스</h3>
-                    <div class="keyword-tabs">
-                        {% for keyword in important_keywords %}
-                            {% if keyword in categorized_news %}
-                                <button class="keyword-tab" onclick="showCategory('{{ keyword }}')">{{ keyword }}</button>
-                            {% endif %}
-                        {% endfor %}
-                    </div>
-                    
-                    {% for keyword, news_list in categorized_news.items %}
-                    <div id="category-{{ keyword }}" class="news-category">
-                        <h4 class="keyword-title">'{{ keyword }}' 관련 뉴스</h4>
-                        <div class="related-news-list">
-                            {% for news in news_list %}
-                            <div class="news-item">
-                                <div class="news-thumbnail">
-                                    {% if news.video_id %}
-                                        <img src="https://img.youtube.com/vi/{{ news.video_id }}/mqdefault.jpg" alt="뉴스 썸네일">
-                                    {% endif %}
-                                </div>
-                                <div class="news-content">
-                                    <h4>{{ news.title }}</h4>
-                                    <div class="news-meta">
-                                        <span>조회수: {{ news.views|default:"0" }}</span>
-                                        <a href="{{ news.url }}" target="_blank" class="news-link">뉴스 보기</a>
-                                    </div>
-                                </div>
-                            </div>
-                            {% endfor %}
+        <!-- 하단 컨텐츠: 스크립트와 관련 뉴스 -->
+        <div class="bottom-content-wrapper">
+            <!-- 스크립트 섹션 -->
+            <div class="transcript-container">
+                <h3>영상 스크립트</h3>
+                {% if transcript_segments %}
+                    {% for segment in transcript_segments %}
+                        <div class="transcript-segment">
+                            <span class="timestamp">{{ segment.time }}</span>
+                            <span class="text">{{ segment.text }}</span>
                         </div>
-                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p>자막이 없습니다.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 관련 뉴스 섹션은 그대로 유지 -->
+        <div class="related-news-wrapper">
+            <div class="related-news-section">
+                <h3>키워드별 관련 뉴스</h3>
+                <div class="keyword-tabs">
+                    {% for keyword in important_keywords %}
+                        {% if keyword in categorized_news %}
+                            <button class="keyword-tab" onclick="showCategory('{{ keyword }}')">{{ keyword }}</button>
+                        {% endif %}
                     {% endfor %}
                 </div>
-            </div>
-            {% else %}
-            <div class="related-news-wrapper">
-                <div class="related-news-section">
-                    <h3>키워드별 관련 뉴스</h3>
-                    <p class="no-news-message">관련 동영상이 없습니다.</p>
+                
+                {% for keyword, news_list in categorized_news.items %}
+                <div id="category-{{ keyword }}" class="news-category">
+                    <h4 class="keyword-title">'{{ keyword }}' 관련 뉴스</h4>
+                    <div class="related-news-list">
+                        {% for news in news_list %}
+                        <div class="news-item">
+                            <div class="news-thumbnail">
+                                {% if news.video_id %}
+                                    <img src="https://img.youtube.com/vi/{{ news.video_id }}/mqdefault.jpg" alt="뉴스 썸네일">
+                                {% endif %}
+                            </div>
+                            <div class="news-content">
+                                <h4>{{ news.title }}</h4>
+                                <div class="news-meta">
+                                    <span>조회수: {{ news.views|default:"0" }}</span>
+                                    <a href="{{ news.url }}" target="_blank" class="news-link">뉴스 보기</a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
                 </div>
+                {% endfor %}
             </div>
-            {% endif %}
         </div>
 
         <div class="rating">
@@ -124,15 +130,6 @@
             </div>
             <p>선택된 별점: <span id="selected-rating">0</span></p>
         </div>
-
-        {% if performance_graph %}
-        <div class="performance-metrics-section">
-            <h2>연관어 클러스터링 품질 평가</h2>
-            <div class="performance-graph">
-                <img src="data:image/png;base64,{{ performance_graph }}" alt="실루엣 분석 그래프" class="responsive-image">
-            </div>
-        </div>
-        {% endif %}
     {% else %}
         <p class="error-message">{{ error_message }}</p>
     {% endif %}
@@ -143,20 +140,22 @@
     display: flex;
     gap: 2rem;
     margin: 2rem 0;
+    align-items: flex-start;
 }
 
 .left-section {
-    flex: 0.6;
-    min-width: 0;
-}
-
-.right-section {
-    flex: 0.4;
-    min-width: 0;
+    flex: 0.7;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 .network-graph {
-    margin-bottom: 2rem;
+    width: 80%;
+    margin: 0 auto 2rem;
+    background-color: rgba(245, 245, 245, 0.8);
+    padding: 20px;
+    border-radius: 8px;
 }
 
 .network-graph img {
@@ -276,8 +275,10 @@
         flex-direction: column;
     }
     
-    .left-section, .right-section {
+    .left-section,
+    .right-section {
         width: 100%;
+        max-width: none;
     }
 }
 
@@ -343,12 +344,13 @@
     display: flex;
     gap: 2rem;
     margin: 2rem 0;
-    justify-content: center;
+    flex-wrap: wrap;
 }
 
-.word-pairs-section {
-    flex: 0.4;
-    min-width: 0;
+.word-pairs-section,
+.transcript-container {
+    flex: 1;
+    min-width: 300px;
     background-color: #f8f9fa;
     border-radius: 8px;
     padding: 1rem;
@@ -439,6 +441,69 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     });
+
+    // 성능 평가 로딩 함수 개선
+    function loadPerformanceMetrics() {
+        const performanceSection = document.getElementById('performanceMetricsSection');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const performanceGraph = document.getElementById('performanceGraph');
+        const performanceError = document.getElementById('performanceError');
+        const btn = document.getElementById('loadPerformanceBtn');
+
+        // 이미 로드된 경우 토글
+        if (performanceSection.style.display !== 'none' && performanceGraph.src) {
+            performanceSection.style.display = 'none';
+            btn.textContent = '클러스터링 품질 평가 보기';
+            return;
+        }
+
+        // 새로 로드하는 경우
+        performanceSection.style.display = 'block';
+        loadingSpinner.style.display = 'block';
+        performanceGraph.style.display = 'none';
+        performanceError.style.display = 'none';
+        btn.disabled = true;
+        btn.textContent = '분석 중...';
+
+        // AJAX 요청에 타임아웃 추가
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30초 타임아웃
+
+        fetch(`/account/analysis/get_performance_metrics/?url={{ video.url }}`, {
+            signal: controller.signal
+        })
+            .then(response => {
+                if (!response.ok) throw new Error('서버 응답 오류');
+                return response.json();
+            })
+            .then(data => {
+                if (data.performance_graph) {
+                    performanceGraph.src = 'data:image/png;base64,' + data.performance_graph;
+                    performanceGraph.style.display = 'block';
+                    btn.textContent = '클러스터링 품질 평가 숨기기';
+                } else {
+                    throw new Error('성능 평가 데이터가 없습니다.');
+                }
+            })
+            .catch(error => {
+                console.error('성능 평가 로딩 오류:', error);
+                performanceError.style.display = 'block';
+                btn.textContent = '클러스터링 품질 평가 보기';
+            })
+            .finally(() => {
+                clearTimeout(timeoutId);
+                loadingSpinner.style.display = 'none';
+                btn.disabled = false;
+            });
+    }
+
+    // 재시도 함수
+    function retryLoadPerformance() {
+        document.getElementById('performanceError').style.display = 'none';
+        loadPerformanceMetrics();
+    }
+
+    document.getElementById('loadPerformanceBtn').addEventListener('click', loadPerformanceMetrics);
 });
 
 function showCategory(keyword) {
