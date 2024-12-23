@@ -124,6 +124,15 @@
             </div>
             <p>선택된 별점: <span id="selected-rating">0</span></p>
         </div>
+
+        {% if performance_graph %}
+        <div class="performance-metrics-section">
+            <h2>연관어 클러스터링 품질 평가</h2>
+            <div class="performance-graph">
+                <img src="data:image/png;base64,{{ performance_graph }}" alt="실루엣 분석 그래프" class="responsive-image">
+            </div>
+        </div>
+        {% endif %}
     {% else %}
         <p class="error-message">{{ error_message }}</p>
     {% endif %}
@@ -371,6 +380,39 @@
     padding: 2rem;
     color: #666;
     font-size: 1.1rem;
+}
+
+.performance-metrics-section {
+    margin: 3rem 0;
+    padding: 2rem;
+    background-color: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    overflow-x: auto;
+}
+
+.performance-metrics-section h2 {
+    text-align: center;
+    margin-bottom: 2rem;
+    color: #333;
+    font-size: 1.8rem;
+    font-family: 'Malgun Gothic', sans-serif;
+}
+
+.performance-graph {
+    width: 100%;
+    max-width: 1600px;
+    margin: 0 auto;
+    background-color: white;
+    padding: 1rem;
+    border-radius: 8px;
+}
+
+.performance-graph img {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+    min-width: 1200px;
 }
 </style>
 

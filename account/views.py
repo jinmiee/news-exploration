@@ -25,7 +25,7 @@ import matplotlib
 matplotlib.use('Agg')
 
 
-from .analysis.relate_analysis import analyze_related_words, generate_network_graph
+from .analysis.relate_analysis import analyze_related_words, generate_network_graph, visualize_performance_metrics
 from .analysis.emotion_analysis import (
     generate_wordcloud,
     generate_pie_chart,
@@ -452,8 +452,13 @@ def relate(request):
                         'text': item['text']
                     })
             
-            # 연관어 분석 수행
-            graph, top_pairs, important_keywords = analyze_related_words(video_desc, video.transcript)
+            # 연관어 분석 수행 (성능 평가 그래프 추가)
+            graph, top_pairs, important_keywords, performance_graph = analyze_related_words(
+                video_desc, 
+                video.transcript,
+                clean_title_func=clean_title
+            )
+            
             network_graph = generate_network_graph(graph)
             
             # 키워드별 관련 뉴스 분류 (상위 10개 키워드만)
@@ -492,7 +497,7 @@ def relate(request):
                 'categorized_news': categorized_news,
                 'important_keywords': important_keywords,
                 'transcript_segments': transcript_segments,
-                'has_related_news': bool(categorized_news)  # 관련 뉴스 존재 여부
+                'performance_graph': performance_graph  # 성능 평가 그래프
             }
             
         except Exception as e:

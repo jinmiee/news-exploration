@@ -23,6 +23,23 @@ import re
 from django.shortcuts import render
 from ..models import YouTubeData
 from django.db.models import Q
+from time import time
+import pandas as pd
+from sklearn.metrics import silhouette_score
+import psutil
+from sklearn.metrics import roc_curve, auc, precision_recall_curve, average_precision_score
+from sklearn.preprocessing import label_binarize
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_samples
+from kneed import KneeLocator
+from sklearn.decomposition import PCA
+from umap import UMAP
+from sklearn.preprocessing import StandardScaler
+from sklearn.covariance import EllipticEnvelope
+from sklearn.cluster import DBSCAN
+
+
+
 
 # 로깅 설정
 logging.basicConfig(level=logging.WARNING)
@@ -37,8 +54,26 @@ logging.getLogger('gensim').setLevel(logging.ERROR)
 API_KEY = "koba-5JNWNQI-MH5EQJY-QINVNIQ-2IOA5IY"
 SIMILARITY_THRESHOLD = 0.73
 EDGE_THRESHOLD = 0.5
-TOP_KEYWORDS_COUNT = 25
+TOP_KEYWORDS_COUNT = 20
 t = brn.Tagger(API_KEY, "localhost")
+COMMON_WORDS = {
+    '오늘', '관련', '가능', '당일', '이번', '현재', '지금', '계획', '예정',
+    '진행', '추후', '방향', '방침', '대상', '자체', '과정', '입장', '일체',
+    '관계', '정도', '상황', '결과', '내용', '의견', '사실', '기준', '이후',
+    '최근', '기존', '향후', '대부분', '일부', '전체', '기타', '가운데', '간주'
+}
+
+# 성능 메트릭을 저장할 전역 변수
+performance_metrics = defaultdict(list)
+
+def log_performance_metrics(metrics):
+    """성능 지표를 기록하는 함수"""
+    for key, value in metrics.items():
+        performance_metrics[key].append(value)
+    
+    # 주기적으로 CSV 파일로 저장
+    if len(performance_metrics['timestamp']) % 100 == 0:  # 100개 단위 저장
+        pd.DataFrame(performance_metrics).to_csv('analysis_performance_metrics.csv', index=False)
 
 def load_pretrained_model():
     """
@@ -168,7 +203,7 @@ def load_stopwords():
         logger.error(f"불용어 파일 로드 실패: {str(e)}")
         return set()
 
-# 전역 변수로 불용어 로드
+# 전역 변수 불용어 로드
 stopwords = load_stopwords()
 
 def extract_keywords_from_desc(text):
@@ -275,7 +310,7 @@ def find_similar_keywords_lsh(target_keyword, candidate_keywords, threshold=0.8)
         if not target_hash:
             return []
         
-        # LSH로 유사한 키워드 찾기
+        # LSH로 유사한 키워드 ���기
         similar_keywords = lsh.query(target_hash)
         
         # 정확한 유사도 계산 및 필터링
@@ -291,6 +326,189 @@ def find_similar_keywords_lsh(target_keyword, candidate_keywords, threshold=0.8)
     except Exception as e:
         logger.error(f"LSH 검색 중 오류: {str(e)}")
         return []
+
+def find_optimal_k(embeddings, max_k=10):
+    """
+    엘보우 방법과 실루엣 점수를 모두 고려하여 최적의 클러스터 수 찾기
+    """
+    try:
+        # 1. 차원 축소 전 데이터 전처리
+        scaler = StandardScaler()
+        scaled_embeddings = scaler.fit_transform(embeddings)
+        
+        # 2. UMAP으로 차원 축소 (파라미터 최적화)
+        umap_reducer = UMAP(
+            n_neighbors=3,        # 더 적은 이웃 수로 지역 구조 강화
+            min_dist=0.0,         # 클러스터 더 조밀하게
+            n_components=2,
+            metric='cosine',      # 코사인 유사도 사용
+            random_state=42,
+            spread=0.5,           # 클러스터 간 거리 조절
+            local_connectivity=2   # 지역 연결성 강화
+        )
+        reduced_embeddings = umap_reducer.fit_transform(scaled_embeddings)
+        
+        # 3. DBSCAN으로 이상치 제거
+        dbscan = DBSCAN(eps=0.5, min_samples=2, metric='cosine')
+        dbscan_labels = dbscan.fit_predict(reduced_embeddings)
+        inlier_mask = dbscan_labels != -1
+        clean_embeddings = reduced_embeddings[inlier_mask]
+        
+        if len(clean_embeddings) < 3:  # 너무 적은 데이터가 남은 경우
+            return 2, reduced_embeddings, np.zeros(len(reduced_embeddings))
+        
+        # 4. 최적의 클러스터 수 찾기
+        best_score = -1
+        optimal_k = 2
+        best_labels = None
+        
+        # 클러스터 수를 2-3개로 제한하고 품질 높은 클러스터링 찾기
+        for k in range(2, min(4, len(clean_embeddings))):
+            for seed in range(20):  # 더 많은 시도
+                kmeans = KMeans(
+                    n_clusters=k,
+                    random_state=seed*42,
+                    init='k-means++',
+                    n_init=50,     # 초기화 시도 횟수 대폭 증가
+                    max_iter=1000   # 충분한 반복
+                )
+                
+                # 클러스터링 수행
+                cluster_labels = kmeans.fit_predict(clean_embeddings)
+                
+                # 클러스터 크기가 너무 작은 경우 스킵
+                cluster_sizes = np.bincount(cluster_labels)
+                if min(cluster_sizes) < 2:
+                    continue
+                
+                # 실루엣 점수 계산
+                sil_score = silhouette_score(
+                    clean_embeddings, 
+                    cluster_labels,
+                    metric='cosine'
+                )
+                
+                # 개별 실루엣 점수 확인
+                sample_sil_scores = silhouette_samples(
+                    clean_embeddings, 
+                    cluster_labels,
+                    metric='cosine'
+                )
+                
+                # 음수 실루엣 점수를 가진 샘플이 30% 이상이면 스킵
+                if np.mean(sample_sil_scores < 0) > 0.3:
+                    continue
+                
+                # 최소 실루엣 점수가 -0.1 미만이면 스킵
+                if np.min(sample_sil_scores) < -0.1:
+                    continue
+                
+                if sil_score > best_score:
+                    best_score = sil_score
+                    optimal_k = k
+                    best_labels = cluster_labels
+        
+        # 5. 원본 데이터에 대한 레이블 복원
+        full_labels = np.full(len(reduced_embeddings), -1)
+        full_labels[inlier_mask] = best_labels
+        
+        # 6. 이상치 재할당
+        if np.any(~inlier_mask):
+            # 가장 가까운 클러스터에 할당
+            outlier_points = reduced_embeddings[~inlier_mask]
+            for idx, point in zip(np.where(~inlier_mask)[0], outlier_points):
+                distances = [np.mean([np.linalg.norm(point - clean_embeddings[i]) 
+                           for i in np.where(best_labels == label)[0]])
+                           for label in range(optimal_k)]
+                full_labels[idx] = np.argmin(distances)
+        
+        print(f"최종 실루엣 점수: {best_score:.3f}")
+        return optimal_k, reduced_embeddings, full_labels
+        
+    except Exception as e:
+        logger.error(f"최적 클러스터 수 계산 중 오류: {str(e)}")
+        return min(3, len(embeddings)-1), embeddings, None
+
+def evaluate_model_performance(embeddings, labels):
+    """
+    모델 성능 평가 및 시각화 (실루엣 점수)
+    """
+    try:
+        plt.figure(figsize=(15, 6))
+        
+        # 한글 폰트 설정
+        try:
+            plt.rcParams['font.family'] = 'Malgun Gothic'
+            plt.rcParams['axes.unicode_minus'] = False
+        except:
+            logger.warning("Malgun Gothic 폰트를 찾을 수 없습니다.")
+
+        # 실루엣 점수 계산
+        sil_score = silhouette_score(embeddings, labels)
+        
+        # 개별 샘플의 실루엣 점수 계산
+        sample_silhouette_values = silhouette_samples(embeddings, labels)
+        
+        # 2개의 서브플롯 생성
+        plt.subplot(1, 2, 1)
+        y_lower = 10
+        n_clusters = len(set(labels))
+        
+        # 클러스터별 실루엣 점수 시각화
+        for i in range(n_clusters):
+            ith_cluster_values = sample_silhouette_values[labels == i]
+            ith_cluster_values.sort()
+            
+            size_cluster_i = ith_cluster_values.shape[0]
+            y_upper = y_lower + size_cluster_i
+            
+            color = plt.cm.nipy_spectral(float(i) / n_clusters)
+            plt.fill_betweenx(np.arange(y_lower, y_upper),
+                            0, ith_cluster_values,
+                            facecolor=color, edgecolor=color, alpha=0.7,
+                            label=f'클러스터 {i+1} (크기: {size_cluster_i})')
+            
+            plt.text(-0.05, y_lower + 0.5 * size_cluster_i, f'클러스터 {i+1}')
+            y_lower = y_upper + 10
+        
+        plt.title(f'클러스터별 실루엣 분석\n평균 실루엣 점수: {sil_score:.3f}', 
+                 fontsize=12, pad=20)
+        plt.xlabel('실루엣 계수', fontsize=10)
+        plt.ylabel('클러스터 레이블', fontsize=10)
+        
+        # 수직선 추가
+        plt.axvline(x=sil_score, color="red", linestyle="--", 
+                   label='평균 실루엣 점수')
+        
+        plt.legend(loc='lower right', bbox_to_anchor=(1.3, 0))
+        plt.grid(True, alpha=0.3)
+        
+        # 클러스터 크기 분포 시각화 (파이 차트)
+        plt.subplot(1, 2, 2)
+        cluster_sizes = [np.sum(labels == i) for i in range(n_clusters)]
+        colors = [plt.cm.nipy_spectral(float(i) / n_clusters) for i in range(n_clusters)]
+        plt.pie(cluster_sizes, labels=[f'클러스터 {i+1}\n({size}개)' for i, size in enumerate(cluster_sizes)],
+               colors=colors, autopct='%1.1f%%', startangle=90)
+        plt.title('클러스터 크기 분포', fontsize=12, pad=20)
+        
+        plt.tight_layout(pad=3.0, w_pad=3.0)
+        
+        # 이미지 저장
+        buffer = BytesIO()
+        plt.savefig(buffer, format='png', dpi=300, bbox_inches='tight',
+                   facecolor='white', edgecolor='none')
+        buffer.seek(0)
+        image_png = buffer.getvalue()
+        buffer.close()
+        plt.close('all')
+        
+        return base64.b64encode(image_png).decode('utf-8')
+        
+    except Exception as e:
+        logger.error(f"성능 평가 시각화 중 오류: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return None
 
 def analyze_related_words(video_desc, video_transcript, clean_title_func=None):
     """
@@ -332,9 +550,9 @@ def analyze_related_words(video_desc, video_transcript, clean_title_func=None):
             
             if not all_transcript_keywords:
                 print("[경고] 자막에서 추출된 키워드가 없습니다")
-                return nx.Graph(), [], []
+                return nx.Graph(), [], [], None
             
-            # TF-IDF 계산 부분 수정
+            # TF-IDF 산 부분 수정
             try:
                 # 문서 생성 방식 변경
                 documents = []
@@ -374,18 +592,30 @@ def analyze_related_words(video_desc, video_transcript, clean_title_func=None):
                     # 기본 가중치 적용 (40:60)
                     weighted_score = 0.4 * freq_score + 0.6 * tfidf_score
                     
-                    # 특정 조건에 따른 가중치 보정
-                    # 1. 제목/설명에 있는 키워드는 가중치 증가
+                    # 가중치 보정
+                    # 1. 제목/설명에 있는 키워드는 가중치 크게 증가
                     if keyword in desc_keywords:
+                        weighted_score *= 2.0
+                    
+                    # 2. 일반적인 단어는 가중치 폭 감소
+                    if keyword in COMMON_WORDS:
+                        weighted_score *= 0.3
+                    
+                    # 3. 2음절 이하의 단어는 가중치 감소 (제목/설명에 있는 경우 제외)
+                    if len(keyword) <= 2 and keyword not in desc_keywords:
+                        weighted_score *= 0.4
+                    
+                    # # 4. 고유명사나 특정 주제어는 가중치 증가
+                    # if any(topic in keyword for topic in ['탄핵', '대통령', '윤석열', '민주당', '국회']):
+                    #     weighted_score *= 1.8
+                    
+                    # 5. TF-IDF 점수가 빈도수보다 현저히 높은 경우 (문맥적 중요성)
+                    if tfidf_score > freq_score * 2:
                         weighted_score *= 1.5
                     
-                    # 2. 2음절 이하의 일반적인 단어는 가중치 감소
-                    if len(keyword) <= 2 and keyword not in desc_keywords:
+                    # 6. 숫자나 특수문자가 포함된 경우 가중치 감소
+                    if any(c.isdigit() or not c.isalnum() for c in keyword):
                         weighted_score *= 0.5
-                    
-                    # 3. TF-IDF 점수가 빈도수보다 현저히 높은 경우 (문맥적 중요성)
-                    if tfidf_score > freq_score * 2:
-                        weighted_score *= 1.3
                     
                     keyword_importance[keyword] = weighted_score
                 
@@ -400,11 +630,11 @@ def analyze_related_words(video_desc, video_transcript, clean_title_func=None):
                 
             except Exception as e:
                 logger.error(f"TF-IDF 계산 중 오류: {str(e)}")
-                return nx.Graph(), [], []
+                return nx.Graph(), [], [], None
         
         if not transcript_keywords:
             logger.warning("처리할 키워드가 없습니다.")
-            return nx.Graph(), [], []
+            return nx.Graph(), [], [], None
             
         # 3. LSH, SBERT, SimCSE 결합한 효율적인 유사도 계산
         keyword_mapping = {}  # 매핑 결과 저장
@@ -523,13 +753,31 @@ def analyze_related_words(video_desc, video_transcript, clean_title_func=None):
         for u, v, data in G.edges(data=True):
             word_pairs.append(((u, v), data['weight']))
         
-        return G, sorted(word_pairs, key=lambda x: x[1], reverse=True)[:20], top_10_keywords
+        # 성능 평가 그래프 생성
+        if G.number_of_nodes() > 1:
+            node_embeddings = nlp_models['sbert'].encode(list(G.nodes()))
+            
+            # 최적의 클러스터 수 찾기 및 차원 축소
+            optimal_k, reduced_embeddings, cluster_labels = find_optimal_k(node_embeddings)
+            
+            if cluster_labels is not None:
+                # 실루엣 점수 그래프 생성
+                performance_graph = evaluate_model_performance(
+                    reduced_embeddings, 
+                    cluster_labels
+                )
+            else:
+                performance_graph = None
+        else:
+            performance_graph = None
+            
+        return G, sorted(word_pairs, key=lambda x: x[1], reverse=True)[:20], top_10_keywords, performance_graph
         
     except Exception as e:
         logger.error(f"연관어 분석 중 오류 발생: {str(e)}")
         import traceback
         logger.error(traceback.format_exc())
-        return nx.Graph(), [], []
+        return nx.Graph(), [], [], None
 
 def generate_network_graph(G):
     """네트워크 그래프 시각화"""
@@ -688,7 +936,7 @@ def relate(request):
                     })
             
             # clean_title 함수를 파라미터로 전달
-            graph, top_pairs, important_keywords = analyze_related_words(
+            graph, top_pairs, important_keywords, performance_graph = analyze_related_words(
                 video_desc, 
                 video.transcript,
                 clean_title_func=clean_title
@@ -716,6 +964,9 @@ def relate(request):
                             cleaned_news.append(news)
                         categorized_news[keyword] = cleaned_news
             
+            # 성능 메트릭 시각화 추가
+            performance_graph = visualize_performance_metrics()
+            
             context = {
                 'section': 'relate',
                 'video': video,
@@ -724,7 +975,8 @@ def relate(request):
                 'top_pairs': top_pairs,
                 'categorized_news': categorized_news,
                 'important_keywords': important_keywords,
-                'transcript_segments': transcript_segments
+                'transcript_segments': transcript_segments,
+                'performance_graph': performance_graph
             }
         except Exception as e:
             print(f"분석 중 오류 발생: {str(e)}")
@@ -739,3 +991,87 @@ def relate(request):
         }
     
     return render(request, 'analysis/relate.html', context)
+
+# 성능 분석 결과를 시각화하는 함수 추가
+def visualize_performance_metrics():
+    """성능 메트릭 시각화"""
+    try:
+        df = pd.DataFrame(performance_metrics)
+        if df.empty:
+            logger.warning("성능 메트릭 데이터가 없습니다.")
+            return None
+            
+        # 한글 폰트 설정
+        try:
+            font_path = "C:/Windows/Fonts/malgun.ttf"  # Windows
+            font_prop = matplotlib.font_manager.FontProperties(fname=font_path)
+            plt.rcParams['font.family'] = font_prop.get_name()
+        except:
+            logger.warning("기본 폰트를 사용합니다.")
+            plt.rcParams['font.family'] = 'Malgun Gothic'
+
+        # seaborn 스타일 대신 matplotlib 내장 스타일 사용
+        plt.style.use('bmh')  # 또는 'ggplot', 'fivethirtyeight' 등
+        
+        plt.figure(figsize=(15, 10), facecolor='white')
+        
+        # 전체 그래프 스타일 설정
+        plt.rcParams['axes.facecolor'] = '#f8f9fa'
+        plt.rcParams['axes.grid'] = True
+        plt.rcParams['grid.alpha'] = 0.3
+        plt.rcParams['grid.color'] = '#cccccc'
+        
+        # 처리 시간 추이
+        plt.subplot(2, 2, 1)
+        plt.plot(range(len(df)), df['processing_time'], 'b-', linewidth=2, color='#2196F3')
+        plt.title('처리 시간 추이', fontsize=12, pad=10)
+        plt.xlabel('분석 횟수', fontsize=10)
+        plt.ylabel('처리 시간(초)', fontsize=10)
+        
+        # 메모리 사용량 추이
+        plt.subplot(2, 2, 2)
+        plt.plot(range(len(df)), df['memory_usage'], '-', linewidth=2, color='#4CAF50')
+        plt.title('메모리 사용량 추이', fontsize=12, pad=10)
+        plt.xlabel('분석 횟수', fontsize=10)
+        plt.ylabel('메모리(MB)', fontsize=10)
+        
+        # 키워드 수 분포
+        plt.subplot(2, 2, 3)
+        plt.hist(df['keyword_count'], bins=20, color='#42A5F5', edgecolor='white')
+        plt.title('키워드 수 분포', fontsize=12, pad=10)
+        plt.xlabel('키워드 수', fontsize=10)
+        plt.ylabel('빈도', fontsize=10)
+        
+        # 실루엣 점수 추이
+        plt.subplot(2, 2, 4)
+        valid_scores = df[df['silhouette_score'] > 0]['silhouette_score']
+        if not valid_scores.empty:
+            plt.plot(range(len(valid_scores)), valid_scores, '-', 
+                    linewidth=2, color='#F44336')
+            plt.title('실루엣 점수 추이', fontsize=12, pad=10)
+            plt.xlabel('분석 횟수', fontsize=10)
+            plt.ylabel('실루엣 점수', fontsize=10)
+        else:
+            plt.text(0.5, 0.5, '유효한 실루엣 점수 없음', 
+                    horizontalalignment='center',
+                    verticalalignment='center',
+                    transform=plt.gca().transAxes)
+        
+        plt.tight_layout(pad=3.0)
+        
+        # 이미지 저장
+        buffer = BytesIO()
+        plt.savefig(buffer, format='png', dpi=300, bbox_inches='tight', 
+                   facecolor='white', edgecolor='none')
+        buffer.seek(0)
+        image_png = buffer.getvalue()
+        buffer.close()
+        plt.close('all')
+        
+        return base64.b64encode(image_png).decode('utf-8')
+        
+    except Exception as e:
+        logger.error(f"성능 메트릭 시각화 중 오류: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return None
