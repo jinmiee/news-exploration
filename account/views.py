@@ -622,5 +622,3 @@ def find_password(request):
     
     return render(request, 'registration/find_password.html', {"error": error})
 
-
-

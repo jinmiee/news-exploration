@@ -15,13 +15,119 @@
 
     <section class="mypage-section">
         <h2>회원정보수정</h2>
-        <a href="{% url 'account:password_change' %}" class="mypage-link">비밀번호 변경</a>
+
+        <!-- 비밀번호 변경 폼 -->
+        <form method="post" action="{% url 'account:password_change' %}" class="password-change-form">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="id_old_password">현재 비밀번호</label>
+                <input type="password" name="old_password" id="id_old_password" class="form-control" required>
+            </div>
+
+            <div class="form-group">
+                <label for="id_new_password1">새 비밀번호</label>
+                <input type="password" name="new_password1" id="id_new_password1" class="form-control" required>
+            </div>
+
+            <div class="form-group">
+                <label for="id_new_password2">새 비밀번호 확인</label>
+                <input type="password" name="new_password2" id="id_new_password2" class="form-control" required>
+            </div>
+
+            <button type="submit" class="btn-submit">비밀번호 변경</button>
+        </form>
     </section>
 
     <section class="mypage-section">
         <h2>찜 한 영상</h2>
-        <a href="{% url 'account:my_liked_video' %}" class="mypage-link">찜한 영상 보기</a>
+        <!-- 찜한 영상 보기 버튼 -->
+        <a href="{% url 'account:my_liked_video' %}" class="btn-link">찜한 영상 보기</a>
     </section>
-
 </div>
+
+<style>
+    /* 페이지 전체 컨테이너 */
+    .mypage-container {
+        width: 60%;
+        margin: 0 auto;
+        padding: 20px;
+        background: #f9f9f9;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    /* 헤더 스타일 */
+    .mypage-header {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+
+    .mypage-header h1 {
+        font-size: 24px;
+        color: #333;
+    }
+
+    /* 섹션 스타일 */
+    .mypage-section {
+        margin-top: 20px;
+    }
+
+    .mypage-section h2 {
+        font-size: 20px;
+        margin-bottom: 10px;
+        color: #333;
+    }
+
+    /* 버튼 스타일 */
+    .btn-submit, .btn-link {
+        display: block;
+        width: 100%;
+        padding: 10px;
+        font-size: 16px;
+        color: #fff;
+        background-color: #007bff;
+        text-align: center;
+        text-decoration: none;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+
+    .btn-submit:hover, .btn-link:hover {
+        background-color: #0056b3;
+    }
+
+    /* 비밀번호 변경 폼 */
+    .password-change-form {
+        background: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .password-change-form .form-group {
+        margin-bottom: 15px;
+    }
+
+    .password-change-form label {
+        display: block;
+        margin-bottom: 5px;
+        font-size: 14px;
+        color: #555;
+    }
+
+    .password-change-form input {
+        width: 100%;
+        padding: 10px;
+        font-size: 14px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+
+    .password-change-form input:focus {
+        outline: none;
+        border-color: #007bff;
+    }
+</style>
 {% endblock %}

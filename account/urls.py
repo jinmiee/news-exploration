@@ -21,6 +21,7 @@ from . import views
 from django.urls import reverse_lazy
 
 
+
 app_name = 'account'
 
 urlpatterns = [
@@ -46,5 +47,6 @@ urlpatterns = [
 
     path('signup/', views.register, name='signup'),
     path('find-password/', views.find_password, name='find_password'),
+    
 
 ]
