@@ -20,8 +20,6 @@ from django.contrib.auth import views as auth_views
 from . import views
 from django.urls import reverse_lazy
 
-from .views import get_related_duplicate_videos
-
 app_name = 'account'
 
 urlpatterns = [
@@ -34,6 +32,7 @@ urlpatterns = [
     path('', views.chart, name='chart'),
     path('video-details/', views.video_details, name='video_details'),
     path('detail/', views.detail, name='detail'),
+    path('feedback/', views.submit_feedback, name='submit_feedback'),
     path('feedback_done/', views.feedback_done, name='feedback_done'),
 
     path('weekly-issues/', views.weekly_issues, name='weekly_issues'),
@@ -44,7 +43,7 @@ urlpatterns = [
     path('mypage/', views.mypage, name='mypage'),
     path('like/<str:video_id>/', views.like_video, name='like_video'),
     path('mypage/like/', views.my_liked_videos, name='my_liked_video'),
-    path('related-duplicates/', get_related_duplicate_videos, name='related_duplicates'),
+    path('related-duplicates/', views.get_related_duplicate_videos, name='related_duplicates'),
 
 
     path('signup/', views.register, name='signup'),
