@@ -596,7 +596,7 @@ def relate(request):
                     related_news = YouTubeData.objects.filter(
                         Q(title__icontains=keyword) | 
                         Q(desc__icontains=keyword)
-                    ).exclude(url=video_url)[:6]  # 뉴스 개수 제한
+                    ).exclude(url=video_url)[:10]  # 뉴스 개수 제한
                     
                     if related_news:
                         cleaned_news = []

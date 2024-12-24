@@ -56,10 +56,18 @@
                 <h3>영상 스크립트</h3>
                 {% if transcript_segments %}
                     {% for segment in transcript_segments %}
-                        <div class="transcript-segment">
+                        {% if forloop.counter0|divisibleby:3 %}
+                            <div class="transcript-segment">
+                        {% endif %}
+                        
+                        <div class="segment-item">
                             <span class="timestamp">{{ segment.time }}</span>
                             <span class="text">{{ segment.text }}</span>
                         </div>
+
+                        {% if forloop.counter|divisibleby:3 or forloop.last %}
+                            </div>
+                        {% endif %}
                     {% endfor %}
                 {% else %}
                     <p>자막이 없습니다.</p>
@@ -70,7 +78,7 @@
         <!-- 관련 뉴스 섹션은 그대로 유지 -->
         <div class="related-news-wrapper">
             <div class="related-news-section">
-                <h3>키워드별 관련 뉴스</h3>
+                <h3>키워드 TOP 10 관련 뉴스</h3>
                 <div class="keyword-tabs">
                     {% for keyword in important_keywords %}
                         {% if keyword in categorized_news %}
@@ -150,7 +158,7 @@
     width: 100%;
     background-color: rgba(245, 245, 245, 0.8);
     border-radius: 8px;
-    margin-top: 1rem;
+    /* margin-top: 1rem; */
 }
 
 .network-graph img {
@@ -161,13 +169,12 @@
 
 .related-news-wrapper {
     flex: 0.4;
-    max-width: 600px;
 }
 
 .transcript-container {
     margin: 20px 0;
     padding: 20px;
-    background-color: #f8f9fa;
+    background-color: rgba(245, 245, 245, 0.8);
     border-radius: 5px;
     max-height: 550px;
     overflow-y: auto;
@@ -213,7 +220,6 @@
 .news-item {
     display: flex;
     padding: 1rem;
-    margin-bottom: 1rem;
     background-color: white;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -314,7 +320,7 @@
 .transcript-segment {
     margin: 10px 0;
     line-height: 1.5;
-    padding: 8px;
+    padding: 6px;
     border-bottom: 1px solid #eee;
     transition: background-color 0.2s;
 }
@@ -341,13 +347,14 @@
     gap: 2rem;
     margin: 2rem 0;
     flex-wrap: wrap;
+    max-width: 1535px;
 }
 
 .word-pairs-section,
 .transcript-container {
     flex: 1;
     min-width: 300px;
-    background-color: #f8f9fa;
+    background-color: rgba(245, 245, 245, 0.8);
     border-radius: 8px;
     padding: 1rem;
 }
@@ -406,23 +413,18 @@
 
 .section-title {
     text-align: center;
-    margin: 2rem;
+    margin: 30px 0 30px 0;
     color: #333;
-    font-size: 1.5rem;
+    font-size: 50px;
     font-weight: bold;
 }
 
 .right-section {
     flex: 0.3;
-    margin: 20px 0 0 0;
+    margin: 35px 0 0 0;
 }
 
-.word-pairs h2 {
-    margin-bottom: 1.5rem;
-    color: #333;
-    font-size: 1.5rem;
-    font-weight: bold;
-}
+
 
 .word-pairs table th,
 .word-pairs table td {
