@@ -43,22 +43,31 @@
     {% include "feedback/feedback_form.html" %}
 
     <!-- 관련 기사 섹션 -->
-    <div style="margin-top: 40px;">
-        <h3 style="font-size: 22px; color: #333;">중복 기사 목록</h3>
-        <div style="display: flex; flex-wrap: wrap; gap: 20px;">
-            {% for related_video in related_videos %}
-                <div style="flex: 0 0 30%; text-align: center;">
-                    <!-- 썸네일 및 링크 -->
-                    <a href="https://www.youtube.com/watch?v={{ related_video.video_id }}" target="_blank">
-                        <img src="{{ related_video.thumbnail }}" alt="{{ related_video.title }}" style="width: 100%; height: auto; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 10px;">
-                    </a>
-                    <!-- 제목 -->
-                    <p style="font-size: 14px; color: #333; font-weight: bold;">{{ related_video.title }}</p>
-                </div>
-            {% empty %}
-                <p>중복 동영상이 없습니다.</p>
-            {% endfor %}
-        </div>
+    <div class="related-videos">
+        {% if related_videos %}
+            <h3 style="margin-top: 20px;">관련 동영상</h3>
+            <ul style="list-style-type: none; padding: 0;">
+                {% for video in related_videos %}
+                    <li style="margin-bottom: 20px; display: flex; align-items: center;">
+                        <!-- Thumbnail -->
+                        <div style="flex-shrink: 0; margin-right: 10px;">
+                            <img src="{{ video.thumbnail }}" alt="Thumbnail" style="width: 120px; height: 80px; object-fit: cover;">
+                        </div>
+                        <!-- Video Details -->
+                        <div>
+                            <a href="{{ video.url }}" target="_blank" style="font-size: 16px; font-weight: bold; color: #3498db; text-decoration: none;">
+                                {{ video.title }}
+                            </a>
+                            <p style="margin: 5px 0;">조회수: {{ video.views }}</p>
+                            <p style="margin: 5px 0;">업로드 날짜: {{ video.upload_date|date:"Y-m-d H:i" }}</p>
+                            <p style="margin: 5px 0; color: #555;">채널 이름: {{ video.channel_name }}</p>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p style="color: #999; margin-top: 20px;">관련된 동영상이 없습니다.</p>
+        {% endif %}
     </div>
 
     <!-- 뒤로가기 -->

@@ -47,7 +47,7 @@ def clean_title(title):
     title = re.sub(r'아침&', '', title, flags=re.IGNORECASE)
 
     # '/ 모아보는 뉴스' 제거
-    title = re.sub(r'/\s*모아보는 뉴스|굿모닝연예|뉴스딱|실시간 e뉴스|생생지구촌', '', title)
+    title = re.sub(r'/\s*모아보는 뉴스|굿모닝연예|뉴스딱|실시간 e뉴스|생생지구촌|정치컨설팅|편상욱의 뉴스브리핑|스토브리그', '', title)
 
     #'-MBC 중계방송' 제거
     title = re.sub(r'-\s*MBC\s*중계방송', '', title, flags=re.IGNORECASE)

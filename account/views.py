@@ -530,20 +530,15 @@ def extract_duplicates_for_chart():
         print(f"차트 중복 동영상 추출 오류: {e}")
 
 def get_related_duplicate_videos(request):
-    """
-    주간 이슈나 차트의 기사를 기준으로 중복된 동영상을 반환.
-    """
     try:
-        video_url = request.GET.get('url')  # 사용자가 클릭한 기사의 URL
+        video_url = request.GET.get('url')
         if not video_url:
             return JsonResponse({"error": "URL 매개변수가 제공되지 않았습니다."}, status=400)
 
-        # 클릭된 기사 데이터 가져오기
         video = WeeklyIssue.objects.filter(url=video_url).first() or Chart.objects.filter(url=video_url).first()
         if not video:
-            return JsonResponse({"error": "주어진 URL에 대한 기사를 찾을 수 없습니다."}, status=404)
+            return JsonResponse({"error": "해당 URL에 대한 기사를 찾을 수 없습니다."}, status=404)
 
-        # 주간 이슈인지 차트인지 확인
         if WeeklyIssue.objects.filter(url=video_url).exists():
             duplicates_model = WeeklyIssueDuplicateVideo
         elif Chart.objects.filter(url=video_url).exists():
@@ -551,10 +546,15 @@ def get_related_duplicate_videos(request):
         else:
             return JsonResponse({"error": "데이터 유형을 확인할 수 없습니다."}, status=400)
 
-        # 중복 동영상 데이터 가져오기
-        duplicates = duplicates_model.objects.filter(title__icontains=video.title)
+        duplicates = duplicates_model.objects.filter(
+            title__icontains=video.title
+        )
 
-        # 중복 동영상 데이터 구성
+        # Debugging: Print duplicate count and details
+        print(f"DEBUG: 중복 동영상 개수: {duplicates.count()}")
+        for duplicate in duplicates:
+            print(f"중복 동영상: {duplicate.title}, URL: {duplicate.url}")
+
         duplicate_list = [
             {
                 "title": duplicate.title,
