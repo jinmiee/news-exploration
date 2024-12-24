@@ -21,7 +21,11 @@ def evaluate_model_performance(embeddings, labels, sil_score):
     클러스터링 모델 성능 평가 및 시각화
     """
     try:
-        plt.figure(figsize=(12, 6))
+        plt.figure(figsize=(15, 7))  # 그래프 크기 증가
+        
+        # 배경색 설정
+        plt.rcParams['figure.facecolor'] = 'white'
+        plt.rcParams['axes.facecolor'] = 'white'
         
         # 1. 실루엣 분석 그래프
         plt.subplot(1, 2, 1)
@@ -52,17 +56,18 @@ def evaluate_model_performance(embeddings, labels, sil_score):
             
             # 클러스터 레이블 표시
             plt.text(-0.05, y_lower + 0.5 * size_cluster_i, 
-                    f'클러스터 {i+1}\n(크기: {size_cluster_i})')
+                    f'클러스터 {i+1}\n(크기: {size_cluster_i})',
+                    fontsize=12)
             y_lower = y_upper + 10
         
         # 평균 실루엣 점수 수직선
         plt.axvline(x=sil_score, color='red', linestyle='--',
                    label=f'평균 실루엣 점수: {sil_score:.3f}')
         
-        plt.title('클러스터별 실루엣 분석', pad=20)
-        plt.xlabel('실루엣 계수')
-        plt.ylabel('클러스터 레이블')
-        plt.legend(loc='lower right')
+        plt.title('클러스터별 실루엣 분석', pad=20, fontsize=14)
+        plt.xlabel('실루엣 계수', fontsize=12)
+        plt.ylabel('클러스터 레이블', fontsize=12)
+        plt.legend(loc='lower right', fontsize=10)
         plt.grid(True, alpha=0.3)
         
         # 2. 클러스터 크기 분포 (파이 차트)
@@ -78,14 +83,14 @@ def evaluate_model_performance(embeddings, labels, sil_score):
                autopct='%1.1f%%',
                startangle=90)
         
-        plt.title('클러스터 크기 분포', pad=20)
+        plt.title('클러스터 크기 분포', pad=20, fontsize=14)
         
         # 전체 레이아웃 조정
         plt.suptitle('연관어 클러스터링 품질 평가', 
-                    fontsize=16, y=1.05)
+                    fontsize=16, y=1.02)
         plt.tight_layout(pad=3.0)
         
-        # 이미지 저장
+        # 이미지 저장 시 DPI 증가 및 여백 조정
         buffer = BytesIO()
         plt.savefig(buffer, format='png', dpi=300, bbox_inches='tight',
                    facecolor='white', edgecolor='none')
