@@ -418,9 +418,11 @@ def extract_duplicates_for_weekly_issues():
 
                 # 중복 데이터로 간주할 조건
                 if similarity > threshold:
-                    duplicates.add(all_video._id)
-                    print(
-                        f"DEBUG: 중복 탐지 - 유튜브 비디오(ID: {all_video._id})와 주간 이슈 비디오(ID: {weekly_video._id}) 유사도: {similarity}")
+                    # 중복 데이터가 이미 저장되었는지 확인
+                    if not WeeklyIssueDuplicateVideo.objects.filter(url=all_video.url).exists():
+                        duplicates.add(all_video._id)
+                        print(
+                            f"DEBUG: 중복 탐지 - 유튜브 비디오(ID: {all_video._id})와 주간 이슈 비디오(ID: {weekly_video._id}) 유사도: {similarity}")
 
         print(f"DEBUG: 총 {len(duplicates)}개의 중복 비디오를 탐지했습니다.")
 
@@ -428,6 +430,12 @@ def extract_duplicates_for_weekly_issues():
         for duplicate_id in duplicates:
             try:
                 duplicate_video = YouTubeData.objects.get(_id=duplicate_id)
+
+                # 저장 전에 중복 확인
+                if WeeklyIssueDuplicateVideo.objects.filter(url=duplicate_video.url).exists():
+                    print(f"DEBUG: 중복 비디오가 이미 저장됨 - URL: {duplicate_video.url}")
+                    continue
+
                 WeeklyIssueDuplicateVideo.objects.update_or_create(
                     _id=duplicate_video._id,
                     defaults={
@@ -487,29 +495,31 @@ def extract_duplicates_for_chart():
             for j, chart_video in enumerate(chart_videos):
                 similarity = similarity_matrix[i, j]
 
-                # URL이 동일한 경우 건너뛰기
-                if all_video.url == chart_video.url:
+                # URL이 동일하거나 유사도가 1.0인 경우 건너뛰기
+                if all_video.url == chart_video.url or similarity >= 0.9:
                     print(
-                        f"DEBUG: 동일한 URL - 유튜브 비디오(ID: {all_video._id}, URL: {all_video.url})와 차트 비디오(ID: {chart_video._id}, URL: {chart_video.url})")
-                    continue
-
-                # 유사도가 1에 가까운 경우 동일 데이터로 간주하고 건너뛰기
-                if similarity >= 0.9999:
-                    print(
-                        f"DEBUG: 높은 유사도(동일 데이터로 간주) - 유튜브 비디오(ID: {all_video._id}, URL: {all_video.url})와 차트 비디오(ID: {chart_video._id}, URL: {chart_video.url}) 유사도: {similarity}")
+                        f"DEBUG: 동일 데이터 또는 높은 유사도 - 유튜브 비디오(ID: {all_video._id}, URL: {all_video.url})와 차트 비디오(ID: {chart_video._id}, URL: {chart_video.url}) 유사도: {similarity}")
                     continue
 
                 # 중복 데이터로 간주할 조건
                 if similarity > threshold:
-                    duplicates.add(all_video._id)
-                    print(
-                        f"DEBUG: 중복 탐지 - 유튜브 비디오(ID: {all_video._id})와 차트 비디오(ID: {chart_video._id}) 유사도: {similarity}")
+                    # 중복 동영상이 이미 저장되어 있는지 확인
+                    if not ChartDuplicateVideo.objects.filter(url=all_video.url).exists():
+                        duplicates.add(all_video._id)
+                        print(
+                            f"DEBUG: 중복 탐지 - 유튜브 비디오(ID: {all_video._id})와 차트 비디오(ID: {chart_video._id}) 유사도: {similarity}")
 
         print(f"DEBUG: 총 {len(duplicates)}개의 중복 비디오를 탐지했습니다.")
 
         # 중복 동영상 저장
         for duplicate_id in duplicates:
             duplicate_video = YouTubeData.objects.get(_id=duplicate_id)
+
+            # 중복 동영상이 이미 저장된 경우 건너뜀
+            if ChartDuplicateVideo.objects.filter(url=duplicate_video.url).exists():
+                print(f"DEBUG: 중복 비디오가 이미 존재합니다 - URL: {duplicate_video.url}")
+                continue
+
             ChartDuplicateVideo.objects.update_or_create(
                 _id=duplicate_video._id,
                 defaults={
