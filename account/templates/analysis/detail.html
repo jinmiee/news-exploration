@@ -45,30 +45,31 @@
     <!-- 관련 기사 섹션 -->
     <div class="related-videos">
         {% if related_videos %}
-            <h3 style="margin-top: 20px;">관련 동영상</h3>
-            <ul style="list-style-type: none; padding: 0;">
+            <h3 style="margin-top: 20px; font-size: 18px; font-weight: bold; color: #333;">관련 동영상</h3>
+            <div style="display: flex; flex-wrap: wrap; gap: 20px; margin-top: 20px;">
                 {% for video in related_videos %}
-                    <li style="margin-bottom: 20px; display: flex; align-items: center;">
-                        <!-- Thumbnail -->
-                        <div style="flex-shrink: 0; margin-right: 10px;">
-                            <img src="{{ video.thumbnail }}" alt="Thumbnail" style="width: 120px; height: 80px; object-fit: cover;">
-                        </div>
-                        <!-- Video Details -->
-                        <div>
-                            <a href="{{ video.url }}" target="_blank" style="font-size: 16px; font-weight: bold; color: #3498db; text-decoration: none;">
+                    <div style="width: 300px; background-color: #fff; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
+                        <!-- 썸네일 -->
+                        <a href="{{ video.url }}" target="_blank" style="text-decoration: none; color: inherit;">
+                            <img src="{{ video.thumbnail }}" alt="Thumbnail" style="width: 100%; height: 180px; object-fit: cover;">
+                        </a>
+                        <!-- 동영상 정보 -->
+                        <div style="padding: 15px;">
+                            <a href="{{ video.url }}" target="_blank" style="font-size: 16px; font-weight: bold; color: #333; text-decoration: none; display: block; margin-bottom: 10px;">
                                 {{ video.title }}
                             </a>
-                            <p style="margin: 5px 0;">조회수: {{ video.views }}</p>
-                            <p style="margin: 5px 0;">업로드 날짜: {{ video.upload_date|date:"Y-m-d H:i" }}</p>
-                            <p style="margin: 5px 0; color: #555;">채널 이름: {{ video.channel_name }}</p>
+                            <p style="margin: 0; font-size: 14px; color: #777;">조회수: {{ video.views }}</p>
+                            <p style="margin: 0; font-size: 14px; color: #777;">업로드: {{ video.upload_date|date:"Y년 m월 d일" }}</p>
+                            <p style="margin: 0; font-size: 14px; color: #777;">채널: {{ video.channel_name }}</p>
                         </div>
-                    </li>
+                    </div>
                 {% endfor %}
-            </ul>
+            </div>
         {% else %}
             <p style="color: #999; margin-top: 20px;">관련된 동영상이 없습니다.</p>
         {% endif %}
     </div>
+
 
     <!-- 뒤로가기 -->
     <p style="margin-top: 20px;">
@@ -142,29 +143,68 @@
     </style>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
+            // 중복 동영상 가져오기
+            const relatedVideosContainer = document.querySelector('.related-videos');
+            if (relatedVideosContainer) {
+                fetch('/account/related-duplicates/?url={{ video.url }}')
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log("DEBUG: 중복 동영상 API 응답", data);
+
+                        if (data.duplicates && data.duplicates.length > 0) {
+                            let html = '<h3 style="margin-top: 20px;">중복된 관련 동영상</h3><ul style="list-style-type: none; padding: 0;">';
+                            data.duplicates.forEach(video => {
+                                html += `
+                                    <li style="margin-bottom: 20px; display: flex; align-items: center;">
+                                        <div style="flex-shrink: 0; margin-right: 10px;">
+                                            <img src="${video.thumbnail}" alt="Thumbnail" style="width: 120px; height: 80px; object-fit: cover;">
+                                        </div>
+                                        <div>
+                                            <a href="${video.url}" target="_blank" style="font-size: 16px; font-weight: bold; color: #3498db; text-decoration: none;">
+                                                ${video.title}
+                                            </a>
+                                            <p style="margin: 5px 0;">조회수: ${video.views}</p>
+                                            <p style="margin: 5px 0;">업로드 날짜: ${new Date(video.upload_date).toLocaleString()}</p>
+                                            <p style="margin: 5px 0; color: #555;">채널 이름: ${video.channel_name}</p>
+                                        </div>
+                                    </li>`;
+                            });
+                            html += '</ul>';
+                            relatedVideosContainer.innerHTML = html;
+                        } else {
+                            relatedVideosContainer.innerHTML = '<p style="color: #999; margin-top: 20px;">관련된 중복 동영상이 없습니다.</p>';
+                        }
+                    })
+                    .catch(error => console.error("DEBUG: API 호출 오류", error));
+            }
+
+            // 첫 번째 키워드 탭 클릭
             const firstKeyword = document.querySelector('.keyword-tab');
             if (firstKeyword) {
                 firstKeyword.click();
             }
-        
+
+            // 별점 평가 로직
             const stars = document.querySelectorAll('.star');
             const ratingDisplay = document.getElementById('selected-rating');
-            
-            stars.forEach(star => {
-                star.addEventListener('click', function() {
-                    const rating = this.dataset.rating;
-                    ratingDisplay.textContent = rating;
-                    
-                    stars.forEach(s => {
-                        s.classList.remove('active');
-                        if (s.dataset.rating <= rating) {
-                            s.classList.add('active');
-                        }
+            if (stars.length > 0 && ratingDisplay) {
+                stars.forEach(star => {
+                    star.addEventListener('click', function () {
+                        const rating = this.dataset.rating;
+                        ratingDisplay.textContent = rating;
+
+                        stars.forEach(s => {
+                            s.classList.remove('active');
+                            if (s.dataset.rating <= rating) {
+                                s.classList.add('active');
+                            }
+                        });
                     });
                 });
-            });
+            }
         });
     </script>
+
 
 {% endblock %}

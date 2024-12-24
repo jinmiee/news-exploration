@@ -529,16 +529,22 @@ def extract_duplicates_for_chart():
     except Exception as e:
         print(f"차트 중복 동영상 추출 오류: {e}")
 
+from fuzzywuzzy import fuzz
+from datetime import timedelta
+
 def get_related_duplicate_videos(request):
     try:
+        # 요청에서 URL을 가져옵니다.
         video_url = request.GET.get('url')
         if not video_url:
             return JsonResponse({"error": "URL 매개변수가 제공되지 않았습니다."}, status=400)
 
+        # WeeklyIssue 또는 Chart에서 해당 URL과 일치하는 동영상 가져오기
         video = WeeklyIssue.objects.filter(url=video_url).first() or Chart.objects.filter(url=video_url).first()
         if not video:
             return JsonResponse({"error": "해당 URL에 대한 기사를 찾을 수 없습니다."}, status=404)
 
+        # 중복 동영상 모델 선택
         if WeeklyIssue.objects.filter(url=video_url).exists():
             duplicates_model = WeeklyIssueDuplicateVideo
         elif Chart.objects.filter(url=video_url).exists():
@@ -546,15 +552,19 @@ def get_related_duplicate_videos(request):
         else:
             return JsonResponse({"error": "데이터 유형을 확인할 수 없습니다."}, status=400)
 
-        duplicates = duplicates_model.objects.filter(
-            title__icontains=video.title
-        )
+        # 중복 검색 (유사도 + 업로드 날짜 범위 기준)
+        duplicates = []
+        for candidate in duplicates_model.objects.all():
+            similarity = fuzz.ratio(video.title, candidate.title)
+            if similarity > 70 : # 유사도가 70% 이상이고 업로드 날짜가 하루 이내인 경우
+                duplicates.append(candidate)
 
-        # Debugging: Print duplicate count and details
-        print(f"DEBUG: 중복 동영상 개수: {duplicates.count()}")
+        # 디버깅 로그 출력
+        print(f"DEBUG: 중복 동영상 개수: {len(duplicates)}")
         for duplicate in duplicates:
-            print(f"중복 동영상: {duplicate.title}, URL: {duplicate.url}")
+            print(f"중복 동영상: {duplicate.title}, URL: {duplicate.url}, 유사도: {similarity}")
 
+        # JSON 응답 생성
         duplicate_list = [
             {
                 "title": duplicate.title,
