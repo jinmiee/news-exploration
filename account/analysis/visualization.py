@@ -113,6 +113,7 @@ def generate_network_graph(G, node_clusters=None):
         plt.figure(figsize=(16, 12), facecolor='none')
         ax = plt.gca()
         ax.set_facecolor('none')
+
         
         # 노드 위치 계산 (매번 다른 레이아웃)
         pos = nx.spring_layout(G, k=2, iterations=100, 
@@ -125,7 +126,7 @@ def generate_network_graph(G, node_clusters=None):
         
         for node in nodes:
             # 노드 크기: 연결 수 + 가중치
-            size = (G.degree(node) + 1) * 500
+            size = (G.degree(node) + 1) * 1000
             node_sizes.append(size)
             
             # 노드 색상: 클러스터별 구분
@@ -172,12 +173,6 @@ def generate_network_graph(G, node_clusters=None):
                               font_size=12,
                               font_weight='bold',
                               font_color='white')
-        
-        plt.title('연관어 키워드 네트워크',
-                 fontdict={'family': plt.rcParams['font.family'],
-                          'size': 24,
-                          'weight': 'bold'},
-                 pad=50)
         
         plt.axis('off')
         plt.tight_layout(pad=20)

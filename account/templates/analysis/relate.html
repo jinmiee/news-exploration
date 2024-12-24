@@ -13,6 +13,7 @@
         <div class="content-wrapper">
             <!-- 왼쪽: 네트워크 그래프 -->
             <div class="left-section">
+                <h2 class="section-title">연관어 키워드 TOP 20</h2>
                 <div class="network-graph">
                     <img src="data:image/png;base64,{{ network_graph }}" alt="연관어 네트워크 그래프" class="responsive-image">
                 </div>
@@ -142,12 +143,14 @@
     flex: 0.7;
     display: flex;
     flex-direction: column;
+    padding-top: 2.5rem;
 }
 
 .network-graph {
     width: 100%;
     background-color: rgba(245, 245, 245, 0.8);
     border-radius: 8px;
+    margin-top: 1rem;
 }
 
 .network-graph img {
@@ -399,6 +402,31 @@
     margin: 0 auto;
     display: block;
     border-radius: 8px;
+}
+
+.section-title {
+    text-align: center;
+    margin: 2rem;
+    color: #333;
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.right-section {
+    flex: 0.3;
+    margin: 20px 0 0 0;
+}
+
+.word-pairs h2 {
+    margin-bottom: 1.5rem;
+    color: #333;
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.word-pairs table th,
+.word-pairs table td {
+    text-align: center;
 }
 </style>
 
