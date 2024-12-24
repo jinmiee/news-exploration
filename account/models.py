@@ -92,6 +92,7 @@ class WeeklyIssue(models.Model):
     class Meta:
         db_table = "weekly_issues"  # MongoDB 컬렉션 이름
 
+
 class Chart(models.Model):
     _id = models.ObjectIdField(primary_key=True, default=ObjectId)  # MongoDB ObjectId를 기본 키로 설정
     chart_date = models.DateTimeField()  # 차트 생성 날짜
@@ -120,3 +121,13 @@ class Chart(models.Model):
 
     class Meta:
         db_table = "chart"  # MongoDB 컬렉션 이름
+
+class Feedbacks(models.Model):
+    _id = models.ObjectIdField(primary_key=True, default=ObjectId)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    rating = models.PositiveBigIntegerField()
+    feedback = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "feedbacks"  # MongoDB 컬렉션 이름

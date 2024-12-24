@@ -414,7 +414,19 @@ def detail(request):
         if similarity_scores[i] > threshold and i != target_index
     ]
 
+    ####피드백 폼 처리
+    if request.method == 'POST':
+        feedback_form = FeedbackForm(request.POST)
+        if feedback_form.is_valid():
+            feedback = feedback_form.save(commit=False)
+            feedback.user = request.user
+            feedback.save()
+            return redirect('/account/feedback_done/')
+    else:
+        feedback_form = FeedbackForm()
+
     context = {
+        'form': feedback_form,
         'video': video,
         'video_id': video_id,
         'video_url': video_url,
@@ -661,10 +673,6 @@ def get_performance_metrics(request):
 
 
 
-
-
-
-
 @login_required
 def mypage(request):
     return render(request, 'analysis/mypage/mypage.html', {'section': 'mypage'}) 
@@ -766,3 +774,23 @@ def find_password(request):
     
     return render(request, 'registration/find_password.html', {"error": error})
 
+
+from django.shortcuts import render, redirect
+from .models import Feedbacks 
+from .forms import FeedbackForm
+def feedback(request):
+    if request.method == 'POST':
+        feedback_form = FeedbackForm(request.POST)
+        if feedback_form.is_valid():
+            feedback = feedback_form.save(commit=False)
+            feedback.user = request.user
+            feedback.save()
+            return redirect('feedback_done')
+    else:
+        feedback_form = FeedbackForm()
+    return render(request, 'feedback/feedback.html', {'feedback_form': feedback_form})
+
+
+
+def feedback_done(request):
+    return render(request, 'feedback/feedback_done.html')
