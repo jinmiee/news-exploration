@@ -16,23 +16,14 @@
                 <div class="network-graph">
                     <img src="data:image/png;base64,{{ network_graph }}" alt="연관어 네트워크 그래프" class="responsive-image">
                 </div>
-                <button id="loadPerformanceBtn" class="performance-btn">클러스터링 품질 평가 보기</button>
-                
-                <!-- 성능 평가 섹션 -->
-                <div id="performanceMetricsSection" class="performance-metrics-section" style="display: none;">
-                    <h2>연관어 클러스터링 품질 평가</h2>
-                    <div class="performance-graph">
-                        <div id="loadingSpinner" class="loading-spinner">
-                            <div class="spinner"></div>
-                            <p>분석 중입니다...</p>
-                        </div>
-                        <div id="performanceError" style="display: none;" class="error-message">
-                            <p>성능 평가 데이터를 불러오는데 실패했습니다.</p>
-                            <button onclick="retryLoadPerformance()">다시 시도</button>
-                        </div>
-                        <img id="performanceGraph" style="display: none;" alt="실루엣 분석 그래프" class="responsive-image">
-                    </div>
-                </div>
+            </div>
+
+            <!-- 실루엣 분석 섹션 추가 -->
+            <div class="silhouette-section">
+                {% if silhouette_graph %}
+                    <h2>클러스터링 실루엣 분석</h2>
+                    <img src="data:image/png;base64,{{ silhouette_graph }}" alt="실루엣 분석 그래프" class="responsive-image">
+                {% endif %}
             </div>
 
             <!-- 오른쪽: 상위 연관어 쌍 -->
@@ -384,37 +375,25 @@
     font-size: 1.1rem;
 }
 
-.performance-metrics-section {
-    margin: 3rem 0;
-    padding: 2rem;
+.silhouette-section {
+    margin: 2rem 0;
+    padding: 1rem;
     background-color: #ffffff;
     border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    overflow-x: auto;
 }
 
-.performance-metrics-section h2 {
+.silhouette-section h2 {
     text-align: center;
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
     color: #333;
-    font-size: 1.8rem;
-    font-family: 'Malgun Gothic', sans-serif;
+    font-size: 1.5rem;
 }
 
-.performance-graph {
-    width: 100%;
-    max-width: 1600px;
-    margin: 0 auto;
-    background-color: white;
-    padding: 1rem;
-    border-radius: 8px;
-}
-
-.performance-graph img {
+.silhouette-section img {
     width: 100%;
     height: auto;
     border-radius: 8px;
-    min-width: 1200px;
 }
 </style>
 
@@ -441,69 +420,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     });
-
-    // 성능 평가 로딩 함수 개선
-    function loadPerformanceMetrics() {
-        const performanceSection = document.getElementById('performanceMetricsSection');
-        const loadingSpinner = document.getElementById('loadingSpinner');
-        const performanceGraph = document.getElementById('performanceGraph');
-        const performanceError = document.getElementById('performanceError');
-        const btn = document.getElementById('loadPerformanceBtn');
-
-        // 이미 로드된 경우 토글
-        if (performanceSection.style.display !== 'none' && performanceGraph.src) {
-            performanceSection.style.display = 'none';
-            btn.textContent = '클러스터링 품질 평가 보기';
-            return;
-        }
-
-        // 새로 로드하는 경우
-        performanceSection.style.display = 'block';
-        loadingSpinner.style.display = 'block';
-        performanceGraph.style.display = 'none';
-        performanceError.style.display = 'none';
-        btn.disabled = true;
-        btn.textContent = '분석 중...';
-
-        // AJAX 요청에 타임아웃 추가
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30초 타임아웃
-
-        fetch(`/account/analysis/get_performance_metrics/?url={{ video.url }}`, {
-            signal: controller.signal
-        })
-            .then(response => {
-                if (!response.ok) throw new Error('서버 응답 오류');
-                return response.json();
-            })
-            .then(data => {
-                if (data.performance_graph) {
-                    performanceGraph.src = 'data:image/png;base64,' + data.performance_graph;
-                    performanceGraph.style.display = 'block';
-                    btn.textContent = '클러스터링 품질 평가 숨기기';
-                } else {
-                    throw new Error('성능 평가 데이터가 없습니다.');
-                }
-            })
-            .catch(error => {
-                console.error('성능 평가 로딩 오류:', error);
-                performanceError.style.display = 'block';
-                btn.textContent = '클러스터링 품질 평가 보기';
-            })
-            .finally(() => {
-                clearTimeout(timeoutId);
-                loadingSpinner.style.display = 'none';
-                btn.disabled = false;
-            });
-    }
-
-    // 재시도 함수
-    function retryLoadPerformance() {
-        document.getElementById('performanceError').style.display = 'none';
-        loadPerformanceMetrics();
-    }
-
-    document.getElementById('loadPerformanceBtn').addEventListener('click', loadPerformanceMetrics);
 });
 
 function showCategory(keyword) {

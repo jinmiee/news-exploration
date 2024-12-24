@@ -26,7 +26,7 @@ matplotlib.use('Agg')
 from django.utils.timezone import localtime, utc
 
 
-from .analysis.relate_analysis import analyze_related_words, generate_network_graph, visualize_performance_metrics
+from .analysis.relate_analysis import analyze_related_words, generate_network_graph
 from .analysis.emotion_analysis import (
     generate_wordcloud,
     generate_pie_chart,
@@ -41,6 +41,8 @@ from pymongo import MongoClient
 from pymongo.errors import DuplicateKeyError
 from django.utils.timezone import localtime
 from datetime import timedelta
+
+from .analysis.visualization import visualize_performance_metrics
 
 def save_top_videos(start_time, end_time, model):
     """
@@ -578,7 +580,7 @@ def relate(request):
             # 키워드별 관련 뉴스 분류
             categorized_news = {}
             if important_keywords:
-                for keyword in important_keywords[:10]:  # 상위 5개 키워드만 처리
+                for keyword in important_keywords[:10]:  # 상위 10개 키워드만 처리
                     related_news = YouTubeData.objects.filter(
                         Q(title__icontains=keyword) | 
                         Q(desc__icontains=keyword)
@@ -622,38 +624,7 @@ def relate(request):
 
 
 
-def get_performance_metrics(request):
-    try:
-        video_url = request.GET.get('url')
-        video = YouTubeData.objects.filter(url=video_url).first()
-        
-        if not video:
-            return JsonResponse({'error': '비디오를 찾을 수 없습니다.'}, status=404)
-        
-        # 캐시 키 생성
-        cache_key = f'performance_metrics_{video.url}'
-        
-        # 캐시된 결과가 있는지 확인
-        from django.core.cache import cache
-        cached_result = cache.get(cache_key)
-        
-        if cached_result:
-            return JsonResponse({'performance_graph': cached_result})
-            
-        # 성능 평가 그래프 생성
-        performance_graph = visualize_performance_metrics()
-        
-        if not performance_graph:
-            return JsonResponse({'error': '성능 평가 데이터를 생성할 수 없습니다.'}, status=500)
-            
-        # 결과 캐시에 저장 (1시간)
-        cache.set(cache_key, performance_graph, 3600)
-        
-        return JsonResponse({
-            'performance_graph': performance_graph
-        })
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+
 
 
 

@@ -22,8 +22,10 @@ from django.db.models import Q
 from time import time
 import pandas as pd
 from .visualization import generate_network_graph, visualize_performance_metrics
-from django.http import JsonResponse
 import psutil
+import matplotlib.pyplot as plt
+import base64
+from io import BytesIO
 
 
 
@@ -49,18 +51,6 @@ COMMON_WORDS = {
     '관계', '정도', '상황', '결과', '내용', '의견', '사실', '기준', '이후',
     '최근', '기존', '향후', '대부분', '일부', '전체', '기타', '가운데', '간주'
 }
-
-# 성능 메트릭을 저장할 전역 변수를 딕셔너리 리스트로 변경
-performance_metrics = []
-
-def log_performance_metrics(metrics):
-    """성능 지표를 기록하는 함수"""
-    global performance_metrics
-    performance_metrics.append(metrics)
-    
-    # 최근 100개만 유지
-    if len(performance_metrics) > 100:
-        performance_metrics.pop(0)
 
 def load_sbert_model():
     """
@@ -95,7 +85,7 @@ def load_sbert_model():
         logger.info("SBERT와 KoSimCSE 모델 로드 완료")
         return models
     except Exception as e:
-        logger.error(f"모델 로��� 중 오류 발생: {str(e)}")
+        logger.error(f"모델 로드 중 오류 발생: {str(e)}")
         return None
 
 # NLP 모델 로드
@@ -345,9 +335,6 @@ def find_optimal_k(embeddings, max_k=10):
         return 2, embeddings, np.zeros(len(embeddings)), 0.0
 
 def analyze_related_words(video_desc, transcript, clean_title_func=None):
-    start_time = time()
-    initial_memory = psutil.Process().memory_info().rss / 1024 / 1024  # MB 단위
-    
     try:
         print("\n[연관어 분석 시작]")
         
@@ -590,28 +577,8 @@ def analyze_related_words(video_desc, transcript, clean_title_func=None):
         # 클러스터링 수행
         if G.number_of_nodes() > 1:
             node_embeddings = nlp_models['sbert'].encode(list(G.nodes()))
-            
-            # 클러스터링 및 ���능 평가
             optimal_k, reduced_embeddings, labels, sil_score = find_optimal_k(node_embeddings)
-            
-            # 성능 메트릭 기록
-            end_time = time()
-            metrics = {
-                'timestamp': pd.Timestamp.now(),
-                'processing_time': round(end_time - start_time, 2),
-                'memory_usage': round(psutil.Process().memory_info().rss / 1024 / 1024 - initial_memory, 2),
-                'keyword_count': len(keywords),
-                'silhouette_score': float(sil_score),
-                'cluster_count': optimal_k,
-                'data_size': len(node_embeddings),
-                'edge_count': G.number_of_edges()
-            }
-            
-            log_performance_metrics(metrics)
-            
-            # 그래프 생성
             network_graph = generate_network_graph(G, labels)
-            
         else:
             network_graph = generate_network_graph(G)
             
@@ -621,11 +588,11 @@ def analyze_related_words(video_desc, transcript, clean_title_func=None):
         logger.error(f"연관어 분석 중 오류: {str(e)}")
         return None, None, None, None
 
-def get_memory_usage():
-    """현재 프로세스의 메모리 사용량을 MB 단위로 반환"""
-    import psutil
-    process = psutil.Process()
-    return process.memory_info().rss / 1024 / 1024
+# def get_memory_usage():
+#     """현재 프로세스의 메모리 사용량을 MB 단위로 반환"""
+#     import psutil
+#     process = psutil.Process()
+#     return process.memory_info().rss / 1024 / 1024
 
 def relate(request):
     video_url = request.GET.get('url')
@@ -684,19 +651,16 @@ def relate(request):
                             cleaned_news.append(news)
                         categorized_news[keyword] = cleaned_news
             
-            # 성능 메트릭 시각화 추가
-            performance_graph = visualize_performance_metrics(performance_metrics)
-            
             context = {
                 'section': 'relate',
                 'video': video,
                 'video_title': cleaned_title,
                 'network_graph': network_graph,
+                'silhouette_graph': performance_graph,
                 'top_pairs': top_pairs,
                 'categorized_news': categorized_news,
                 'important_keywords': important_keywords,
-                'transcript_segments': transcript_segments,
-                'performance_graph': performance_graph
+                'transcript_segments': transcript_segments
             }
         except Exception as e:
             print(f"분석 중 오류 발생: {str(e)}")
@@ -712,34 +676,3 @@ def relate(request):
     
     return render(request, 'analysis/relate.html', context)
 
-def get_performance_metrics(request):
-    """성능 메트릭 데이터를 환하는 API 엔드포인트"""
-    try:
-        global performance_metrics
-        
-        # 성능 메트릭이 없는 경우
-        if not performance_metrics:
-            return JsonResponse({
-                'error': '성능 평가 데이터가 없습니다.'
-            }, status=404)
-            
-        # 성능 메트릭 시각화
-        graph = visualize_performance_metrics(performance_metrics)
-        
-        if graph is None:
-            return JsonResponse({
-                'error': '성능 평가 그래프 생성에 실패했습니다.'
-            }, status=500)
-            
-        return JsonResponse({
-            'success': True,
-            'performance_graph': graph
-        })
-        
-    except Exception as e:
-        logger.error(f"성능 메트릭 API 오류: {str(e)}")
-        import traceback
-        logger.error(traceback.format_exc())
-        return JsonResponse({
-            'error': '성능 메트릭을 가져오는 중 오류가 발생했습니다.'
-        }, status=500)

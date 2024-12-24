@@ -19,7 +19,6 @@ from django.urls import path, include
 from django.contrib.auth import views as auth_views
 from . import views
 from django.urls import reverse_lazy
-from .analysis.relate_analysis import get_performance_metrics
 
 
 
@@ -48,7 +47,6 @@ urlpatterns = [
 
     path('signup/', views.register, name='signup'),
     path('find-password/', views.find_password, name='find_password'),
-    path('analysis/get_performance_metrics/', get_performance_metrics, name='get_performance_metrics'),
     
 
 ]

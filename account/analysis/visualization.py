@@ -1,8 +1,8 @@
-import networkx as nx
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.font_manager
+import networkx as nx
 from io import BytesIO
 import base64
 import logging
@@ -197,62 +197,34 @@ def generate_network_graph(G, node_clusters=None):
         logger.error(traceback.format_exc())
         return None
 
-def visualize_performance_metrics(metrics_list):
-    """성능 메트릭 시각화"""
+def visualize_performance_metrics(reduced_embeddings, cluster_labels):
+    """
+    클러스터링 성능 시각화 (실루엣 분석)
+    """
     try:
-        if not metrics_list:
-            logger.warning("성능 메트릭 데이터가 없습니다.")
-            return None
+        plt.figure(figsize=(10, 6))
+        silhouette_vals = silhouette_samples(reduced_embeddings, cluster_labels)
+        
+        y_lower = 10
+        for i in range(max(cluster_labels) + 1):
+            cluster_silhouette_vals = silhouette_vals[cluster_labels == i]
+            cluster_silhouette_vals.sort()
+            cluster_size = cluster_silhouette_vals.shape[0]
+            y_upper = y_lower + cluster_size
+
+            plt.fill_betweenx(np.arange(y_lower, y_upper),
+                            0, cluster_silhouette_vals,
+                            alpha=0.7)
             
-        # 리스트를 DataFrame으로 변환
-        df = pd.DataFrame(metrics_list)
+            y_lower = y_upper + 10
+
+        plt.title("실루엣 분석 결과", fontsize=14, pad=20)
+        plt.xlabel("실루엣 계수")
+        plt.ylabel("클러스터")
         
-        # 시간순 정렬
-        df = df.sort_values('timestamp')
-        
-        plt.figure(figsize=(15, 10), facecolor='white')
-        
-        # 처리 시간 추이
-        plt.subplot(2, 2, 1)
-        plt.plot(df['timestamp'], df['processing_time'], 'b-', 
-                linewidth=2, color='#2196F3')
-        plt.title('처리 시간 추이', fontsize=12, pad=10)
-        plt.xlabel('분석 시간', fontsize=10)
-        plt.ylabel('처리 시간(초)', fontsize=10)
-        plt.xticks(rotation=45)
-        
-        # 메모리 사용량 추이
-        plt.subplot(2, 2, 2)
-        plt.plot(df['timestamp'], df['memory_usage'], '-', 
-                linewidth=2, color='#4CAF50')
-        plt.title('메모리 사용량 추이', fontsize=12, pad=10)
-        plt.xlabel('분석 시간', fontsize=10)
-        plt.ylabel('메모리(MB)', fontsize=10)
-        plt.xticks(rotation=45)
-        
-        # 키워드 수 분포
-        plt.subplot(2, 2, 3)
-        plt.hist(df['keyword_count'], bins=20, color='#42A5F5', 
-                edgecolor='white')
-        plt.title('키워드 수 분포', fontsize=12, pad=10)
-        plt.xlabel('키워드 수', fontsize=10)
-        plt.ylabel('빈도', fontsize=10)
-        
-        # 실루엣 점수 추이
-        plt.subplot(2, 2, 4)
-        plt.plot(df['timestamp'], df['silhouette_score'], '-', 
-                linewidth=2, color='#F44336')
-        plt.title('실루엣 점수 추이', fontsize=12, pad=10)
-        plt.xlabel('분석 시간', fontsize=10)
-        plt.ylabel('실루엣 점수', fontsize=10)
-        plt.xticks(rotation=45)
-        
-        plt.tight_layout(pad=3.0)
-        
-        # 이미지 저장
+        # 이미지를 바이트 스트림으로 변환
         buffer = BytesIO()
-        plt.savefig(buffer, format='png', dpi=300, bbox_inches='tight',
-                   facecolor='white', edgecolor='none')
+        plt.savefig(buffer, format='png', bbox_inches='tight', dpi=300)
         buffer.seek(0)
         image_png = buffer.getvalue()
         buffer.close()
@@ -261,6 +233,6 @@ def visualize_performance_metrics(metrics_list):
         return base64.b64encode(image_png).decode('utf-8')
         
     except Exception as e:
-        logger.error(f"성능 메트릭 시각화 중 오류: {str(e)}")
+        logger.error(f"성능 지표 시각화 중 오류: {str(e)}")
         return None
   
