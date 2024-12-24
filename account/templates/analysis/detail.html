@@ -39,19 +39,8 @@
         </div>
     </div>
 
-
-
-    
-        
-    <form method="POST">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button type="submit">Submit Feedback</button>
-    </form>
-    
-    
-
-  
+    <!-- feedback 파트 -->
+    {% include "feedback/feedback_form.html" %}
 
     <!-- 관련 기사 섹션 -->
     <div style="margin-top: 40px;">

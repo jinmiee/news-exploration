@@ -34,6 +34,7 @@ urlpatterns = [
     path('', views.chart, name='chart'),
     path('video-details/', views.video_details, name='video_details'),
     path('detail/', views.detail, name='detail'),
+    path('feedback/', views.submit_feedback, name='submit_feedback'),
     path('feedback_done/', views.feedback_done, name='feedback_done'),
 
     path('weekly-issues/', views.weekly_issues, name='weekly_issues'),
