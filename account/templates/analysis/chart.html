@@ -34,7 +34,7 @@
                         </a>
                         {% if user.is_authenticated %}
                         <button class="like-button" data-id="{{ item.id }}" onclick="likeVideo('{{ item.id }}')">
-                            {% if item.is_liked_by_user %}
+                            {% if item.is_liked %}
                                 ❤️
                             {% else %}
                                 ♡
@@ -226,6 +226,7 @@
         });
     });
 
+
     document.addEventListener('DOMContentLoaded', function() {
         const sidebar = document.getElementById("sidebar");
         const newsTitles = document.querySelectorAll(".news-title");
@@ -305,6 +306,7 @@
         };
     });
 
+    
     document.addEventListener("DOMContentLoaded", function () {
         const likeButtons = document.querySelectorAll(".like-button");
         const modal = document.getElementById("login-modal");
