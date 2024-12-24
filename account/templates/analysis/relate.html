@@ -21,7 +21,7 @@
 
             <!-- 오른쪽: 상위 연관어 쌍 -->
             <div class="right-section">
-                <div class="word-pairs">
+                <div class="word-pairs scrollable-word-pairs">
                     <h2>상위 연관어 쌍</h2>
                     <table>
                         <thead>
@@ -33,7 +33,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {% for pair in top_pairs %}
+                            {% for pair in top_pairs|slice:":25" %}
                             <tr>
                                 <td>{{ forloop.counter }}</td>
                                 <td>{{ pair.0.0 }}</td>
@@ -413,9 +413,9 @@
 
 .section-title {
     text-align: center;
-    margin: 30px 0 30px 0;
+    margin: 20px 0 40px 0;
     color: #333;
-    font-size: 50px;
+    font-size: 55px;
     font-weight: bold;
 }
 
