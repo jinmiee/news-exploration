@@ -1,14 +1,20 @@
 from django.apps import AppConfig
 import threading
+from .tasks import start_scheduler
+from django.conf import settings
+import time
 
 class AccountConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'account'
 
     def ready(self):
-        # 스케줄러를 지연 실행
+        # 스케줄러 실행을 설정에 따라 제어
         from django.conf import settings
-        if settings.DEBUG:  # 개발 모드에서만 스케줄러 실행
-            import threading
-            from .tasks import start_scheduler
-            threading.Thread(target=start_scheduler).start()
+        if getattr(settings, 'ENABLE_SCHEDULER', True):
+            def delayed_scheduler():
+                time.sleep(1)  # 1초 지연
+                from .tasks import start_scheduler  # Import를 지연시켜 순환 참조 방지
+                start_scheduler()
+
+            threading.Thread(target=delayed_scheduler, daemon=True).start()

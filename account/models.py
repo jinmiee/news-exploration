@@ -66,7 +66,6 @@ class Like(models.Model):
     def __str__(self):
         return f"{self.user.username} likes {self.youtube_data.title}"
 
-
 class WeeklyIssue(models.Model):
     _id = models.ObjectIdField(primary_key=True, default=ObjectId)
     channel_name = models.CharField(max_length=255)
@@ -79,33 +78,39 @@ class WeeklyIssue(models.Model):
     comments = models.ArrayField(
         model_container=YouTubeComment,
         blank=True,
-        null=False,  # null 값 허용하지 않음
-        default=list  # 기본값을 빈 리스트로 설정
+        null=False,
+        default=list
     )
     transcript = models.ArrayField(
         model_container=Transcript,
         blank=True,
-        null=False,  # null 값을 허용하지 않음
+        null=False,
         default=list
     )
+    desc = models.TextField(blank=True, null=True)  # Add this field
+    likes = models.BigIntegerField(blank=True, null=True)  # Add this field
+    rank = models.IntegerField(blank=True, null=True)  # Add this field
 
     class Meta:
-        db_table = "weekly_issues"  # MongoDB 컬렉션 이름
+        db_table = "weekly_issues"
+        indexes = [
+            models.Index(fields=['title']),  # title 필드에 인덱스 추가
+            models.Index(fields=['url']),    # url 필드에 인덱스 추가
+        ]
 
 
 class Chart(models.Model):
-    _id = models.ObjectIdField(primary_key=True, default=ObjectId)  # MongoDB ObjectId를 기본 키로 설정
-    chart_date = models.DateTimeField()  # 차트 생성 날짜
-    rank = models.IntegerField()  # 순위
-    channel_name = models.CharField(max_length=255)  # 채널 이름
-    title = models.TextField()  # 동영상 제목
-    views = models.BigIntegerField()  # 조회수
-    upload_date = models.DateTimeField()  # 업로드 날짜
-    url = models.URLField(unique=True)  # 동영상 URL
-    channel = models.CharField(max_length=255)  # 채널 제목
-    desc = models.TextField(blank=True, null=True)  # 동영상 설명
-    likes = models.BigIntegerField(blank=True, null=True)  # 좋아요 수
-    thumbnail = models.URLField(blank=True, null=True)  # 썸네일 URL
+    _id = models.ObjectIdField(primary_key=True, default=ObjectId)
+    rank = models.IntegerField()
+    channel_name = models.CharField(max_length=255)
+    title = models.TextField()
+    views = models.BigIntegerField()
+    upload_date = models.DateTimeField()
+    url = models.URLField(unique=True)
+    channel = models.CharField(max_length=255)
+    desc = models.TextField(blank=True, null=True)
+    likes = models.BigIntegerField(blank=True, null=True)
+    thumbnail = models.URLField(blank=True, null=True)
     comments = models.ArrayField(
         model_container=YouTubeComment,
         blank=True,
@@ -120,7 +125,11 @@ class Chart(models.Model):
     )
 
     class Meta:
-        db_table = "chart"  # MongoDB 컬렉션 이름
+        db_table = "chart"
+        indexes = [
+            models.Index(fields=['title']),  # 텍스트 인덱스는 유지
+        ]
+
 
 class Feedbacks(models.Model):
     _id = models.ObjectIdField(primary_key=True, default=ObjectId)
@@ -131,3 +140,59 @@ class Feedbacks(models.Model):
 
     class Meta:
         db_table = "feedbacks"  # MongoDB 컬렉션 이름
+
+
+class TranscriptItem(models.Model):  # ArrayField에 사용할 모델
+    start = models.FloatField()  # 시작 시간
+    text = models.TextField()  # 텍스트 내용
+
+    class Meta:
+        abstract = True  # 데이터베이스에 직접 테이블을 생성하지 않음
+
+class ChartDuplicateVideo(models.Model):
+    _id = models.ObjectIdField(primary_key=True, default=ObjectId)
+    title = models.TextField()
+    url = models.URLField(unique=True)
+    views = models.BigIntegerField()
+    upload_date = models.DateTimeField()
+    channel_name = models.CharField(max_length=255)
+    thumbnail = models.URLField(blank=True, null=True)
+    likes = models.BigIntegerField(blank=True, null=True)
+    transcript = models.ArrayField(
+        model_container=TranscriptItem,  # 수정된 부분
+        blank=True,
+        null=False,
+        default=list
+    )
+
+    class Meta:
+        db_table = "chart_duplicate_videos"
+        indexes = [
+            models.Index(fields=['title']),
+            models.Index(fields=['upload_date']),
+            models.Index(fields=['views']),
+        ]
+
+class WeeklyIssueDuplicateVideo(models.Model):
+    _id = models.ObjectIdField(primary_key=True, default=ObjectId)
+    title = models.TextField()
+    url = models.URLField(unique=True)
+    views = models.BigIntegerField()
+    upload_date = models.DateTimeField()
+    channel_name = models.CharField(max_length=255)
+    thumbnail = models.URLField(blank=True, null=True)
+    likes = models.BigIntegerField(blank=True, null=True)
+    transcript = models.ArrayField(
+        model_container=TranscriptItem,  # 수정된 부분
+        blank=True,
+        null=False,
+        default=list
+    )
+
+    class Meta:
+        db_table = "weekly_issue_duplicate_videos"
+        indexes = [
+            models.Index(fields=['title']),
+            models.Index(fields=['upload_date']),
+            models.Index(fields=['channel_name']),
+        ]

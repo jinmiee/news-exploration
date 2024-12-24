@@ -15,7 +15,7 @@ from bson import ObjectId
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 from .forms import UserRegistrationForm
-from .models import YouTubeData, Like, WeeklyIssue, Chart
+from .models import YouTubeData, Like, WeeklyIssue, Chart, WeeklyIssueDuplicateVideo, ChartDuplicateVideo
 from urllib.parse import urlparse, parse_qs
 
 from pytz import timezone
@@ -72,7 +72,6 @@ def save_top_videos(start_time, end_time, model):
                 model.objects.update_or_create(
                     _id=video_id,  # MongoDB ObjectId
                     defaults={
-                        "chart_date": localtime(),
                         "rank": rank,
                         "channel_name": video.channel_name,
                         "title": video.title,
@@ -138,7 +137,7 @@ def delete_expired_charts():
         expiration_time = now - timedelta(hours=24)
 
         # 24시간 이전의 데이터를 필터링하여 삭제
-        expired_charts = Chart.objects.filter(chart_date__lt=expiration_time)
+        expired_charts = Chart.objects.filter(upload_date__lt=expiration_time)
         deleted_count, _ = expired_charts.delete()
 
         logger.info(f"{deleted_count}개의 24시간 지난 Chart 데이터가 삭제되었습니다.")
@@ -153,30 +152,30 @@ def chart(request):
         now = localtime()
 
         # 기준 시간 설정
-        if now.hour < 11:
+        if now.hour < 11:  # 현재 시간이 오전 11시 이전
+            analysis_start = (now - timedelta(days=1)).replace(hour=11, minute=0, second=0, microsecond=0)
+            analysis_end = (now - timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)
+        elif now.hour < 23:  # 현재 시간이 오전 11시 이후, 오늘 오후 11시 이전
             analysis_start = (now - timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)
             analysis_end = now.replace(hour=11, minute=0, second=0, microsecond=0)
-        elif now.hour < 23:
+        else:  # 현재 시간이 오후 11시 이후
             analysis_start = now.replace(hour=11, minute=0, second=0, microsecond=0)
             analysis_end = now.replace(hour=23, minute=0, second=0, microsecond=0)
-        else:
-            analysis_start = now.replace(hour=23, minute=0, second=0, microsecond=0)
-            analysis_end = (now + timedelta(days=1)).replace(hour=11, minute=0, second=0, microsecond=0)
 
         analysis_start_utc = analysis_start.astimezone(utc)
         analysis_end_utc = analysis_end.astimezone(utc)
 
         # MongoDB에서 데이터 필터링
         chart_data = Chart.objects.filter(
-            chart_date__gte=analysis_start_utc,
-            chart_date__lt=analysis_end_utc
+            upload_date__gte=analysis_start_utc,
+            upload_date__lt=analysis_end_utc
         )
         chart_data = sorted(chart_data, key=lambda x: x.rank)
 
         # QuerySet 개수를 확인하려면 .count()를 사용
         print("DEBUG: QuerySet count before sorting:", Chart.objects.filter(
-            chart_date__gte=analysis_start_utc,
-            chart_date__lt=analysis_end_utc
+            upload_date__gte=analysis_start_utc,
+            upload_date__lt=analysis_end_utc
         ).count())
 
         # 리스트의 길이를 확인하려면 len()을 사용
@@ -213,6 +212,7 @@ def chart(request):
         print(f"Error in chart function: {e}")
         print(traceback.format_exc())
         return JsonResponse({"error": str(e)}, status=500)
+
 
 @csrf_exempt  # CSRF 검사 비활성화(POST 요청 허용)
 def video_details(request):
@@ -374,6 +374,205 @@ def weekly_issues(request):
         print(f"Error in weekly_issues function: {e}")
         return JsonResponse({"error": str(e)}, status=500)
 
+def extract_duplicates_for_weekly_issues():
+    """
+    주간 이슈 데이터를 기준으로 중복 동영상을 추출하고 WeeklyIssueDuplicateVideo에 저장.
+    """
+    try:
+        # 1. 데이터 가져오기
+        weekly_videos = list(WeeklyIssue.objects.all())
+        all_videos = list(YouTubeData.objects.all())
+
+        print(f"DEBUG: 주간 이슈 비디오 개수: {len(weekly_videos)}")
+        print(f"DEBUG: 전체 유튜브 데이터 개수: {len(all_videos)}")
+
+        # 2. 텍스트 전처리
+        weekly_corpus = [process_text(video.title, video.transcript or []) for video in weekly_videos]
+        all_corpus = [process_text(video.title, video.transcript or []) for video in all_videos]
+
+        print(f"DEBUG: 주간 이슈 텍스트 전처리 완료. (크기: {len(weekly_corpus)})")
+        print(f"DEBUG: 전체 유튜브 텍스트 전처리 완료. (크기: {len(all_corpus)})")
+
+        # 3. TF-IDF 및 유사도 계산
+        vectorizer = TfidfVectorizer(max_features=5000, stop_words='english')
+        weekly_tfidf_matrix = vectorizer.fit_transform(weekly_corpus)
+        all_tfidf_matrix = vectorizer.transform(all_corpus)
+
+        print("DEBUG: TF-IDF 벡터화 완료.")
+        similarity_matrix = cosine_similarity(all_tfidf_matrix, weekly_tfidf_matrix)
+        print("DEBUG: 유사도 계산 완료.")
+
+        # 4. 중복 판단
+        threshold = 0.6
+        duplicates = set()
+
+        for i, all_video in enumerate(all_videos):
+            for j, weekly_video in enumerate(weekly_videos):
+                similarity = similarity_matrix[i, j]
+
+                # URL 동일성 및 높은 유사도 체크
+                if all_video.url == weekly_video.url or similarity >= 0.9999:
+                    print(
+                        f"DEBUG: 동일 데이터 또는 높은 유사도 - 유튜브 비디오(ID: {all_video._id}, URL: {all_video.url})와 주간 이슈 비디오(ID: {weekly_video._id}, URL: {weekly_video.url}) 유사도: {similarity}")
+                    continue
+
+                # 중복 데이터로 간주할 조건
+                if similarity > threshold:
+                    duplicates.add(all_video._id)
+                    print(
+                        f"DEBUG: 중복 탐지 - 유튜브 비디오(ID: {all_video._id})와 주간 이슈 비디오(ID: {weekly_video._id}) 유사도: {similarity}")
+
+        print(f"DEBUG: 총 {len(duplicates)}개의 중복 비디오를 탐지했습니다.")
+
+        # 5. 중복 동영상 저장
+        for duplicate_id in duplicates:
+            try:
+                duplicate_video = YouTubeData.objects.get(_id=duplicate_id)
+                WeeklyIssueDuplicateVideo.objects.update_or_create(
+                    _id=duplicate_video._id,
+                    defaults={
+                        "title": duplicate_video.title,
+                        "url": duplicate_video.url,
+                        "views": duplicate_video.views,
+                        "upload_date": duplicate_video.upload_date,
+                        "channel_name": duplicate_video.channel_name,
+                        "thumbnail": duplicate_video.thumbnail,
+                        "likes": duplicate_video.likes,
+                        "transcript": duplicate_video.transcript,
+                    }
+                )
+                print(f"DEBUG: 중복 비디오 저장 완료 - 제목: {duplicate_video.title}, URL: {duplicate_video.url}")
+            except Exception as save_error:
+                print(f"ERROR: 중복 비디오 저장 실패 - ID: {duplicate_id}, 오류: {save_error}")
+
+        print(f"주간 이슈 기준 {len(duplicates)}개의 중복 동영상이 저장되었습니다.")
+    except Exception as e:
+        print(f"주간 이슈 중복 동영상 추출 오류: {e}")
+
+def extract_duplicates_for_chart():
+    """
+    차트 데이터를 기준으로 중복 동영상을 추출하고 ChartDuplicateVideo에 저장.
+    """
+    try:
+        # 차트 데이터와 전체 유튜브 데이터 가져오기
+        chart_videos = list(Chart.objects.all())
+        all_videos = list(YouTubeData.objects.all())
+
+        print(f"DEBUG: 차트 비디오 개수: {len(chart_videos)}")
+        print(f"DEBUG: 전체 유튜브 데이터 개수: {len(all_videos)}")
+
+        # 텍스트 전처리
+        chart_corpus = [process_text(video.title, video.transcript or []) for video in chart_videos]
+        all_corpus = [process_text(video.title, video.transcript or []) for video in all_videos]
+
+        print(f"DEBUG: 차트 텍스트 전처리 완료. (크기: {len(chart_corpus)})")
+        print(f"DEBUG: 전체 유튜브 텍스트 전처리 완료. (크기: {len(all_corpus)})")
+
+        # TF-IDF 및 유사도 계산
+        vectorizer = TfidfVectorizer(max_features=5000, stop_words='english')
+        chart_tfidf_matrix = vectorizer.fit_transform(chart_corpus)
+        all_tfidf_matrix = vectorizer.transform(all_corpus)
+
+        print("DEBUG: TF-IDF 벡터화 완료.")
+
+        similarity_matrix = cosine_similarity(all_tfidf_matrix, chart_tfidf_matrix)
+
+        print("DEBUG: 유사도 계산 완료.")
+
+        # 중복 판단
+        threshold = 0.6
+        duplicates = set()
+
+        for i, all_video in enumerate(all_videos):
+            for j, chart_video in enumerate(chart_videos):
+                similarity = similarity_matrix[i, j]
+
+                # URL이 동일한 경우 건너뛰기
+                if all_video.url == chart_video.url:
+                    print(
+                        f"DEBUG: 동일한 URL - 유튜브 비디오(ID: {all_video._id}, URL: {all_video.url})와 차트 비디오(ID: {chart_video._id}, URL: {chart_video.url})")
+                    continue
+
+                # 유사도가 1에 가까운 경우 동일 데이터로 간주하고 건너뛰기
+                if similarity >= 0.9999:
+                    print(
+                        f"DEBUG: 높은 유사도(동일 데이터로 간주) - 유튜브 비디오(ID: {all_video._id}, URL: {all_video.url})와 차트 비디오(ID: {chart_video._id}, URL: {chart_video.url}) 유사도: {similarity}")
+                    continue
+
+                # 중복 데이터로 간주할 조건
+                if similarity > threshold:
+                    duplicates.add(all_video._id)
+                    print(
+                        f"DEBUG: 중복 탐지 - 유튜브 비디오(ID: {all_video._id})와 차트 비디오(ID: {chart_video._id}) 유사도: {similarity}")
+
+        print(f"DEBUG: 총 {len(duplicates)}개의 중복 비디오를 탐지했습니다.")
+
+        # 중복 동영상 저장
+        for duplicate_id in duplicates:
+            duplicate_video = YouTubeData.objects.get(_id=duplicate_id)
+            ChartDuplicateVideo.objects.update_or_create(
+                _id=duplicate_video._id,
+                defaults={
+                    "title": duplicate_video.title,
+                    "url": duplicate_video.url,
+                    "views": duplicate_video.views,
+                    "upload_date": duplicate_video.upload_date,
+                    "channel_name": duplicate_video.channel_name,
+                    "thumbnail": duplicate_video.thumbnail,
+                    "likes": duplicate_video.likes,
+                    "transcript": duplicate_video.transcript,
+                }
+            )
+            print(f"DEBUG: 중복 비디오 저장 완료 - 제목: {duplicate_video.title}, URL: {duplicate_video.url}")
+
+        print(f"차트 기준 {len(duplicates)}개의 중복 동영상이 저장되었습니다.")
+    except Exception as e:
+        print(f"차트 중복 동영상 추출 오류: {e}")
+
+def get_related_duplicate_videos(request):
+    """
+    주간 이슈나 차트의 기사를 기준으로 중복된 동영상을 반환.
+    """
+    try:
+        video_url = request.GET.get('url')  # 사용자가 클릭한 기사의 URL
+        if not video_url:
+            return JsonResponse({"error": "URL 매개변수가 제공되지 않았습니다."}, status=400)
+
+        # 클릭된 기사 데이터 가져오기
+        video = WeeklyIssue.objects.filter(url=video_url).first() or Chart.objects.filter(url=video_url).first()
+        if not video:
+            return JsonResponse({"error": "주어진 URL에 대한 기사를 찾을 수 없습니다."}, status=404)
+
+        # 주간 이슈인지 차트인지 확인
+        if WeeklyIssue.objects.filter(url=video_url).exists():
+            duplicates_model = WeeklyIssueDuplicateVideo
+        elif Chart.objects.filter(url=video_url).exists():
+            duplicates_model = ChartDuplicateVideo
+        else:
+            return JsonResponse({"error": "데이터 유형을 확인할 수 없습니다."}, status=400)
+
+        # 중복 동영상 데이터 가져오기
+        duplicates = duplicates_model.objects.filter(title__icontains=video.title)
+
+        # 중복 동영상 데이터 구성
+        duplicate_list = [
+            {
+                "title": duplicate.title,
+                "url": duplicate.url,
+                "views": duplicate.views,
+                "upload_date": duplicate.upload_date.isoformat(),
+                "channel_name": duplicate.channel_name,
+                "thumbnail": duplicate.thumbnail,
+            }
+            for duplicate in duplicates
+        ]
+
+        return JsonResponse({"duplicates": duplicate_list}, safe=False, status=200)
+
+    except Exception as e:
+        print(f"중복 동영상 검색 오류: {e}")
+        return JsonResponse({"error": "중복 동영상 검색 중 오류가 발생했습니다."}, status=500)
+
 #상세분석
 # @login_required
 def detail(request):
@@ -382,41 +581,32 @@ def detail(request):
 
     # 선택된 비디오 데이터 가져오기
     video = YouTubeData.objects.filter(url=video_url).first()
-    video_views = video.views if video else None
-    video_likes = video.likes if video else None
-    video_comments = video.comments if video else None
-    video_title = video.title if video else None
 
-    # 관련 비디오 처리
-    all_videos = YouTubeData.objects.all()
+    # 비디오 데이터가 없을 경우 처리
+    if not video:
+        return JsonResponse({"error": "해당 URL에 대한 비디오 데이터를 찾을 수 없습니다."}, status=404)
 
-    def process_for_similarity(video_data):
-        title = clean_title(video_data.title)
-        transcript = " ".join([item['text'] for item in video_data.transcript]) if video_data.transcript else ""
-        return f"{title} {transcript}"
+    video_views = video.views
+    video_likes = video.likes
+    video_comments = video.comments
+    video_title = video.title
 
-    # TF-IDF 벡터화
-    corpus = [process_for_similarity(v) for v in all_videos]
-    vectorizer = TfidfVectorizer(max_features=5000, stop_words='english')
-    tfidf_matrix = vectorizer.fit_transform(corpus)
+    # 주간 이슈인지 차트인지 확인
+    if WeeklyIssue.objects.filter(url=video_url).exists():
+        duplicates_model = WeeklyIssueDuplicateVideo
+    elif Chart.objects.filter(url=video_url).exists():
+        duplicates_model = ChartDuplicateVideo
+    else:
+        duplicates_model = None
 
-    target_index = list(all_videos).index(video)
-    similarity_scores = cosine_similarity(tfidf_matrix[target_index:target_index+1], tfidf_matrix).flatten()
-
-    # 유사도가 높은 비디오 필터링
-    threshold = 0.7
-    related_videos = [
-        {
-            "url": v.url,
-            "video_id": v.url.split('v=')[1].split('&')[0],  # 여기서 ID를 추출
-            "thumbnail": v.thumbnail,
-            "title": v.title,
-        }
-        for i, v in enumerate(all_videos)
-        if similarity_scores[i] > threshold and i != target_index
-    ]
-
-    
+    # 중복 동영상 가져오기
+    duplicates = []
+    if duplicates_model:
+        try:
+            duplicates = duplicates_model.objects.filter(title__icontains=video.title)
+        except Exception as e:
+            print(f"Error retrieving duplicates: {e}")
+            duplicates = []
 
     context = {
         'video': video,
@@ -426,7 +616,7 @@ def detail(request):
         'video_views': video_views,
         'video_likes': video_likes,
         'video_comments': video_comments,
-        'related_videos': related_videos,  # 유사한 비디오들
+        'related_videos': duplicates,  # 유사한 비디오들
     }
 
     return render(request, 'analysis/detail.html', context)
