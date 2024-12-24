@@ -453,3 +453,8 @@
     }
 }
 
+/* 실루엣 섹션 스타일 제거 */
+.silhouette-section {
+    display: none;
+}
+

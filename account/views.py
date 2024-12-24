@@ -26,7 +26,7 @@ matplotlib.use('Agg')
 from django.utils.timezone import localtime, utc
 
 
-from .analysis.relate_analysis import analyze_related_words, generate_network_graph
+from .analysis.relate_analysis import analyze_related_words
 from .analysis.emotion_analysis import (
     generate_wordcloud,
     generate_pie_chart,
@@ -42,7 +42,7 @@ from pymongo.errors import DuplicateKeyError
 from django.utils.timezone import localtime
 from datetime import timedelta
 
-from .analysis.visualization import visualize_performance_metrics
+from .analysis.visualization import generate_network_graph
 
 def save_top_videos(start_time, end_time, model):
     """

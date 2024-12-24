@@ -21,7 +21,7 @@ from ..models import YouTubeData
 from django.db.models import Q
 from time import time
 import pandas as pd
-from .visualization import generate_network_graph, visualize_performance_metrics
+from .visualization import generate_network_graph
 import psutil
 import matplotlib.pyplot as plt
 import base64
@@ -52,53 +52,25 @@ COMMON_WORDS = {
     '최근', '기존', '향후', '대부분', '일부', '전체', '기타', '가운데', '간주'
 }
 
-def load_sbert_model():
-    """
-    한국 SBERT와 KoSimCSE 모델을 로드하는 함수
-    """
-    try:
-        # 두 가지 모델을 딕셔너리 형태로 저장
-        models = {
-            # SBERT 모델 로드 - 한국어 문장 임베딩을 위한 모델
-            # CPU에서 실행되도록 device='cpu' 설정
-            'sbert': SentenceTransformer('jhgan/ko-sbert-nli', device='cpu'),
-            
-            # KoSimCSE 모델 로드 - 문장 유사도 계산을 위한 모델
-            # 모델과 토크나이저를 튜플 형태로 저장
-            'simcse': (
-                # 사전학습된 RoBERTa 기반 모델 로드
-                # revision='main'은 최신 버전 사용
-                # use_auth_token=False로 인증 없이 사용
-                AutoModel.from_pretrained(
-                    'BM-K/KoSimCSE-roberta',
-                    revision='main',
-                    token=None
-                ),
-                # 해당 모델의 토크나이저 로드
-                AutoTokenizer.from_pretrained(
-                    'BM-K/KoSimCSE-roberta', 
-                    revision='main',
-                    token=None
-                )
-            )
-        }
-        logger.info("SBERT와 KoSimCSE 모델 로드 완료")
-        return models
-    except Exception as e:
-        logger.error(f"모델 로드 중 오류 발생: {str(e)}")
-        return None
+# 파일 상단에 전역 변수로 SBERT 모델 로드 (한 번만 로드되도록)
+_nlp_models = None
 
-# NLP 모델 로드
-try:
-    logger.info("NLP 모델 로딩 시작...")
-    nlp_models = load_sbert_model()
-    if nlp_models is not None:
-        logger.info("NLP 모델 로딩 완료")
-    else:
-        logger.warning("NLP 모델 로딩 실패")
-except Exception as e:
-    logger.error(f"모델 로드 중 예외 발생: {str(e)}")
-    nlp_models = None
+def get_nlp_models():
+    global _nlp_models
+    if _nlp_models is None:
+        try:
+            _nlp_models = {
+                'sbert': SentenceTransformer('jhgan/ko-sbert-nli', device='cpu'),
+                'simcse': (
+                    AutoModel.from_pretrained('BM-K/KoSimCSE-roberta', revision='main', token=None),
+                    AutoTokenizer.from_pretrained('BM-K/KoSimCSE-roberta', revision='main', token=None)
+                )
+            }
+            logger.info("NLP 모델 로드 완료")
+        except Exception as e:
+            logger.error(f"모델 로드 중 오류: {str(e)}")
+            return None
+    return _nlp_models
 
 # 불용어 로드
 def load_stopwords():
@@ -151,16 +123,16 @@ def extract_keywords_from_desc(text):
 def calculate_similarity(text1, text2):
     """두 텍스트 간 유사도 계산"""
     try:
-        if nlp_models is None:
+        models = get_nlp_models()
+        if models is None:
             return 0.0
             
-        sbert = nlp_models['sbert']
-        embedding1 = sbert.encode([text1])[0]
-        embedding2 = sbert.encode([text2])[0]
-        
+        sbert = models['sbert']
+        # 배치 처리로 변경하여 효율성 향상
+        embeddings = sbert.encode([text1, text2])
         similarity = cosine_similarity(
-            embedding1.reshape(1, -1),
-            embedding2.reshape(1, -1)
+            embeddings[0].reshape(1, -1),
+            embeddings[1].reshape(1, -1)
         )[0][0]
         
         return float(similarity)
@@ -233,106 +205,6 @@ def find_similar_keywords_lsh(target_keyword, candidate_keywords, threshold=0.8)
     except Exception as e:
         logger.error(f"LSH 검색 중 오류: {str(e)}")
         return []
-
-def find_optimal_k(embeddings, max_k=10):
-    """
-    엘보우 방법과 실루엣 점수를 모두 고려하여 최적의 클러스터 수 찾기
-    """
-    try:
-        if len(embeddings) < 3:
-            logger.warning("데이터가 너무 적어 클러스터링을 수행할 수 없습니다.")
-            return 2, embeddings, np.zeros(len(embeddings)), 0.0
-
-        # 1. 데이터 전처리
-        scaler = StandardScaler()
-        scaled_embeddings = scaler.fit_transform(embeddings)
-        
-        # 2. UMAP으로 차원 축소
-        n_neighbors = min(3, len(embeddings)-1)
-        umap_reducer = UMAP(
-            n_neighbors=n_neighbors,
-            min_dist=0.0,
-            n_components=2,
-            metric='cosine',
-            random_state=42,
-            spread=0.5,
-            local_connectivity=2
-        )
-        reduced_embeddings = umap_reducer.fit_transform(scaled_embeddings)
-        
-        # 3. DBSCAN으로 이상치 제거
-        dbscan = DBSCAN(eps=0.5, min_samples=2, metric='cosine')
-        dbscan_labels = dbscan.fit_predict(reduced_embeddings)
-        inlier_mask = dbscan_labels != -1
-        clean_embeddings = reduced_embeddings[inlier_mask]
-        
-        if len(clean_embeddings) < 3:
-            return 2, reduced_embeddings, np.zeros(len(reduced_embeddings)), 0.0
-        
-        # 4. 최적의 클러스터 수 찾기
-        best_score = -1
-        optimal_k = 2
-        best_labels = None
-        
-        for k in range(2, min(4, len(clean_embeddings))):
-            for seed in range(20):
-                kmeans = KMeans(
-                    n_clusters=k,
-                    random_state=seed*42,
-                    init='k-means++',
-                    n_init=50,
-                    max_iter=1000
-                )
-                
-                cluster_labels = kmeans.fit_predict(clean_embeddings)
-                
-                # 클러스터 크기 검증
-                cluster_sizes = np.bincount(cluster_labels)
-                if min(cluster_sizes) < 2:
-                    continue
-                
-                # 실루엣 점수 계산
-                sil_score = silhouette_score(
-                    clean_embeddings, 
-                    cluster_labels,
-                    metric='cosine'
-                )
-                
-                # 개별 실루엣 점수 검증
-                sample_sil_scores = silhouette_samples(
-                    clean_embeddings, 
-                    cluster_labels,
-                    metric='cosine'
-                )
-                
-                if (np.mean(sample_sil_scores < 0) > 0.3 or 
-                    np.min(sample_sil_scores) < -0.1):
-                    continue
-                
-                if sil_score > best_score:
-                    best_score = sil_score
-                    optimal_k = k
-                    best_labels = cluster_labels
-        
-        # 5. 전체 레이블 생성
-        full_labels = np.full(len(reduced_embeddings), -1)
-        full_labels[inlier_mask] = best_labels
-        
-        # 6. 이상치 처리
-        if np.any(~inlier_mask):
-            outlier_points = reduced_embeddings[~inlier_mask]
-            for idx, point in zip(np.where(~inlier_mask)[0], outlier_points):
-                distances = [np.mean([np.linalg.norm(point - clean_embeddings[i]) 
-                           for i in np.where(best_labels == label)[0]])
-                           for label in range(optimal_k)]
-                full_labels[idx] = np.argmin(distances)
-        
-        logger.info(f"클러스터링 완료 - 클러스터 수: {optimal_k}, 실루엣 점수: {best_score:.3f}")
-        return optimal_k, reduced_embeddings, full_labels, best_score
-        
-    except Exception as e:
-        logger.error(f"최적 클러스터 수 계산 중 오류: {str(e)}")
-        return 2, embeddings, np.zeros(len(embeddings)), 0.0
 
 def analyze_related_words(video_desc, transcript, clean_title_func=None):
     try:
@@ -475,8 +347,8 @@ def analyze_related_words(video_desc, transcript, clean_title_func=None):
                     lsh.insert(keyword, m)
             
             # SBERT와 SimCSE 베딩 미리 계산
-            sbert = nlp_models['sbert']
-            simcse_model, simcse_tokenizer = nlp_models['simcse']
+            sbert = get_nlp_models()['sbert']
+            simcse_model, simcse_tokenizer = get_nlp_models()['simcse']
             
             desc_sbert_embeddings = sbert.encode(desc_keywords)
             desc_inputs = simcse_tokenizer(desc_keywords, padding=True, truncation=True, return_tensors="pt")
@@ -539,7 +411,7 @@ def analyze_related_words(video_desc, transcript, clean_title_func=None):
         if len(keywords) > 1:
             try:
                 # 임베딩 일괄 계산
-                embeddings = nlp_models['sbert'].encode(keywords)
+                embeddings = get_nlp_models()['sbert'].encode(keywords, batch_size=32)
                 similarity_matrix = cosine_similarity(embeddings)
                 
                 # 엣지 추가 및 중심성 계산
@@ -576,9 +448,7 @@ def analyze_related_words(video_desc, transcript, clean_title_func=None):
         
         # 클러스터링 수행
         if G.number_of_nodes() > 1:
-            node_embeddings = nlp_models['sbert'].encode(list(G.nodes()))
-            optimal_k, reduced_embeddings, labels, sil_score = find_optimal_k(node_embeddings)
-            network_graph = generate_network_graph(G, labels)
+            network_graph = generate_network_graph(G)
         else:
             network_graph = generate_network_graph(G)
             
