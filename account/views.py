@@ -189,6 +189,7 @@ def chart(request):
                     "title": chart.title,
                     "cleaned_title": clean_title(chart.title),
                     "views": chart.views,
+                    "likes": chart.likes,
                     "channel_name": chart.channel_name,
                     "url": chart.url,
                     "upload_date": chart.upload_date,
