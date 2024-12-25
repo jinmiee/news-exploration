@@ -195,8 +195,10 @@ def chart(request):
                     "upload_date": chart.upload_date,
                     "thumbnail": chart.thumbnail,
                     "id": str(chart._id),  # _id를 id로 매핑
-                    "is_liked_by_user" : Like.objects.filter(user=request.user, youtube_data=YouTubeData.objects.get(_id = chart._id)).exists()
+                    
                 })
+                if request.user.is_authenticated:
+                    processed_chart_data[-1]['is_liked_by_user'] = Like.objects.filter(user=request.user, youtube_data=YouTubeData.objects.get(_id = chart._id)).exists()
             except Exception as e:
                 print(f"Error processing chart data: {e}")
 
