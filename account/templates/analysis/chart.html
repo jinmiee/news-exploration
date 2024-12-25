@@ -24,7 +24,7 @@
     <div class="content-container">
         <!-- 메인 뉴스 리스트 -->
         <div class="news-list">
-            <ul class="news-ul      ">
+            <ul class="news-ul">
                 {% for item in top_news %}
                 <li class="news-item">
                     <div class="rank-badge">{{ forloop.counter }}</div>
@@ -32,6 +32,21 @@
                         <a href="#" class="news-title" data-video-url="{{ item.url }}" data-thumbnail="{{ item.thumbnail }}">
                             {{ item.cleaned_title }}
                         </a>
+                        <!-- 오른쪽: 조회수, 좋아요, 날짜 -->
+                        <div class="news-info">
+                            <span class="info-item">
+                                <i class="fas fa-eye"></i>
+                                {{ item.views }}
+                            </span>
+                            <span class="info-item">
+                                <i class="fas fa-thumbs-up"></i>
+                                {{ item.likes }}
+                            </span>
+                            <span class="info-item">
+                                <i class="fas fa-calendar"></i>
+                                {{ item.upload_date|date:"Y-m-d H:i" }}
+                            </span>
+                        </div>
                         {% if user.is_authenticated %}
                         <button class="like-button" data-id="{{ item.id }}" onclick="likeVideo('{{ item.id }}')">
                             {% if item.is_liked %}
@@ -64,8 +79,10 @@
         <!-- 오른쪽 사이드바 -->
         <div id="sidebar" class="video-sidebar" style="display: none;">
             <div class="sidebar-header">
-                <h2>동영상 보기</h2>
+                <h2 class="sidebar-title">동영상 보기</h2>
+                <button id="close-sidebar" class="close-button">×</button>
             </div>
+
             <div id="video-container">
                 <div id="player-wrapper">
                     <div id="youtube-player"></div>
@@ -163,6 +180,12 @@
         const videoId = extractVideoId(videoUrl);
         const sidebar = document.getElementById('sidebar');
 
+        // 사이드바가 열리면 화면 중앙에 표시
+        sidebar.style.display = 'block';
+        sidebar.style.top = '50%';
+        sidebar.style.left = '50%';
+        sidebar.style.transform = 'translate(-50%, -50%)';
+
         // 선택된 뉴스 제목에 활성화 클래스 추가
         const activeTitle = document.querySelector('.news-title.active');
         if (activeTitle && activeTitle.getAttribute('data-video-url') === videoUrl) {
@@ -250,6 +273,12 @@
                     });
                 }
             }
+        });
+
+        // 사이드바 닫기 버튼 이벤트 추가
+        document.getElementById('close-sidebar').addEventListener('click', function() {
+            sidebar.style.display = 'none';
+            if (player) player.stopVideo(); // 동영상 정지
         });
 
         // CSRF 토큰을 가져오는 함수
