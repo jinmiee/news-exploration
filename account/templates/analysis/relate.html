@@ -113,17 +113,8 @@
             </div>
         </div>
 
-        <div class="rating">
-            <h3>별점 평가</h3>
-            <div class="stars">
-                <span class="star" data-rating="1">★</span>
-                <span class="star" data-rating="2">★</span>
-                <span class="star" data-rating="3">★</span>
-                <span class="star" data-rating="4">★</span>
-                <span class="star" data-rating="5">★</span>
-            </div>
-            <p>선택된 별점: <span id="selected-rating">0</span></p>
-        </div>
+        <!-- feedback 파트 -->
+        {% include "feedback/feedback_form.html" %}
     {% else %}
         <p class="error-message">{{ error_message }}</p>
     {% endif %}

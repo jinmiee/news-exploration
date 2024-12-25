@@ -31,18 +31,8 @@
                     <p class="error">{{ wordcloud_error }}</p>
                 {% endif %}
 
-                <!-- 별점 기능 추가 -->
-                <div class="rating">
-                    <h3>별점</h3>
-                    <div class="stars">
-                        <span class="star" data-value="1">&#9733;</span>
-                        <span class="star" data-value="2">&#9733;</span>
-                        <span class="star" data-value="3">&#9733;</span>
-                        <span class="star" data-value="4">&#9733;</span>
-                        <span class="star" data-value="5">&#9733;</span>
-                    </div>
-                    <p>선택된 별점: <span id="selected-rating">0</span></p>
-                </div>
+                <!-- feedback 파트 -->
+                {% include "feedback/feedback_form.html" %}
             </div>
 
             <!-- 오른쪽: 긍부정 단어 순위 -->
