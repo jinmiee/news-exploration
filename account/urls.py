@@ -43,6 +43,8 @@ urlpatterns = [
     path('mypage/', views.mypage, name='mypage'),
     path('like/<str:video_id>/', views.like_video, name='like_video'),
     path('mypage/like/', views.my_liked_videos, name='my_liked_video'),
+    path('mypage/like/<str:id>/', views.delete_from_liked, name='delete_from_liked'),
+
     path('related-duplicates/', views.get_related_duplicate_videos, name='related_duplicates'),
 
 

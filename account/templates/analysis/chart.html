@@ -34,7 +34,7 @@
                         </a>
                         {% if user.is_authenticated %}
                         <button class="like-button" data-id="{{ item.id }}" onclick="likeVideo('{{ item.id }}')">
-                            {% if item.is_liked %}
+                            {% if item.is_liked_by_user %}
                                 ❤️
                             {% else %}
                                 ♡
@@ -287,22 +287,17 @@
                 return response.json();
             })
             .then(data => {
-                if (data.status === 'success') {
-                    const button = document.querySelector(`button[data-id="${videoId}"]`);
-                    if (data.is_liked) {
-                        button.innerHTML = '❤️';
-                    } else {
-                        button.innerHTML = '♡';
-                    }
-                    console.log('좋아요 상태 변경됨:', data.is_liked);  // 디버깅용
+                
+                const button = document.querySelector(`button[data-id="${videoId}"]`);
+                if (data.is_liked) {
+                    button.innerHTML = '❤️';
                 } else {
-                    alert(data.message || '오류가 발생했습니다.');
+                    button.innerHTML = '♡';
                 }
+                console.log('좋아요 상태 변경됨:', data.is_liked);  // 디버깅용
+                
             })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('오류가 발생했습니다. 다시 시도해주세요.');
-            });
+          
         };
     });
 

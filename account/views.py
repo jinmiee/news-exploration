@@ -41,7 +41,7 @@ from pymongo import MongoClient
 from pymongo.errors import DuplicateKeyError
 from django.utils.timezone import localtime
 from datetime import timedelta
-
+from .models import Like, YouTubeData, WeeklyIssue, Chart, WeeklyIssueDuplicateVideo, ChartDuplicateVideo
 from .analysis.visualization import generate_network_graph
 
 def save_top_videos(start_time, end_time, model):
@@ -180,7 +180,7 @@ def chart(request):
 
         # 리스트의 길이를 확인하려면 len()을 사용
         print("DEBUG: chart_data count after sorting:", len(chart_data))
-
+        print(chart_data)
         processed_chart_data = []
         for chart in chart_data:
             try:
@@ -193,13 +193,17 @@ def chart(request):
                     "url": chart.url,
                     "upload_date": chart.upload_date,
                     "thumbnail": chart.thumbnail,
-                    "id": str(chart._id)  # _id를 id로 매핑
+                    "id": str(chart._id),  # _id를 id로 매핑
+                    "is_liked_by_user" : Like.objects.filter(user=request.user, youtube_data=YouTubeData.objects.get(_id = chart._id)).exists()
                 })
             except Exception as e:
                 print(f"Error processing chart data: {e}")
 
+        
+        
         # 템플릿에 전달할 데이터 구성
         context = {
+        
             "top_news": processed_chart_data,
             "analysis_start": analysis_start,
             "analysis_end": analysis_end
@@ -842,45 +846,50 @@ def mypage(request):
     return render(request, 'analysis/mypage/mypage.html', {'section': 'mypage'}) 
 
 
+
+from bson import ObjectId
+from django.shortcuts import get_object_or_404
 @login_required
 def like_video(request, video_id):
-    try:
-        video = YouTubeData.objects.get(_id=ObjectId(video_id))
-        like_obj, created = Like.objects.get_or_create(
-            user=request.user,
-            youtube_data=video
-        )
-        
-        if not created:  # 이미 좋아요가 있으면 삭제
-            like_obj.delete()
-            is_liked = False
-        else:  # 새로 생성된 경우
-            is_liked = True
-            
-        return JsonResponse({
-            'status': 'success',
-            'is_liked': is_liked
-        })
-    except Exception as e:
-        print(f"Error: {str(e)}")  # 디버깅용
-        return JsonResponse({
-            'status': 'error',
-            'message': str(e)
-        }, status=500)
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'User not authenticated'}, status=401)
+
+    video_id = ObjectId(video_id)
+    video = get_object_or_404(YouTubeData, _id=video_id)
+    like_instance, created = Like.objects.get_or_create(user=request.user, youtube_data=video)
+
+
+
+    if not created:
+        like_instance.delete()  # 이미 찜한 경우 삭제
+        return JsonResponse({'message': 'Like removed from like_list', 'is_liked': False})
+
+    return JsonResponse({'message': '해당 기사가 찜 됐어요! 마이페이지에서 확인가능', 'is_liked': True})
+
 
 # @login_required
 def my_liked_videos(request):
     liked_videos = YouTubeData.objects.filter(like__user=request.user)  
     
-    context = {
-        'liked_videos': liked_videos,
-        'section': 'mypage'
-    } 
+
     for video in liked_videos:
         print(video)
         video.id = str(video._id)
         print(video.id)
+
+    context = {
+        'liked_videos': liked_videos,
+        'section': 'mypage'
+    }         
     return render(request, 'analysis/mypage/my_liked_videos.html', context)
+
+def delete_from_liked(request, id):
+    video_id = ObjectId(id)
+    video = get_object_or_404(YouTubeData, _id=video_id)
+    like_instance = Like.objects.filter(user=request.user, youtube_data=video).first()
+    if like_instance:
+        like_instance.delete()
+    return redirect('account:my_liked_video')
 
 
 def register(request):

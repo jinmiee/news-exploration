@@ -43,13 +43,10 @@
                             </span>
                     
                             {% if user.is_authenticated %}
-                                <button class="like-button" data-id="{{ item.id }}" onclick="likeVideo('{{ item.id }}')">
-                                    {% if item.is_liked_by_user %}
-                                        ❤️
-                                    {% else %}
-                                        ♡
-                                    {% endif %}
-                                </button>
+                                <form method="POST" action="{% url 'account:delete_from_liked' item.id %}">
+                                    {% csrf_token %}
+                                    <button type="submit">찜 취소</button>
+                                </form>
                             {% else %}
                                 <a href="#" class="like-button" data-title="{{ item.title }}" data-url="{{ item.url }}">
                                     ♡
