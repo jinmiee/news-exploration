@@ -36,14 +36,15 @@ body {
 }
 
 .chart-header h1 {
-    font-size: 2.5rem;
+    font-size: 2.5rem;``
     color: var(--text-color);
     margin-bottom: 0.5rem;
 }
 
 .subtitle {
-    color: #666;
+    color: #333;
     font-size: 1.1rem;
+    opacity:.5
 }
 
 /* ===== 뉴스 리스트 ===== */
@@ -53,6 +54,10 @@ body {
     margin-top: 2rem;
     list-style: none;
     padding: 0;
+}
+
+.news-ul {
+    padding-left: 0;
 }
 
 .news-item {
@@ -97,7 +102,7 @@ body {
 
 .news-title {
     font-size: 1rem;
-    font-weight: 400; /* 기존 600에서 줄임 */
+    font-weight: 600; /* 기존 600에서 줄임 */
     color: #666; /* 더 연한 회색 */
     text-decoration: none;
     margin-right: 1rem;
@@ -220,6 +225,7 @@ body {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 1rem;
+
 }
 
 .btn-analysis {

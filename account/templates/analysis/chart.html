@@ -15,7 +15,7 @@
     <header class="chart-header">
         <h1>실시간 뉴스 차트</h1>
         <p class="subtitle">최신 뉴스 동향을 한눈에 확인하세요</p>
-        <p class="analysis-time">
+        <p class="subtitle">
             <i class="fas fa-clock"></i>
             분석기준 {{ analysis_start|date:"Y년 m월 d일 (D) H:i" }} ~ {{ analysis_end|date:"Y년 m월 d일 (D) H:i" }}
         </p>
@@ -24,7 +24,7 @@
     <div class="content-container">
         <!-- 메인 뉴스 리스트 -->
         <div class="news-list">
-            <ul>
+            <ul class="news-ul      ">
                 {% for item in top_news %}
                 <li class="news-item">
                     <div class="rank-badge">{{ forloop.counter }}</div>
