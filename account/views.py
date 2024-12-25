@@ -600,6 +600,15 @@ def get_related_duplicate_videos(request):
         print(f"중복 동영상 검색 오류: {e}")
         return JsonResponse({"error": "중복 동영상 검색 중 오류가 발생했습니다."}, status=500)
 
+def get_video_data(video_url):
+    """
+    주어진 URL에 해당하는 동영상 데이터를 반환.
+    """
+    video = YouTubeData.objects.filter(url=video_url).first()
+    if not video:
+        raise ValueError("해당 URL에 대한 동영상 데이터를 찾을 수 없습니다.")
+    return video
+
 #상세분석
 # @login_required
 def detail(request):

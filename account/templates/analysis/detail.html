@@ -1,15 +1,24 @@
 {% extends "base.html" %}
 
-{% block title %}YouTube News Detail{% endblock %}
+{% load static %}
+
+{% block head %}
+<link rel="stylesheet" href="{% static 'css/detail.css' %}">
+{% endblock %}
+
+{% block title %}상세분석{% endblock %}
 
 {% block content %}
     <div class="chart-container">
+
         <div class="top-navigation">
             <div class="hamburger-menu">
                 <span class="menu-icon" onclick="toggleMenu()">☰</span>
             </div>
             <a href="{% url 'account:chart' %}" class="back-button">이전</a>
         </div>
+
+         <h1 class="analysis-title">상세 분석</h1> <!-- 상세 분석 영역 안으로 이동 -->
 
         <!-- 메뉴 오버레이 -->
         <div class="menu-overlay" id="menuOverlay" onclick="toggleMenu()"></div>
@@ -18,35 +27,37 @@
         <div class="menu-slider" id="menuSlider">
             <button class="close-button" onclick="toggleMenu()">✖</button>
             <div class="analysis-buttons">
-                <a id="analysis-detail-btn" href="#" class="btn-analysis">
-                    <i class="fas fa-chart-bar"></i> 상세 분석
+                <a id="analysis-detail-btn"
+                   href="{% url 'account:detail' %}?url={{ video_url }}&id={{ video_id }}"
+                   class="btn-analysis">
+                    <i class="fas fa-chart-bar"></i>
+                    상세 분석
                 </a>
-                <a id="analysis-emotion-btn" href="#" class="btn-analysis">
-                    <i class="fas fa-smile"></i> 감정 분석
+                <a id="analysis-emotion-btn"
+                   href="{% url 'account:emotion' %}?url={{ video_url }}&id={{ video_id }}"
+                   class="btn-analysis">
+                    <i class="fas fa-smile"></i>
+                    감정 분석
                 </a>
-                <a id="analysis-relate-btn" href="#" class="btn-analysis">
-                    <i class="fas fa-project-diagram"></i> 연관어 분석
+                <a id="analysis-relate-btn"
+                   href="{% url 'account:relate' %}?url={{ video_url }}&id={{ video_id }}"
+                   class="btn-analysis">
+                    <i class="fas fa-project-diagram"></i>
+                    연관어 분석
                 </a>
             </div>
         </div>
-
-
-        <h1>상세 분석</h1>
 
         <!-- 영상 및 정보 -->
         <div class="content-container">
             <!-- 왼쪽: 영상 -->
             <div class="video-container">
-                <iframe id="video-frame" width="100%" height="400" src="https://www.youtube.com/embed/{{ video_id }}" frameborder="0" allowfullscreen></iframe>
-                <div class="video-info">
-                    <p><i class="fas fa-eye"></i> 조회수: {{ video_views }}</p>
-                    <p><i class="fas fa-thumbs-up"></i> 좋아요: {{ video_likes }}</p>
-                </div>
+                <iframe id="video-frame" src="https://www.youtube.com/embed/{{ video_id }}" frameborder="0" allowfullscreen></iframe>
             </div>
 
             <!-- 오른쪽: 댓글 -->
             <div class="comments-container">
-                <h3>Comments</h3>
+                <h3 style="text-align: center;">댓글</h3>
                 <ul>
                     {% for comment in video_comments %}
                         <li>{{ comment.comment }}</li>
@@ -55,6 +66,12 @@
                     {% endfor %}
                 </ul>
             </div>
+        </div>
+
+        <!-- 동영상과 댓글 영역 아래의 좋아요 및 조회수 -->
+        <div class="video-info">
+            <p><i class="fas fa-eye"></i> 조회수: {{ video_views }}</p>
+            <p><i class="fas fa-thumbs-up"></i> 좋아요: {{ video_likes }}</p>
         </div>
 
         <!-- 관련 기사 섹션 -->
@@ -88,237 +105,27 @@
         <!-- feedback 파트 -->
         {% include "feedback/feedback_form.html" %}
     </div>
-    <!-- 스타일 -->
-    <style>
-
-        /* 상세 분석 섹션 */
-        /* 공통 스타일 */
-        .chart-container, .detail-container {
-            max-width: 1140px;
-            margin: 0 auto;
-            padding: 2rem;
-            background-color: #fff;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            border-radius: 8px;
-        }
-
-        .top-navigation {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-
-        .back-button {
-            padding: 0; /* 내부 여백 제거 */
-            background-color: transparent; /* 배경색 제거 */
-            color: black; /* 기본 텍스트 색상 */
-            text-decoration: none; /* 밑줄 제거 */
-            font-size: 16px;
-            font-weight: bold;
-            border: none; /* 테두리 제거 */
-            cursor: pointer; /* 클릭 가능 마우스 포인터 */
-        }
-
-        .back-button:hover {
-            color: blue; /* 마우스 올릴 때 텍스트 색상 변경 */
-            text-decoration: underline; /* 강조를 위해 밑줄 표시 */
-        }
-
-        .hamburger-menu {
-            display: inline-block;
-        }
-
-        .menu-icon {
-            font-size: 24px;
-            cursor: pointer;
-            background-color: white;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            padding: 10px;
-        }
-
-        /* 햄버거 메뉴 슬라이더 */
-        .menu-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.6);
-            display: none; /* 기본적으로 숨김 */
-            z-index: 1000;
-        }
-
-        .menu-slider {
-            position: fixed;
-            top: 0;
-            left: -300px; /* 화면 밖으로 숨김 */
-            width: 300px;
-            height: 100%;
-            background-color: #fff;
-            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.5);
-            transition: left 0.3s ease;
-            z-index: 1002;
-            padding: 20px;
-            display: none; /* 기본적으로 숨김 */
-            overflow-y: auto;
-        }
-
-        .close-button {
-            font-size: 20px;
-            cursor: pointer;
-            background: none;
-            border: none;
-            margin-bottom: 20px;
-            display: block;
-            text-align: right;
-        }
-
-        .analysis-buttons {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .btn-analysis {
-            display: flex;
-            align-items: center;
-            font-size: 18px;
-            font-weight: bold;
-            color: #333;
-            text-decoration: none;
-            padding: 10px 15px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            transition: background-color 0.3s, color 0.3s;
-        }
-
-        .btn-analysis i {
-            margin-right: 10px;
-            font-size: 20px;
-        }
-
-        .btn-analysis:hover {
-            background-color: #007bff;
-            color: white;
-            text-decoration: none;
-        }
-
-        .menu-slider .menu-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-
-        .menu-slider .menu-list li {
-            margin-bottom: 15px;
-        }
-
-        .menu-slider .menu-list li a {
-            text-decoration: none;
-            color: #333;
-            font-size: 18px;
-        }
-
-        .menu-slider .menu-list li a:hover {
-            color: #007bff;
-        }
-
-        /* 댓글 스타일 */
-        .comments-container {
-            max-height: 400px;
-            overflow-y: auto;
-            border: 1px solid #ddd;
-            padding: 10px;
-            background-color: #f9f9f9;
-        }
-
-
-        /* 댓글 창 높이를 동영상 높이에 맞춤 */
-        .unique-comments-container {
-            height: 400px; /* 동영상 높이에 맞춤 */
-            overflow-y: auto; /* 스크롤 활성화 */
-            border: 1px solid #ddd;
-            padding: 10px; /* 내부 여백 */
-            background-color: #f9f9f9;
-            box-sizing: border-box; /* Padding 포함 높이 맞춤 */
-        }
-
-        /* 제목 스타일 조정 */
-        .unique-comments-container h3 {
-            margin: 0;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #ddd;
-        }
-
-        /* 댓글 목록 스타일 */
-        .unique-comments-list {
-            list-style-type: none; /* 목록 점 제거 */
-            margin: 0; /* 외부 여백 제거 */
-            padding: 0; /* 내부 여백 제거 */
-        }
-        
-        /* 댓글 아이템 스타일 */
-        .unique-comment-item {
-            color: #333; /* 글자 색상 */
-            font-size: 16px; /* 글자 크기 */
-            margin-bottom: 15px; /* 각 댓글 간 간격 */
-            border-bottom: 1px solid #e0e0e0; /* 아래 테두리 */
-            padding-bottom: 5px; /* 아래 여백 */
-        }
-        
-        .unique-comment-item:last-child {
-            border-bottom: none; /* 마지막 댓글은 테두리 제거 */
-        }
-
-        .rating {
-            margin: 2rem 0;
-            padding: 1rem;
-            background-color: #f8f9fa;
-            border-radius: 8px;
-            text-align: center;
-        }
-        
-        .stars {
-            display: flex;
-            gap: 0.5rem;
-            margin: 1rem 0;
-            justify-content: center;
-        }
-        
-        .star {
-            font-size: 2rem;
-            cursor: pointer;
-            color: #ddd;
-            transition: color 0.2s ease;
-        }
-        
-        .star:hover,
-        .star.active {
-            color: #ffd700;
-        }
-        
-        .rating h3, 
-        .rating p {
-            text-align: center;
-            margin: 0.5rem 0;
-        }
-    </style>
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const videoFrame = document.getElementById('video-frame');
-            const commentsContainer = document.querySelector('.unique-comments-container');
+            const videoContainer = document.querySelector('.video-container');
+            const commentsContainer = document.querySelector('.comments-container');
             const relatedVideosContainer = document.querySelector('.related-videos');
             const menuSlider = document.getElementById('menuSlider');
             const menuOverlay = document.getElementById('menuOverlay');
             const menuIcon = document.querySelector('.menu-icon');
             const closeButton = document.querySelector('.close-button');
 
-            // 댓글 창 높이 동기화
-            if (videoFrame && commentsContainer) {
-                commentsContainer.style.height = `${videoFrame.offsetHeight}px`;
+            if (videoContainer && commentsContainer) {
+                const syncHeight = () => {
+                    const videoHeight = videoContainer.offsetHeight;
+                    commentsContainer.style.height = `${videoHeight}px`;
+                };
+
+                // 페이지 로드 시와 창 크기 조정 시 높이 동기화
+                syncHeight();
+                window.addEventListener('resize', syncHeight);
             }
 
             // 중복 동영상 가져오기
