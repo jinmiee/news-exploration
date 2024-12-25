@@ -43,106 +43,25 @@ from django.utils.timezone import localtime
 from datetime import timedelta
 from .models import Like, YouTubeData, WeeklyIssue, Chart, WeeklyIssueDuplicateVideo, ChartDuplicateVideo
 from .analysis.visualization import generate_network_graph
+from .tasks.processing_tasks import (
+    save_top_videos,
+    save_top10_to_chart,
+    delete_expired_charts,
+    save_daily_top10,
+    extract_duplicates_for_weekly_issues,
+    extract_duplicates_for_chart,
+)
 
-def save_top_videos(start_time, end_time, model):
+
+def trigger_chart_save(request):
     """
-    특정 시간대의 상위 10개 동영상을 지정된 모델에 저장
-    :param start_time: 데이터 필터링 시작 시간
-    :param end_time: 데이터 필터링 종료 시간
-    :param model: 데이터를 저장할 Django 모델 (Chart, WeeklyIssue 등)
-    """
-    try:
-        # 데이터베이스에서 시간 범위에 해당하는 데이터 가져오기
-        all_data = YouTubeData.objects.filter(
-            upload_date__gte=start_time,
-            upload_date__lt=end_time
-        ).order_by('-views')
-
-        if not all_data.exists():
-            print(f"해당 시간 범위에 데이터가 없습니다. {start_time} ~ {end_time}")
-            return
-
-        # 상위 10개 데이터 선정
-        top_videos = get_top10_chart_based(all_data)
-
-        # 상위 10개 데이터를 지정된 모델에 저장
-        for rank, video in enumerate(top_videos, start=1):
-            try:
-                video_id = ObjectId(video._id) if isinstance(video._id, str) else video._id
-                model.objects.update_or_create(
-                    _id=video_id,  # MongoDB ObjectId
-                    defaults={
-                        "rank": rank,
-                        "channel_name": video.channel_name,
-                        "title": video.title,
-                        "views": video.views,
-                        "upload_date": video.upload_date,
-                        "url": video.url,
-                        "channel": video.channel,
-                        "desc": video.desc,
-                        "likes": video.likes,
-                        "thumbnail": video.thumbnail,
-                        "comments": video.comments,
-                        "transcript": video.transcript,
-                    }
-                )
-            except Exception as e:
-                print(f"Error saving video {video._id}: {e}")
-
-        print(f"데이터 저장 완료: {start_time} ~ {end_time}")
-    except Exception as e:
-        print(f"Error in save_top_videos: {e}")
-
-def save_top10_to_chart():
-    """
-    상위 10개의 동영상 데이터를 Chart 컬렉션에 저장.
+    스케줄링된 작업을 수동으로 실행
     """
     try:
-        now = localtime()
-
-        # 기준 시간 설정
-        if now.hour < 11:  # 현재 시간이 오전 11시 이전
-            analysis_start = (now - timedelta(days=1)).replace(hour=11, minute=0, second=0, microsecond=0)
-            analysis_end = (now - timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)
-        elif now.hour < 23:  # 현재 시간이 오전 11시 이후, 오늘 오후 11시 이전
-            analysis_start = (now - timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)
-            analysis_end = now.replace(hour=11, minute=0, second=0, microsecond=0)
-        else:  # 현재 시간이 오후 11시 이후
-            analysis_start = now.replace(hour=11, minute=0, second=0, microsecond=0)
-            analysis_end = now.replace(hour=23, minute=0, second=0, microsecond=0)
-
-        # 시간대를 UTC로 변환
-        analysis_start = analysis_start.astimezone(utc)
-        analysis_end = analysis_end.astimezone(utc)
-
-        print(f"Analysis start(UTC): {analysis_start}, Analysis end(UTC): {analysis_end}")
-
-        # 데이터 저장 로직
-        save_top_videos(analysis_start, analysis_end, Chart)
-
+        save_top10_to_chart()  # processing_tasks.py에서 가져온 함수 호출
+        return JsonResponse({"message": "Chart 저장 작업이 성공적으로 실행되었습니다."}, status=200)
     except Exception as e:
-        print(f"Error in save_top10_to_chart: {e}")
-
-import logging
-
-logger = logging.getLogger('chart_cleanup')
-
-def delete_expired_charts():
-    """
-    Chart 데이터에서 24시간이 지난 항목만 삭제
-    """
-    try:
-        # 현재 시간 기준으로 24시간 전 시간 계산
-        now = localtime()
-        expiration_time = now - timedelta(hours=24)
-
-        # 24시간 이전의 데이터를 필터링하여 삭제
-        expired_charts = Chart.objects.filter(upload_date__lt=expiration_time)
-        deleted_count, _ = expired_charts.delete()
-
-        logger.info(f"{deleted_count}개의 24시간 지난 Chart 데이터가 삭제되었습니다.")
-    except Exception as e:
-        logger.error(f"delete_expired_charts 실행 중 오류 발생: {e}")
+        return JsonResponse({"error": str(e)}, status=500)
 
 def chart(request):
     """
@@ -263,70 +182,6 @@ def video_details(request):
     # 요청이 POST 방식이 아닐 경우 에러 응답
     return JsonResponse({"error": "Invalid request method. Only POST is allowed."}, status=405)
 
-def save_all_historical_top10():
-    try:
-        all_videos = YouTubeData.objects.all().order_by('upload_date')
-        grouped_videos = defaultdict(list)
-
-        seoul_tz = timezone('Asia/Seoul')
-
-        for video in all_videos:
-            # Null 또는 None 체크
-            if not video.upload_date:
-                print(f"Video {video.title} has no upload_date. Skipping...")
-                continue
-
-            # 문자열인 경우 datetime으로 변환
-            if isinstance(video.upload_date, str):
-                try:
-                    video.upload_date = datetime.fromisoformat(video.upload_date)
-                except ValueError:
-                    print(f"Invalid date format for video {video.title}. Skipping...")
-                    continue
-
-            # UTC → KST 변환 후 날짜별 그룹화
-            date_key = video.upload_date.astimezone(seoul_tz).date()
-            grouped_videos[date_key].append(video)
-
-        # 상위 10개 선정
-        for date_key, videos in grouped_videos.items():
-            top_videos = get_top10_chart_based(videos)
-
-            for video in top_videos:
-                WeeklyIssue.objects.update_or_create(
-                    _id=video._id,
-                    defaults={
-                        'title': video.title,
-                        'channel_name': video.channel_name,
-                        'views': video.views,
-                        'upload_date': video.upload_date,  # 이미 UTC로 저장됨
-                        'url': video.url,
-                        'channel': video.channel,
-                        'thumbnail': video.thumbnail,
-                        'comments': video.comments or [],
-                        'transcript': video.transcript or []
-                    }
-                )
-        print("All historical top 10 videos saved successfully.")
-    except Exception as e:
-        print(f"save_all_historical_top10 failed: {e}")
-
-def save_daily_top10():
-    """
-    어제 날짜 데이터를 기반으로 상위 10개 비디오를 WeeklyIssue 컬렉션에 저장
-    """
-    try:
-        seoul_tz = timezone('Asia/Seoul')  # 한국 시간대
-        today = datetime.now(seoul_tz).date()
-        yesterday = today - timedelta(days=1)
-
-        start_time = datetime.combine(yesterday, datetime.min.time()).replace(tzinfo=seoul_tz).astimezone(pytz.UTC)
-        end_time = datetime.combine(yesterday, datetime.max.time()).replace(tzinfo=seoul_tz).astimezone(pytz.UTC)
-
-        save_top_videos(start_time, end_time, WeeklyIssue)
-    except Exception as e:
-        print(f"Error in save_daily_top10: {e}")
-
 def weekly_issues(request):
     date_str = request.GET.get('date')
     seoul_tz = pytz.timezone('Asia/Seoul')
@@ -381,171 +236,6 @@ def weekly_issues(request):
         print(f"Error in weekly_issues function: {e}")
         return JsonResponse({"error": str(e)}, status=500)
 
-def extract_duplicates_for_weekly_issues():
-    """
-    주간 이슈 데이터를 기준으로 중복 동영상을 추출하고 WeeklyIssueDuplicateVideo에 저장.
-    """
-    try:
-        # 1. 데이터 가져오기
-        weekly_videos = list(WeeklyIssue.objects.all())
-        all_videos = list(YouTubeData.objects.all())
-
-        print(f"DEBUG: 주간 이슈 비디오 개수: {len(weekly_videos)}")
-        print(f"DEBUG: 전체 유튜브 데이터 개수: {len(all_videos)}")
-
-        # 2. 텍스트 전처리
-        weekly_corpus = [process_text(video.title, video.transcript or []) for video in weekly_videos]
-        all_corpus = [process_text(video.title, video.transcript or []) for video in all_videos]
-
-        print(f"DEBUG: 주간 이슈 텍스트 전처리 완료. (크기: {len(weekly_corpus)})")
-        print(f"DEBUG: 전체 유튜브 텍스트 전처리 완료. (크기: {len(all_corpus)})")
-
-        # 3. TF-IDF 및 유사도 계산
-        vectorizer = TfidfVectorizer(max_features=5000, stop_words='english')
-        weekly_tfidf_matrix = vectorizer.fit_transform(weekly_corpus)
-        all_tfidf_matrix = vectorizer.transform(all_corpus)
-
-        print("DEBUG: TF-IDF 벡터화 완료.")
-        similarity_matrix = cosine_similarity(all_tfidf_matrix, weekly_tfidf_matrix)
-        print("DEBUG: 유사도 계산 완료.")
-
-        # 4. 중복 판단
-        threshold = 0.6
-        duplicates = set()
-
-        for i, all_video in enumerate(all_videos):
-            for j, weekly_video in enumerate(weekly_videos):
-                similarity = similarity_matrix[i, j]
-
-                # URL 동일성 및 높은 유사도 체크
-                if all_video.url == weekly_video.url or similarity >= 0.9999:
-                    print(
-                        f"DEBUG: 동일 데이터 또는 높은 유사도 - 유튜브 비디오(ID: {all_video._id}, URL: {all_video.url})와 주간 이슈 비디오(ID: {weekly_video._id}, URL: {weekly_video.url}) 유사도: {similarity}")
-                    continue
-
-                # 중복 데이터로 간주할 조건
-                if similarity > threshold:
-                    # 중복 데이터가 이미 저장되었는지 확인
-                    if not WeeklyIssueDuplicateVideo.objects.filter(url=all_video.url).exists():
-                        duplicates.add(all_video._id)
-                        print(
-                            f"DEBUG: 중복 탐지 - 유튜브 비디오(ID: {all_video._id})와 주간 이슈 비디오(ID: {weekly_video._id}) 유사도: {similarity}")
-
-        print(f"DEBUG: 총 {len(duplicates)}개의 중복 비디오를 탐지했습니다.")
-
-        # 5. 중복 동영상 저장
-        for duplicate_id in duplicates:
-            try:
-                duplicate_video = YouTubeData.objects.get(_id=duplicate_id)
-
-                # 저장 전에 중복 확인
-                if WeeklyIssueDuplicateVideo.objects.filter(url=duplicate_video.url).exists():
-                    print(f"DEBUG: 중복 비디오가 이미 저장됨 - URL: {duplicate_video.url}")
-                    continue
-
-                WeeklyIssueDuplicateVideo.objects.update_or_create(
-                    _id=duplicate_video._id,
-                    defaults={
-                        "title": duplicate_video.title,
-                        "url": duplicate_video.url,
-                        "views": duplicate_video.views,
-                        "upload_date": duplicate_video.upload_date,
-                        "channel_name": duplicate_video.channel_name,
-                        "thumbnail": duplicate_video.thumbnail,
-                        "likes": duplicate_video.likes,
-                        "transcript": duplicate_video.transcript,
-                    }
-                )
-                print(f"DEBUG: 중복 비디오 저장 완료 - 제목: {duplicate_video.title}, URL: {duplicate_video.url}")
-            except Exception as save_error:
-                print(f"ERROR: 중복 비디오 저장 실패 - ID: {duplicate_id}, 오류: {save_error}")
-
-        print(f"주간 이슈 기준 {len(duplicates)}개의 중복 동영상이 저장되었습니다.")
-    except Exception as e:
-        print(f"주간 이슈 중복 동영상 추출 오류: {e}")
-
-def extract_duplicates_for_chart():
-    """
-    차트 데이터를 기준으로 중복 동영상을 추출하고 ChartDuplicateVideo에 저장.
-    """
-    try:
-        # 차트 데이터와 전체 유튜브 데이터 가져오기
-        chart_videos = list(Chart.objects.all())
-        all_videos = list(YouTubeData.objects.all())
-
-        print(f"DEBUG: 차트 비디오 개수: {len(chart_videos)}")
-        print(f"DEBUG: 전체 유튜브 데이터 개수: {len(all_videos)}")
-
-        # 텍스트 전처리
-        chart_corpus = [process_text(video.title, video.transcript or []) for video in chart_videos]
-        all_corpus = [process_text(video.title, video.transcript or []) for video in all_videos]
-
-        print(f"DEBUG: 차트 텍스트 전처리 완료. (크기: {len(chart_corpus)})")
-        print(f"DEBUG: 전체 유튜브 텍스트 전처리 완료. (크기: {len(all_corpus)})")
-
-        # TF-IDF 및 유사도 계산
-        vectorizer = TfidfVectorizer(max_features=5000, stop_words='english')
-        chart_tfidf_matrix = vectorizer.fit_transform(chart_corpus)
-        all_tfidf_matrix = vectorizer.transform(all_corpus)
-
-        print("DEBUG: TF-IDF 벡터화 완료.")
-
-        similarity_matrix = cosine_similarity(all_tfidf_matrix, chart_tfidf_matrix)
-
-        print("DEBUG: 유사도 계산 완료.")
-
-        # 중복 판단
-        threshold = 0.6
-        duplicates = set()
-
-        for i, all_video in enumerate(all_videos):
-            for j, chart_video in enumerate(chart_videos):
-                similarity = similarity_matrix[i, j]
-
-                # URL이 동일하거나 유사도가 1.0인 경우 건너뛰기
-                if all_video.url == chart_video.url or similarity >= 0.9:
-                    print(
-                        f"DEBUG: 동일 데이터 또는 높은 유사도 - 유튜브 비디오(ID: {all_video._id}, URL: {all_video.url})와 차트 비디오(ID: {chart_video._id}, URL: {chart_video.url}) 유사도: {similarity}")
-                    continue
-
-                # 중복 데이터로 간주할 조건
-                if similarity > threshold:
-                    # 중복 동영상이 이미 저장되어 있는지 확인
-                    if not ChartDuplicateVideo.objects.filter(url=all_video.url).exists():
-                        duplicates.add(all_video._id)
-                        print(
-                            f"DEBUG: 중복 탐지 - 유튜브 비디오(ID: {all_video._id})와 차트 비디오(ID: {chart_video._id}) 유사도: {similarity}")
-
-        print(f"DEBUG: 총 {len(duplicates)}개의 중복 비디오를 탐지했습니다.")
-
-        # 중복 동영상 저장
-        for duplicate_id in duplicates:
-            duplicate_video = YouTubeData.objects.get(_id=duplicate_id)
-
-            # 중복 동영상이 이미 저장된 경우 건너뜀
-            if ChartDuplicateVideo.objects.filter(url=duplicate_video.url).exists():
-                print(f"DEBUG: 중복 비디오가 이미 존재합니다 - URL: {duplicate_video.url}")
-                continue
-
-            ChartDuplicateVideo.objects.update_or_create(
-                _id=duplicate_video._id,
-                defaults={
-                    "title": duplicate_video.title,
-                    "url": duplicate_video.url,
-                    "views": duplicate_video.views,
-                    "upload_date": duplicate_video.upload_date,
-                    "channel_name": duplicate_video.channel_name,
-                    "thumbnail": duplicate_video.thumbnail,
-                    "likes": duplicate_video.likes,
-                    "transcript": duplicate_video.transcript,
-                }
-            )
-            print(f"DEBUG: 중복 비디오 저장 완료 - 제목: {duplicate_video.title}, URL: {duplicate_video.url}")
-
-        print(f"차트 기준 {len(duplicates)}개의 중복 동영상이 저장되었습니다.")
-    except Exception as e:
-        print(f"차트 중복 동영상 추출 오류: {e}")
-
 from fuzzywuzzy import fuzz
 from datetime import timedelta
 
@@ -599,15 +289,6 @@ def get_related_duplicate_videos(request):
     except Exception as e:
         print(f"중복 동영상 검색 오류: {e}")
         return JsonResponse({"error": "중복 동영상 검색 중 오류가 발생했습니다."}, status=500)
-
-def get_video_data(video_url):
-    """
-    주어진 URL에 해당하는 동영상 데이터를 반환.
-    """
-    video = YouTubeData.objects.filter(url=video_url).first()
-    if not video:
-        raise ValueError("해당 URL에 대한 동영상 데이터를 찾을 수 없습니다.")
-    return video
 
 #상세분석
 # @login_required

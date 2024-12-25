@@ -6,6 +6,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from django.core.mail import send_mail
 from pymongo import MongoClient
 
+
 def send_email_task():
     print("send_email_task 실행됨")  # 디버깅 로그
     from django.contrib.auth.models import User  # 함수 내부에서 import하여 초기화 시점 문제 방지
@@ -17,28 +18,9 @@ def send_email_task():
 
     send_mail(subject, message, from_email, recipient_list)
 
-def save_daily_top10():
-    print("save_daily_top10 실행됨")  # 디버깅 로그
-    # 실제 데이터 저장 로직
-
-def save_top10_to_chart():
-    print("save_top10_to_chart 실행됨")  # 디버깅 로그
-    # 실제 데이터 저장 로직
-
-def extract_duplicates_for_weekly_issues():
-    print("extract_duplicates_for_weekly_issues 실행됨")  # 디버깅 로그
-    # 실제 데이터 처리 로직
-
-def extract_duplicates_for_chart():
-    print("extract_duplicates_for_chart 실행됨")  # 디버깅 로그
-    # 실제 데이터 처리 로직
-
-def delete_expired_charts():
-    print("delete_expired_charts 실행됨")  # 디버깅 로그
-    # 만료된 데이터 삭제 로직
-
 def start_scheduler(save_chart_to_mongo=None):
-    from .views import save_daily_top10, delete_expired_charts, save_top10_to_chart,extract_duplicates_for_weekly_issues, extract_duplicates_for_chart
+    from .processing_tasks import save_daily_top10, delete_expired_charts, save_top10_to_chart, extract_duplicates_for_weekly_issues, extract_duplicates_for_chart
+
     jobstores = {
         'default': MongoDBJobStore(
             database='youtube_data',
@@ -75,14 +57,12 @@ def start_scheduler(save_chart_to_mongo=None):
     )
     print("daily_top10 저장 작업이 실행됩니다.")
 
-
     add_job_if_not_exists(
         'save_top10_to_chart',
         save_top10_to_chart,
-        trigger=IntervalTrigger(hour=5)
+        trigger=IntervalTrigger(hours=1)
     )
     print("Chart 저장 작업이 1시간마다 실행되도록 등록되었습니다.")
-
 
     add_job_if_not_exists(
         'extract_weekly_duplicates',
@@ -91,18 +71,17 @@ def start_scheduler(save_chart_to_mongo=None):
     )
     print("Weekly Issues 중복 데이터 추출 작업이 실행됩니다.")
 
-
     add_job_if_not_exists(
         'extract_chart_duplicates',
         extract_duplicates_for_chart,
-        trigger=IntervalTrigger(hour=5)
+        trigger=IntervalTrigger(hours=5)
     )
     print("Chart 중복 데이터 추출 작업이 1시간마다 실행되도록 등록되었습니다.")
 
     add_job_if_not_exists(
         'delete_expired_charts',
         delete_expired_charts,
-        trigger=IntervalTrigger(hour=0, minute=5)
+        trigger=CronTrigger(hour=0, minute=5)
     )
     print("스케줄러가 시작되었습니다: 24시간 지난 Chart 데이터를 삭제합니다.")
 

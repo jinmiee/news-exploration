@@ -1,7 +1,5 @@
 from django.apps import AppConfig
 import threading
-from .tasks import start_scheduler
-from django.conf import settings
 import time
 
 class AccountConfig(AppConfig):
@@ -14,7 +12,7 @@ class AccountConfig(AppConfig):
         if getattr(settings, 'ENABLE_SCHEDULER', True):
             def delayed_scheduler():
                 time.sleep(1)  # 1초 지연
-                from .tasks import start_scheduler  # Import를 지연시켜 순환 참조 방지
+                from account.tasks.scheduler import start_scheduler  # Import를 지연시켜 순환 참조 방지
                 start_scheduler()
 
             threading.Thread(target=delayed_scheduler, daemon=True).start()
