@@ -52,6 +52,8 @@ def clean_title(title):
     #'-MBC 중계방송' 제거
     title = re.sub(r'-\s*MBC\s*중계방송', '', title, flags=re.IGNORECASE)
 
+    title = re.sub(r'-\s*KBS', '', title, flags=re.IGNORECASE)
+
     title = re.sub(r'-\s*MBC', '', title, flags=re.IGNORECASE)
 
     # 'YYYY년 MM월 DD일'형식 날짜 제거
