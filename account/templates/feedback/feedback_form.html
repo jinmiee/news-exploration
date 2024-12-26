@@ -1,33 +1,63 @@
-<form method="post" action="{% url 'account:submit_feedback' %}" class="feedback-form">
-    {% csrf_token %}
-    
-    <div class="form-group feedback-top-section">
-        <!-- 별점 입력 -->
-        <label class="feedback-label">사용경험을 표현해주세요!</label>
-        <div class="star-rating">
-            <input type="radio" id="star5" name="rating" value="5">
-            <label for="star5" title="5점">★</label>
-            <input type="radio" id="star4" name="rating" value="4">
-            <label for="star4" title="4점">★</label>
-            <input type="radio" id="star3" name="rating" value="3">
-            <label for="star3" title="3점">★</label>
-            <input type="radio" id="star2" name="rating" value="2">
-            <label for="star2" title="2점">★</label>
-            <input type="radio" id="star1" name="rating" value="1" required>
-            <label for="star1" title="1점">★</label>
+<div class="feedback-form-container">
+    <form method="post" action="{% url 'account:submit_feedback' %}" class="feedback-form">
+        {% csrf_token %}
+
+        <div class="form-group feedback-top-section">
+            <!-- 별점 입력 -->
+            <label class="feedback-label">분석 결과는 만족스러우셨나요?</label>
+            <div class="star-rating">
+                <input type="radio" id="star5" name="rating" value="5">
+                <label for="star5" title="5점">
+                    <svg class="star" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.27 5.82 22 7 14.14l-5-4.87 6.91-1.01L12 2z"/>
+                    </svg>
+                </label>
+                <input type="radio" id="star4" name="rating" value="4">
+                <label for="star4" title="4점">
+                    <svg class="star" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.27 5.82 22 7 14.14l-5-4.87 6.91-1.01L12 2z"/>
+                    </svg>
+                </label>
+                <input type="radio" id="star3" name="rating" value="3">
+                <label for="star3" title="3점">
+                    <svg class="star" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.27 5.82 22 7 14.14l-5-4.87 6.91-1.01L12 2z"/>
+                    </svg>
+                </label>
+                <input type="radio" id="star2" name="rating" value="2">
+                <label for="star2" title="2점">
+                    <svg class="star" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.27 5.82 22 7 14.14l-5-4.87 6.91-1.01L12 2z"/>
+                    </svg>
+                </label>
+                <input type="radio" id="star1" name="rating" value="1" required>
+                <label for="star1" title="1점">
+                    <svg class="star" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.27 5.82 22 7 14.14l-5-4.87 6.91-1.01L12 2z"/>
+                    </svg>
+                </label>
+            </div>
+
         </div>
-    </div>
 
-    <!-- 피드백 텍스트 -->
-    <div class="form-group feedback-bottom-section">
-        <label for="feedback" class="feedback-label">사용하면서 좋았던 점이나 아쉬운 점을 말해주세요</label>
-        <textarea id="feedback" name="feedback" rows="4" class="feedback-textarea" placeholder="여기에 피드백을 작성하세요..." required></textarea>
-    </div>
-
-    <button type="submit" class="btn-submit">제출</button>
-</form>
+        <!-- 피드백 작성과 제출 버튼을 한 줄에 -->
+        <div class="form-group feedback-bottom-section">
+            <textarea id="feedback" name="feedback" rows="2" class="feedback-textarea" placeholder="회원님의 소중한 의견은 좋은 뉴스분석을 만드는데 큰 도움이 됩니다." required></textarea>
+            <button type="submit" class="btn-submit" disabled>제출</button>
+        </div>
+    </form>
+</div>
 
 <style>
+    /* 페이지 전체를 포함하는 컨테이너 */
+    .feedback-form-container {
+        display: flex;
+        justify-content: center; /* 수평 중앙 정렬 */
+        align-items: center; /* 수직 중앙 정렬 */
+        padding: 20px;
+        box-sizing: border-box;
+    }
+
     /* 피드백 폼 컨테이너 */
     .feedback-form {
         margin-top: 20px;
@@ -35,23 +65,36 @@
         background: #f9f9f9;
         border: 1px solid #ddd;
         box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        display: flex;
+        flex-direction: column;
+        align-items: center; /* 전체 중앙 정렬 */
+        width: 900px;
+        border-radius: 10px;
     }
 
     /* 라벨 스타일 */
     .feedback-label {
-        display: block;
-        margin-bottom: 10px;
         font-size: 16px;
         font-weight: bold;
         color: #333;
+        margin-bottom: 10px;
+        text-align: center;
+    }
+
+    /* 별점 입력 컨테이너 */
+    .feedback-top-section {
+        display: flex;
+        flex-direction: column; /* 세로로 정렬 */
+        align-items: center; /* 중앙 정렬 */
+        gap: 1px; /* 라벨과 별점 사이 간격 */
     }
 
     /* 별점 입력 영역 */
     .star-rating {
         display: flex;
         flex-direction: row-reverse; /* 오른쪽에서 왼쪽으로 표시 */
-        justify-content: flex-end;  /* 별점을 오른쪽 정렬 */
-        gap: 5px;
+        justify-content: center;  /* 별점을 오른쪽 정렬 */
+        gap: 10px;
     }
 
     .star-rating input {
@@ -59,30 +102,52 @@
     }
 
     .star-rating label {
-        font-size: 24px;
-        color: #ccc; /* 기본 별 색상 */
+        display: flex;
+        align-items: center;
+        justify-content: center;
         cursor: pointer;
-        transition: color 0.2s;
+        transition: transform 0.2s;
     }
 
-    .star-rating input:checked ~ label {
-        color: #007bff; /* 선택된 별 색상 */
+    .star-rating .star {
+        width: 30px; /* 별 크기 */
+        height: 30px;
+        stroke: #ccc; /* 기본 별 색상 */
+        fill: none; /* 채우기 없음 */
+        transition: stroke 0.2s ease, fill 0.2s ease;
     }
 
-    .star-rating input:checked ~ label:hover,
-    .star-rating input:hover ~ label {
-        color: #0056b3; /* 호버 시 별 색상 */
+    .star-rating input:checked ~ label .star {
+        stroke: #007bff; /* 선택된 별 테두리 색상 */
+        fill: #007bff; /* 선택된 별 채우기 색상 */
     }
 
-    .star-rating label:hover,
-    .star-rating label:hover ~ label {
-        color: #0056b3; /* 호버 시 별 색상 */
+    .star-rating label:hover .star,
+    .star-rating label:hover ~ label .star {
+        stroke: #0056b3; /* 호버 시 별 테두리 색상 */
+        fill: #0056b3; /* 호버 시 별 채우기 색상 */
+    }
+
+    .star-rating label:hover {
+        transform: scale(1.2); /* 호버 시 확대 효과 */
+    }
+
+    /* 텍스트 영역과 버튼 한 줄 정렬 */
+    .feedback-bottom-section {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        width: 100%;
+        max-width: 600px; /* 한 줄의 최대 너비 */
     }
 
     /* 텍스트 영역 스타일 */
     .feedback-textarea {
+        flex: 1; /* 남는 공간을 채움 */
         width: 100%;
-        height: 80px;
+        height: 45px;
         padding: 10px;
         font-size: 14px;
         border: 1px solid #ddd;
@@ -90,6 +155,8 @@
         box-sizing: border-box;
         resize: none;
         font-family: 'Arial', sans-serif;
+        margin-top: 15px; /* 별과 텍스트 영역 간격 */
+        text-align: center;
     }
 
     .feedback-textarea:focus {
@@ -101,42 +168,57 @@
     .btn-submit {
         margin-top: 15px;
         display: block;
-        width: 100%;
-        padding: 10px 20px;
-        font-size: 16px;
+        width: 10%;
+        padding: 13px 16px;
+        font-size: 14px;
         color: #fff;
-        background-color: #007bff;
         border: none;
         border-radius: 4px;
-        cursor: pointer;
         text-align: center;
+        background-color: #ccc; /* 비활성화 색상 */
+        cursor: not-allowed; /* 커서 비활성화 표시 */
         transition: background-color 0.3s ease;
+        white-space: nowrap; /* 버튼 텍스트 줄바꿈 방지 */
     }
 
-    .btn-submit:hover {
-        background-color: #0056b3;
+    /* 활성화 상태 */
+    .btn-submit.active {
+        background-color: #007bff; /* 활성화 색상 */
+        cursor: pointer; /* 활성화 시 클릭 가능 */
+    }
+
+    .btn-submit.active:hover {
+        background-color: #0056b3; /* 호버 시 색상 */
     }
 
     /* 반응형 스타일 */
     @media (max-width: 768px) {
-        .feedback-form {
-            padding: 15px;
-        }
-
-        .feedback-label {
-            font-size: 14px;
+        .feedback-bottom-section {
+            flex-direction: column; /* 작은 화면에서는 세로로 정렬 */
+            gap: 10px;
         }
 
         .feedback-textarea {
-            font-size: 13px;
+            width: 100%; /* 화면 너비에 맞춤 */
+            height: 60px; /* 텍스트 박스 높이 조정 */
         }
 
         .btn-submit {
-            font-size: 14px;
-        }
-
-        .star-rating label {
-            font-size: 20px;
+            width: 100%; /* 버튼도 화면 너비에 맞춤 */
         }
     }
 </style>
+
+<script>
+    // 별점 입력 요소 선택
+    const starInputs = document.querySelectorAll('.star-rating input');
+    const submitButton = document.querySelector('.btn-submit');
+
+    // 별점이 선택되었을 때 버튼 활성화
+    starInputs.forEach(input => {
+        input.addEventListener('change', () => {
+            submitButton.disabled = false; // 버튼 활성화
+            submitButton.classList.add('active'); // 활성화 스타일 추가
+        });
+    });
+</script>
