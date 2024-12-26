@@ -135,23 +135,18 @@ header p {
 }
 
 .issue-title a {
-    color: inherit; /* 기본 색상 상속 */
+    color: #333; /* 기본 색상 상속 */
     text-decoration: none; /* 기본 밑줄 제거 */
     transition: color 0.3s ease; /* 색상 전환 효과 추가 */
 }
 
 .issue-title a:hover {
     color: #007bff; /* 마우스를 올렸을 때 파란색 */
-    text-decoration: underline; /* 밑줄 추가 (옵션) */
 }
 
 .issue-link {
     color: #333;
     text-decoration: none;
-}
-
-.issue-link:hover {
-    text-decoration: underline;
 }
 
 @media (max-width: 768px) {
