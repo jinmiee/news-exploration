@@ -6,3 +6,4 @@ venv/
 .env/
 ko.bin
 linux
+staticfiles/

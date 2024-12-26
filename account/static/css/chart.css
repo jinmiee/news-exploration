@@ -32,18 +32,20 @@ body {
 
 .chart-header {
     text-align: center;
+    margin-top: 3rem;
     margin-bottom: 2rem;
 }
 
 .chart-header h1 {
-    font-size: 2.5rem;
+    font-size: 2.5rem;``
     color: var(--text-color);
     margin-bottom: 0.5rem;
 }
 
 .subtitle {
-    color: #666;
+    color: #333;
     font-size: 1.1rem;
+    opacity:.5
 }
 
 /* ===== 뉴스 리스트 ===== */
@@ -53,18 +55,27 @@ body {
     margin-top: 2rem;
     list-style: none;
     padding: 0;
+    max-width: 1000px; /* 리스트의 최대 너비 */
+    margin-left: auto; /* 자동으로 좌우 여백 설정 */
+    margin-right: auto;
+}
+
+.news-ul {
+    padding-left: 0;
 }
 
 .news-item {
     display: flex;
     align-items: flex-start;
-    padding: 0.8rem; /* 기존 1.5rem에서 1rem으로 줄임 */
-    margin-bottom: 0.5rem; /* 기존 1rem에서 0.5rem으로 줄임 */
+    padding: 1rem; /* 내부 여백을 넉넉하게 설정 */
+    margin-bottom: 1rem; /* 항목 간 여백 */
     background: white;
     border-radius: var(--border-radius);
     box-shadow: var(--card-shadow);
     transition: transform var(--transition-duration), box-shadow var(--transition-duration);
-    text-align: left; /* 텍스트 정렬을 왼쪽으로 */
+    max-width: 1140px; /* 전체 화면 폭에 맞춤 */
+    margin-left: auto; /* 자동 중앙 정렬 */
+    margin-right: auto;
 }
 
 .news-item:hover {
@@ -89,16 +100,16 @@ body {
 
 .news-content {
     display: flex;
-    align-items: center;
     justify-content: space-between;
-    width: 100%; /* 찜하기 버튼을 포함한 전체 영역 */
-    min-width: 0;
+    align-items: center;
+    width: 100%;
+    padding: 0 1.5rem; /* 좌우 여백 */
 }
 
 .news-title {
     font-size: 1rem;
-    font-weight: 400; /* 기존 600에서 줄임 */
-    color: #666; /* 더 연한 회색 */
+    font-weight: 600;
+    color: #333;
     text-decoration: none;
     margin-right: 1rem;
     line-height: 1.2;
@@ -106,7 +117,8 @@ body {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    text-align: center;
+    text-align: left;
+    flex: 1; /* 제목이 왼쪽 공간을 차지하도록 설정 */
 }
 
 .news-title:hover {
@@ -142,20 +154,34 @@ body {
 
 /* ===== 동영상 사이드바 ===== */
 .video-sidebar {
-    position: fixed; /* 고정 위치 */
-    top: 10%; /* 화면 상단에서 약간 떨어지게 설정 */
-    right: 0; /* 화면 오른쪽에 고정 */
-    width: 500px; /* 너비를 더 크게 설정 */
-    background: white;
-    border-radius: var(--border-radius);
-    box-shadow: var(--card-shadow);
-    padding: 2rem; /* 여백 증가 */
-    z-index: 1000; /* 다른 요소 위에 나타나도록 설정 */
-    display: none; /* 기본값: 보이지 않음 */
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40%; /* 전체 너비의 40%로 설정 (반으로 줄임) */
+    height: auto;
+    z-index: 1000;
+    display: none;
+    background-color: #fff;
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    padding: 20px;
 }
 
+/* Flexbox로 제목과 닫기 버튼 정렬 */
 .sidebar-header {
+    display: flex;
+    align-items: center; /* 세로 중앙 정렬 */
+    justify-content: space-between; /* 제목과 버튼 간격 설정 */
     margin-bottom: 1rem;
+}
+
+/* 제목 스타일 */
+.sidebar-title {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: var(--text-color);
+    margin: 0; /* 제목 상하 여백 제거 */
 }
 
 .sidebar-header h2 {
@@ -163,8 +189,25 @@ body {
     color: var(--text-color);
 }
 
+/* 닫기 버튼 스타일 */
+.close-button {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #666;
+    cursor: pointer;
+    padding: 0.5rem;
+    transition: color 0.3s ease;
+}
+
+.close-button:hover {
+    color: var(--accent-color); /* 마우스 오버 시 강조 색상 */
+}
+
+
 #player-wrapper {
-    width: 100%; /* 플레이어가 사이드바 전체 너비를 차지 */
+    width: 100%; /* 사이드바 너비에 맞춤 */
     position: relative;
     padding-top: 56.25%; /* 16:9 비율 */
     margin-bottom: 1.5rem;
@@ -220,6 +263,7 @@ body {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 1rem;
+
 }
 
 .btn-analysis {

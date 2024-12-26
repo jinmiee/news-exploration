@@ -20,8 +20,6 @@ from django.contrib.auth import views as auth_views
 from . import views
 from django.urls import reverse_lazy
 
-
-
 app_name = 'account'
 
 urlpatterns = [
@@ -34,6 +32,9 @@ urlpatterns = [
     path('', views.chart, name='chart'),
     path('video-details/', views.video_details, name='video_details'),
     path('detail/', views.detail, name='detail'),
+    path('feedback/', views.submit_feedback, name='submit_feedback'),
+    path('feedback_done/', views.feedback_done, name='feedback_done'),
+
     path('weekly-issues/', views.weekly_issues, name='weekly_issues'),
     path('emotion/', views.emotion, name='emotion'),
     path('relate/', views.relate, name='relate'),
@@ -42,12 +43,14 @@ urlpatterns = [
     path('mypage/', views.mypage, name='mypage'),
     path('like/<str:video_id>/', views.like_video, name='like_video'),
     path('mypage/like/', views.my_liked_videos, name='my_liked_video'),
+    path('mypage/like/<str:id>/', views.delete_from_liked, name='delete_from_liked'),
 
+    path('related-duplicates/', views.get_related_duplicate_videos, name='related_duplicates'),
 
 
     path('signup/', views.register, name='signup'),
     path('find-password/', views.find_password, name='find_password'),
-    path('analysis/get_performance_metrics/', views.get_performance_metrics, name='get_performance_metrics'),
+    path('trigger-save-chart/', views.trigger_chart_save, name='trigger_save_chart'),
     
 
 ]

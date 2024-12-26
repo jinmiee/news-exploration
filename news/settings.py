@@ -30,6 +30,10 @@ SECRET_KEY = 'django-insecure-%v&8a5r%z%&(#mfpk03**e(@iv#kkvmnqbqr3*_)scs#bs3%j)
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
+
+# Scheduler 설정
+ENABLE_SCHEDULER = True
+
 ALLOWED_HOSTS = ['15.168.46.71','*']
 
 
@@ -43,7 +47,6 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'django_cron',
 ]
 
 MIDDLEWARE = [

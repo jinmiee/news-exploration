@@ -15,7 +15,7 @@ from bson import ObjectId
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 from .forms import UserRegistrationForm
-from .models import YouTubeData, Like, WeeklyIssue, Chart
+from .models import YouTubeData, Like, WeeklyIssue, Chart, WeeklyIssueDuplicateVideo, ChartDuplicateVideo
 from urllib.parse import urlparse, parse_qs
 
 from pytz import timezone
@@ -26,7 +26,7 @@ matplotlib.use('Agg')
 from django.utils.timezone import localtime, utc
 
 
-from .analysis.relate_analysis import analyze_related_words, generate_network_graph, visualize_performance_metrics
+from .analysis.relate_analysis import analyze_related_words
 from .analysis.emotion_analysis import (
     generate_wordcloud,
     generate_pie_chart,
@@ -41,60 +41,31 @@ from pymongo import MongoClient
 from pymongo.errors import DuplicateKeyError
 from django.utils.timezone import localtime
 from datetime import timedelta
+from .models import Like, YouTubeData, WeeklyIssue, Chart, WeeklyIssueDuplicateVideo, ChartDuplicateVideo
+from .analysis.visualization import generate_network_graph
+from .tasks.processing_tasks import (
+    save_top_videos,
+    save_top10_to_chart,
+    delete_expired_charts,
+    save_daily_top10,
+    extract_duplicates_for_weekly_issues,
+    extract_duplicates_for_chart,
+)
 
-def save_top_videos(start_time, end_time, model):
+
+def trigger_chart_save(request):
     """
-    특정 시간대의 상위 10개 동영상을 지정된 모델에 저장
-    :param start_time: 데이터 필터링 시작 시간
-    :param end_time: 데이터 필터링 종료 시간
-    :param model: 데이터를 저장할 Django 모델 (Chart, WeeklyIssue 등)
+    스케줄링된 작업을 수동으로 실행
     """
     try:
-        # 데이터베이스에서 시간 범위에 해당하는 데이터 가져오기
-        all_data = YouTubeData.objects.filter(
-            upload_date__gte=start_time,
-            upload_date__lt=end_time
-        ).order_by('-views')
-
-        if not all_data.exists():
-            print(f"해당 시간 범위에 데이터가 없습니다. {start_time} ~ {end_time}")
-            return
-
-        # 상위 10개 데이터 선정
-        top_videos = get_top10_chart_based(all_data)
-
-        # 상위 10개 데이터를 지정된 모델에 저장
-        for rank, video in enumerate(top_videos, start=1):
-            try:
-                video_id = ObjectId(video._id) if isinstance(video._id, str) else video._id
-                model.objects.update_or_create(
-                    _id=video_id,  # MongoDB ObjectId
-                    defaults={
-                        "chart_date": localtime(),
-                        "rank": rank,
-                        "channel_name": video.channel_name,
-                        "title": video.title,
-                        "views": video.views,
-                        "upload_date": video.upload_date,
-                        "url": video.url,
-                        "channel": video.channel,
-                        "desc": video.desc,
-                        "likes": video.likes,
-                        "thumbnail": video.thumbnail,
-                        "comments": video.comments,
-                        "transcript": video.transcript,
-                    }
-                )
-            except Exception as e:
-                print(f"Error saving video {video._id}: {e}")
-
-        print(f"데이터 저장 완료: {start_time} ~ {end_time}")
+        save_top10_to_chart()  # processing_tasks.py에서 가져온 함수 호출
+        return JsonResponse({"message": "Chart 저장 작업이 성공적으로 실행되었습니다."}, status=200)
     except Exception as e:
-        print(f"Error in save_top_videos: {e}")
+        return JsonResponse({"error": str(e)}, status=500)
 
-def save_top10_to_chart():
+def chart(request):
     """
-    상위 10개의 동영상 데이터를 Chart 컬렉션에 저장.
+    Chart 데이터를 템플릿으로 전달
     """
     try:
         now = localtime()
@@ -110,88 +81,51 @@ def save_top10_to_chart():
             analysis_start = now.replace(hour=11, minute=0, second=0, microsecond=0)
             analysis_end = now.replace(hour=23, minute=0, second=0, microsecond=0)
 
-        # 시간대를 UTC로 변환
-        analysis_start = analysis_start.astimezone(utc)
-        analysis_end = analysis_end.astimezone(utc)
-
-        print(f"Analysis start(UTC): {analysis_start}, Analysis end(UTC): {analysis_end}")
-
-        # 데이터 저장 로직
-        save_top_videos(analysis_start, analysis_end, Chart)
-
-    except Exception as e:
-        print(f"Error in save_top10_to_chart: {e}")
-
-import logging
-
-logger = logging.getLogger('chart_cleanup')
-
-def delete_expired_charts():
-    """
-    Chart 데이터에서 24시간이 지난 항목만 삭제
-    """
-    try:
-        # 현재 시간 기준으로 24시간 전 시간 계산
-        now = localtime()
-        expiration_time = now - timedelta(hours=24)
-
-        # 24시간 이전의 데이터를 필터링하여 삭제
-        expired_charts = Chart.objects.filter(chart_date__lt=expiration_time)
-        deleted_count, _ = expired_charts.delete()
-
-        logger.info(f"{deleted_count}개의 24시간 지난 Chart 데이터가 삭제되었습니다.")
-    except Exception as e:
-        logger.error(f"delete_expired_charts 실행 중 오류 발생: {e}")
-
-def chart(request):
-    """
-    Chart 데이터를 템플릿으로 전달
-    """
-    try:
-        now = localtime()
-
-        # 기준 시간 설정
-        if now.hour < 11:
-            analysis_start = (now - timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)
-            analysis_end = now.replace(hour=11, minute=0, second=0, microsecond=0)
-        elif now.hour < 23:
-            analysis_start = now.replace(hour=11, minute=0, second=0, microsecond=0)
-            analysis_end = now.replace(hour=23, minute=0, second=0, microsecond=0)
-        else:
-            analysis_start = now.replace(hour=23, minute=0, second=0, microsecond=0)
-            analysis_end = (now + timedelta(days=1)).replace(hour=11, minute=0, second=0, microsecond=0)
-
         analysis_start_utc = analysis_start.astimezone(utc)
         analysis_end_utc = analysis_end.astimezone(utc)
 
         # MongoDB에서 데이터 필터링
         chart_data = Chart.objects.filter(
-            chart_date__gte=analysis_start_utc,
-            chart_date__lt=analysis_end_utc
-        ).order_by('rank')
+            upload_date__gte=analysis_start_utc,
+            upload_date__lt=analysis_end_utc
+        )
+        chart_data = sorted(chart_data, key=lambda x: x.rank)
 
-        # 데이터 확인
-        print("DEBUG: chart_data count:", chart_data.count())
+        # QuerySet 개수를 확인하려면 .count()를 사용
+        print("DEBUG: QuerySet count before sorting:", Chart.objects.filter(
+            upload_date__gte=analysis_start_utc,
+            upload_date__lt=analysis_end_utc
+        ).count())
 
-        # 제목 정제를 포함한 데이터 가공
+        # 리스트의 길이를 확인하려면 len()을 사용
+        print("DEBUG: chart_data count after sorting:", len(chart_data))
+        print(chart_data)
         processed_chart_data = []
         for chart in chart_data:
             try:
                 processed_chart_data.append({
                     "rank": chart.rank,
                     "title": chart.title,
-                    "cleaned_title": clean_title(chart.title),  # 정제된 제목 추가
+                    "cleaned_title": clean_title(chart.title),
                     "views": chart.views,
+                    "likes": chart.likes,
                     "channel_name": chart.channel_name,
                     "url": chart.url,
                     "upload_date": chart.upload_date,
                     "thumbnail": chart.thumbnail,
+                    "id": str(chart._id),  # _id를 id로 매핑
+                    
                 })
+                if request.user.is_authenticated:
+                    processed_chart_data[-1]['is_liked_by_user'] = Like.objects.filter(user=request.user, youtube_data=YouTubeData.objects.get(_id = chart._id)).exists()
             except Exception as e:
                 print(f"Error processing chart data: {e}")
 
+        
+        
         # 템플릿에 전달할 데이터 구성
         context = {
+        
             "top_news": processed_chart_data,
             "analysis_start": analysis_start,
             "analysis_end": analysis_end
@@ -204,6 +138,7 @@ def chart(request):
         print(f"Error in chart function: {e}")
         print(traceback.format_exc())
         return JsonResponse({"error": str(e)}, status=500)
+
 
 @csrf_exempt  # CSRF 검사 비활성화(POST 요청 허용)
 def video_details(request):
@@ -247,125 +182,113 @@ def video_details(request):
     # 요청이 POST 방식이 아닐 경우 에러 응답
     return JsonResponse({"error": "Invalid request method. Only POST is allowed."}, status=405)
 
-def save_all_historical_top10():
-    try:
-        all_videos = YouTubeData.objects.all().order_by('upload_date')
-        grouped_videos = defaultdict(list)
-
-        seoul_tz = timezone('Asia/Seoul')
-
-        for video in all_videos:
-            # Null 또는 None 체크
-            if not video.upload_date:
-                print(f"Video {video.title} has no upload_date. Skipping...")
-                continue
-
-            # 문자열인 경우 datetime으로 변환
-            if isinstance(video.upload_date, str):
-                try:
-                    video.upload_date = datetime.fromisoformat(video.upload_date)
-                except ValueError:
-                    print(f"Invalid date format for video {video.title}. Skipping...")
-                    continue
-
-            # UTC → KST 변환 후 날짜별 그룹화
-            date_key = video.upload_date.astimezone(seoul_tz).date()
-            grouped_videos[date_key].append(video)
-
-        # 상위 10개 선정
-        for date_key, videos in grouped_videos.items():
-            top_videos = get_top10_chart_based(videos)
-
-            for video in top_videos:
-                WeeklyIssue.objects.update_or_create(
-                    _id=video._id,
-                    defaults={
-                        'title': video.title,
-                        'channel_name': video.channel_name,
-                        'views': video.views,
-                        'upload_date': video.upload_date,  # 이미 UTC로 저장됨
-                        'url': video.url,
-                        'channel': video.channel,
-                        'thumbnail': video.thumbnail,
-                        'comments': video.comments or [],
-                        'transcript': video.transcript or []
-                    }
-                )
-        print("All historical top 10 videos saved successfully.")
-    except Exception as e:
-        print(f"save_all_historical_top10 failed: {e}")
-
-def save_daily_top10():
-    """
-    어제 날짜 데이터를 기반으로 상위 10개 비디오를 WeeklyIssue 컬렉션에 저장
-    """
-    try:
-        seoul_tz = timezone('Asia/Seoul')  # 한국 시간대
-        today = datetime.now(seoul_tz).date()
-        yesterday = today - timedelta(days=1)
-
-        start_time = datetime.combine(yesterday, datetime.min.time()).replace(tzinfo=seoul_tz).astimezone(pytz.UTC)
-        end_time = datetime.combine(yesterday, datetime.max.time()).replace(tzinfo=seoul_tz).astimezone(pytz.UTC)
-
-        save_top_videos(start_time, end_time, WeeklyIssue)
-    except Exception as e:
-        print(f"Error in save_daily_top10: {e}")
-
 def weekly_issues(request):
     date_str = request.GET.get('date')
     seoul_tz = pytz.timezone('Asia/Seoul')
     today = datetime.now(seoul_tz).date()
-    yesterday = today - timedelta(days=1)  # 어제 날짜 계산
+    yesterday = today - timedelta(days=1)
 
-    # 날짜 처리
     if date_str:
         try:
             target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
         except ValueError:
-            target_date = yesterday  # 잘못된 날짜 입력 시 어제 날짜로 설정
+            target_date = yesterday
     else:
-        target_date = yesterday  # 기본값: 어제 날짜
+        target_date = yesterday
 
-    # target_date가 어제보다 크다면 강제로 어제 날짜로 설정
     if target_date > yesterday:
         target_date = yesterday
 
-    # 검색한 날짜 기준으로 내림차순 최근 6일 범위 계산
     start_date = target_date - timedelta(days=5)
     end_date = target_date + timedelta(days=1)
 
-    # UTC 변환
     start_date_utc = datetime.combine(start_date, datetime.min.time()).astimezone(pytz.UTC)
     end_date_utc = datetime.combine(end_date, datetime.min.time()).astimezone(pytz.UTC)
 
-    # 데��터 필터링
-    issues = WeeklyIssue.objects.filter(
-        upload_date__gte=start_date_utc,
-        upload_date__lt=end_date_utc
-    ).order_by('-upload_date')
+    try:
+        issues = WeeklyIssue.objects.filter(
+            upload_date__gte=start_date_utc,
+            upload_date__lt=end_date_utc
+        )
+        issues = sorted(issues, key=lambda x: x.upload_date, reverse=True)
 
-    # 날짜별로 그룹화
-    grouped_issues = defaultdict(list)
-    for issue in issues:
-        issue_date = issue.upload_date.astimezone(seoul_tz).date()
-        weekday = issue_date.strftime("%Y년 %m월 %d일 (%a)").replace("Mon", "월").replace("Tue", "화").replace("Wed", "수").replace("Thu", "목").replace("Fri", "금").replace("Sat", "토").replace("Sun", "일")
-        grouped_issues[weekday].append({
-            'rank': len(grouped_issues[weekday]) + 1,
-            'title': clean_title(issue.title),
-            'views': issue.views,
-            'url': issue.url,
-        })
+        grouped_issues = defaultdict(list)
+        for issue in issues:
+            issue_date = issue.upload_date.astimezone(seoul_tz).date()
+            weekday = issue_date.strftime("%Y년 %m월 %d일 (%a)").replace("Mon", "월").replace("Tue", "화").replace("Wed", "수").replace("Thu", "목").replace("Fri", "금").replace("Sat", "토").replace("Sun", "일")
+            grouped_issues[weekday].append({
+                'rank': len(grouped_issues[weekday]) + 1,
+                'title': clean_title(issue.title),
+                'views': issue.views,
+                'url': issue.url,
+            })
 
-    # 정렬 및 최대 6개만 유지
-    sorted_issues = sorted(grouped_issues.items(), key=lambda x: x[0], reverse=True)[:6]
+        sorted_issues = sorted(grouped_issues.items(), key=lambda x: x[0], reverse=True)[:6]
 
-    context = {
-        'sorted_issues': sorted_issues,
-        'target_date': target_date,
-        'yesterday': yesterday,  # 어제 날짜를 템플릿에 전달
-    }
+        context = {
+            'sorted_issues': sorted_issues,
+            'target_date': target_date,
+            'yesterday': yesterday,
+        }
+        return render(request, 'analysis/weekly_issues.html', context)
 
-    return render(request, 'analysis/weekly_issues.html', context)
+    except Exception as e:
+        print(f"Error in weekly_issues function: {e}")
+        return JsonResponse({"error": str(e)}, status=500)
+
+from fuzzywuzzy import fuzz
+from datetime import timedelta
+
+def get_related_duplicate_videos(request):
+    try:
+        # 요청에서 URL을 가져옵니다.
+        video_url = request.GET.get('url')
+        if not video_url:
+            return JsonResponse({"error": "URL 매개변수가 제공되지 않았습니다."}, status=400)
+
+        # WeeklyIssue 또는 Chart에서 해당 URL과 일치하는 동영상 가져오기
+        video = WeeklyIssue.objects.filter(url=video_url).first() or Chart.objects.filter(url=video_url).first()
+        if not video:
+            return JsonResponse({"error": "해당 URL에 대한 기사를 찾을 수 없습니다."}, status=404)
+
+        # 중복 동영상 모델 선택
+        if WeeklyIssue.objects.filter(url=video_url).exists():
+            duplicates_model = WeeklyIssueDuplicateVideo
+        elif Chart.objects.filter(url=video_url).exists():
+            duplicates_model = ChartDuplicateVideo
+        else:
+            return JsonResponse({"error": "데이터 유형을 확인할 수 없습니다."}, status=400)
+
+        # 중복 검색 (유사도 + 업로드 날짜 범위 기준)
+        duplicates = []
+        for candidate in duplicates_model.objects.all():
+            similarity = fuzz.ratio(video.title, candidate.title)
+            if similarity > 70 : # 유사도가 70% 이상이고 업로드 날짜가 하루 이내인 경우
+                duplicates.append(candidate)
+
+        # 디버깅 로그 출력
+        print(f"DEBUG: 중복 동영상 개수: {len(duplicates)}")
+        for duplicate in duplicates:
+            print(f"중복 동영상: {duplicate.title}, URL: {duplicate.url}, 유사도: {similarity}")
+
+        # JSON 응답 생성
+        duplicate_list = [
+            {
+                "title": duplicate.title,
+                "url": duplicate.url,
+                "views": duplicate.views,
+                "upload_date": duplicate.upload_date.isoformat(),
+                "channel_name": duplicate.channel_name,
+                "thumbnail": duplicate.thumbnail,
+            }
+            for duplicate in duplicates
+        ]
+
+        return JsonResponse({"duplicates": duplicate_list}, safe=False, status=200)
+
+    except Exception as e:
+        print(f"중복 동영상 검색 오류: {e}")
+        return JsonResponse({"error": "중복 동영상 검색 중 오류가 발생했습니다."}, status=500)
 
 #상세분석
 # @login_required
@@ -375,39 +298,32 @@ def detail(request):
 
     # 선택된 비디오 데이터 가져오기
     video = YouTubeData.objects.filter(url=video_url).first()
-    video_views = video.views if video else None
-    video_likes = video.likes if video else None
-    video_comments = video.comments if video else None
-    video_title = video.title if video else None
 
-    # 관련 비디오 처리
-    all_videos = YouTubeData.objects.all()
+    # 비디오 데이터가 없을 경우 처리
+    if not video:
+        return JsonResponse({"error": "해당 URL에 대한 비디오 데이터를 찾을 수 없습니다."}, status=404)
 
-    def process_for_similarity(video_data):
-        title = clean_title(video_data.title)
-        transcript = " ".join([item['text'] for item in video_data.transcript]) if video_data.transcript else ""
-        return f"{title} {transcript}"
+    video_views = video.views
+    video_likes = video.likes
+    video_comments = video.comments
+    video_title = video.title
 
-    # TF-IDF 벡터화
-    corpus = [process_for_similarity(v) for v in all_videos]
-    vectorizer = TfidfVectorizer(max_features=5000, stop_words='english')
-    tfidf_matrix = vectorizer.fit_transform(corpus)
+    # 주간 이슈인지 차트인지 확인
+    if WeeklyIssue.objects.filter(url=video_url).exists():
+        duplicates_model = WeeklyIssueDuplicateVideo
+    elif Chart.objects.filter(url=video_url).exists():
+        duplicates_model = ChartDuplicateVideo
+    else:
+        duplicates_model = None
 
-    target_index = list(all_videos).index(video)
-    similarity_scores = cosine_similarity(tfidf_matrix[target_index:target_index+1], tfidf_matrix).flatten()
-
-    # 유사도가 높은 비디오 필터링
-    threshold = 0.7
-    related_videos = [
-        {
-            "url": v.url,
-            "video_id": v.url.split('v=')[1].split('&')[0],  # 여기서 ID를 추출
-            "thumbnail": v.thumbnail,
-            "title": v.title,
-        }
-        for i, v in enumerate(all_videos)
-        if similarity_scores[i] > threshold and i != target_index
-    ]
+    # 중복 동영상 가져오기
+    duplicates = []
+    if duplicates_model:
+        try:
+            duplicates = duplicates_model.objects.filter(title__icontains=video.title)
+        except Exception as e:
+            print(f"Error retrieving duplicates: {e}")
+            duplicates = []
 
     context = {
         'video': video,
@@ -417,7 +333,7 @@ def detail(request):
         'video_views': video_views,
         'video_likes': video_likes,
         'video_comments': video_comments,
-        'related_videos': related_videos,  # 유사한 비디오들
+        'related_videos': duplicates,  # 유사한 비디오들
     }
 
     return render(request, 'analysis/detail.html', context)
@@ -548,7 +464,7 @@ def relate(request):
             cleaned_title = clean_title(video.title)
             video_desc = f"{cleaned_title} {video.desc if video.desc else ''}"
             
-            # transcript 데이터를 시간 단위로 구분하여 텍스트로 변환
+            # transcript 데이터 처리
             transcript_segments = []
             for item in video.transcript:
                 if 'start' in item and 'text' in item:
@@ -573,11 +489,11 @@ def relate(request):
             # 키워드별 관련 뉴스 분류
             categorized_news = {}
             if important_keywords:
-                for keyword in important_keywords:
+                for keyword in important_keywords[:10]:  # 상위 10개 키워드만 처리
                     related_news = YouTubeData.objects.filter(
                         Q(title__icontains=keyword) | 
                         Q(desc__icontains=keyword)
-                    ).exclude(url=video_url)[:6]
+                    ).exclude(url=video_url)[:10]  # 뉴스 개수 제한
                     
                     if related_news:
                         cleaned_news = []
@@ -617,93 +533,56 @@ def relate(request):
 
 
 
-def get_performance_metrics(request):
-    try:
-        video_url = request.GET.get('url')
-        video = YouTubeData.objects.filter(url=video_url).first()
-        
-        if not video:
-            return JsonResponse({'error': '비디오를 찾을 수 없습니다.'}, status=404)
-        
-        # 캐시 키 생성
-        cache_key = f'performance_metrics_{video.url}'
-        
-        # 캐시된 결과가 있는지 확인
-        from django.core.cache import cache
-        cached_result = cache.get(cache_key)
-        
-        if cached_result:
-            return JsonResponse({'performance_graph': cached_result})
-            
-        # 성능 평가 그래프 생성
-        performance_graph = visualize_performance_metrics()
-        
-        if not performance_graph:
-            return JsonResponse({'error': '성능 평가 데이터를 생성할 수 없습니다.'}, status=500)
-            
-        # 결과 캐시에 저장 (1시간)
-        cache.set(cache_key, performance_graph, 3600)
-        
-        return JsonResponse({
-            'performance_graph': performance_graph
-        })
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
-
-
-
-
-
-
-
-
-
-
 
 @login_required
 def mypage(request):
     return render(request, 'analysis/mypage/mypage.html', {'section': 'mypage'}) 
 
 
+
+from bson import ObjectId
+from django.shortcuts import get_object_or_404
 @login_required
 def like_video(request, video_id):
-    try:
-        video = YouTubeData.objects.get(_id=ObjectId(video_id))
-        like_obj, created = Like.objects.get_or_create(
-            user=request.user,
-            youtube_data=video
-        )
-        
-        if not created:  # 이미 좋아요가 있으면 삭제
-            like_obj.delete()
-            is_liked = False
-        else:  # 새로 생성된 경우
-            is_liked = True
-            
-        return JsonResponse({
-            'status': 'success',
-            'is_liked': is_liked
-        })
-    except Exception as e:
-        print(f"Error: {str(e)}")  # 디버깅용
-        return JsonResponse({
-            'status': 'error',
-            'message': str(e)
-        }, status=500)
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'User not authenticated'}, status=401)
+
+    video_id = ObjectId(video_id)
+    video = get_object_or_404(YouTubeData, _id=video_id)
+    like_instance, created = Like.objects.get_or_create(user=request.user, youtube_data=video)
+
+
+
+    if not created:
+        like_instance.delete()  # 이미 찜한 경우 삭제
+        return JsonResponse({'message': 'Like removed from like_list', 'is_liked': False})
+
+    return JsonResponse({'message': '해당 기사가 찜 됐어요! 마이페이지에서 확인가능', 'is_liked': True})
+
 
 # @login_required
 def my_liked_videos(request):
     liked_videos = YouTubeData.objects.filter(like__user=request.user)  
     
-    context = {
-        'liked_videos': liked_videos,
-        'section': 'mypage'
-    } 
+
     for video in liked_videos:
         print(video)
         video.id = str(video._id)
         print(video.id)
+
+    context = {
+        'liked_videos': liked_videos,
+        'section': 'mypage'
+    }         
     return render(request, 'analysis/mypage/my_liked_videos.html', context)
+
+def delete_from_liked(request, id):
+    video_id = ObjectId(id)
+    video = get_object_or_404(YouTubeData, _id=video_id)
+    like_instance = Like.objects.filter(user=request.user, youtube_data=video).first()
+    if like_instance:
+        like_instance.delete()
+    return redirect('account:my_liked_video')
 
 
 def register(request):
@@ -761,3 +640,29 @@ def find_password(request):
     
     return render(request, 'registration/find_password.html', {"error": error})
 
+
+from django.shortcuts import render, redirect
+from .models import Feedbacks 
+from .forms import FeedbackForm
+from django.contrib import messages
+
+def submit_feedback(request):
+    if request.method == 'POST':
+        feedback_text = request.POST.get('feedback')
+        rating = request.POST.get('rating')
+
+        if feedback_text and rating:
+            Feedbacks.objects.create(feedback=feedback_text, rating=int(rating), user=request.user)
+            messages.success(request, "피드백이 성공적으로 제출되었습니다!")
+            return render(request, 'feedback/feedback_done.html')
+        else:
+            messages.error(request, "모든 필드를 입력해주세요.")
+            return render(request, '/')
+        
+        
+    
+
+
+
+def feedback_done(request):
+    return render(request, 'feedback/feedback_done.html')
