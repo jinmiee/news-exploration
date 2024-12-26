@@ -1,11 +1,15 @@
-/* 인증 페이지 공통 스타일 */
 .auth-container {
     max-width: 450px;
-    margin: 4rem auto;
+    margin: 0 auto; /* 수평 중앙 정렬 */
     padding: 2.5rem;
     background: white;
     border-radius: 16px;
     box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    display: flex; /* 수직 및 수평 중앙 정렬 */
+    flex-direction: column;
+    align-items: center; /* 가운데 정렬 */
+    justify-content: center; /* 수직 중앙 정렬 */
+    min-height: 100vh; /* 화면 전체 높이 */
 }
 
 .auth-container h1 {
@@ -20,7 +24,9 @@
 .auth-form {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 1rem;
+    width: 100%; /* 폼의 너비를 컨테이너에 맞게 */
+    max-width: 400px; /* 최대 너비 설정 */
 }
 
 .auth-form p {
@@ -40,28 +46,27 @@
 .auth-form input[type="password"],
 .auth-form input[type="email"] {
     width: 100%;
-    padding: 1rem;
-    border: 2px solid var(--border-color);
-    border-radius: 8px;
-    font-size: 1rem;
+    padding: 0.75rem; /* 패딩 크기 줄임 */
+    border: 1px solid #ddd; /* 테두리 두께 줄임 */
+    border-radius: 6px; /* 둥근 정도 줄임 */
+    font-size: 0.9rem; /* 폰트 크기 줄임 */
     transition: all 0.3s ease;
 }
 
 .auth-form input[type="text"]:focus,
 .auth-form input[type="password"]:focus,
 .auth-form input[type="email"]:focus {
-    border-color: var(--secondary-color);
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+    border-color: #aaa; /* 포커스 시 더 연한 회색 */
+    box-shadow: none; /* 기존 강조 효과 제거 */
 }
 
 .auth-form input[type="submit"] {
     background: var(--secondary-color);
     color: white;
-    padding: 1rem;
+    padding: 0.75rem;
     border: none;
     border-radius: 8px;
-    font-size: 1.1rem;
+    font-size: 1rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;

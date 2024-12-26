@@ -4,7 +4,10 @@ pip install konlpy networkx matplotlib pandas
 from collections import defaultdict
 from datetime import timedelta, datetime
 
+from django.contrib.auth import update_session_auth_hash
+from django.contrib.auth.views import PasswordChangeView
 from django.http import JsonResponse
+from django.urls import reverse_lazy
 from django.utils import timezone
 
 from django.utils.timezone import localtime, make_aware, is_aware
@@ -14,7 +17,7 @@ from django.contrib.auth.decorators import login_required
 from bson import ObjectId
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-from .forms import UserRegistrationForm
+from .forms import UserRegistrationForm, CustomPasswordChangeForm
 from .models import YouTubeData, Like, WeeklyIssue, Chart, WeeklyIssueDuplicateVideo, ChartDuplicateVideo
 from urllib.parse import urlparse, parse_qs
 
@@ -667,11 +670,38 @@ def submit_feedback(request):
         else:
             messages.error(request, "모든 필드를 입력해주세요.")
             return render(request, '/')
-        
-        
-    
-
-
 
 def feedback_done(request):
     return render(request, 'feedback/feedback_done.html')
+
+class CustomPasswordChangeView(PasswordChangeView):
+    form_class = CustomPasswordChangeForm  # 커스텀 폼 적용
+    success_url = reverse_lazy('account:password_change_done')  # 성공 후 이동할 URL
+    template_name = 'registration/password_change_form.html'  # 기존 템플릿 경로
+
+@login_required
+def update_info(request):
+    if request.method == 'POST':
+        email = request.POST.get('email', '')
+        user = request.user
+        if email:
+            user.email = email
+            user.save()
+            messages.success(request, '회원 정보가 성공적으로 수정되었습니다.')
+        else:
+            messages.error(request, '이메일을 입력해주세요.')
+        return redirect('account:mypage')  # 마이페이지로 리다이렉트
+
+    return render(request, 'update_info.html')
+
+@login_required
+def password_change(request):
+    if request.method == 'POST':
+        form = CustomPasswordChangeForm(user=request.user, data=request.POST)
+        if form.is_valid():
+            form.save()  # 비밀번호 저장
+            update_session_auth_hash(request, form.user)  # 세션 유지
+            return JsonResponse({'message': '비밀번호가 성공적으로 변경되었습니다!'}, status=200)
+        else:
+            return JsonResponse({'errors': form.errors.as_json()}, status=400)
+    return JsonResponse({'error': 'Invalid request method'}, status=405)

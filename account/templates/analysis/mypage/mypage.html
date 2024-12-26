@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+
 {% load static %}
 
 {% block head %}
@@ -13,122 +14,190 @@
         <h1>{{ user.username }}님의 페이지</h1>
     </header>
 
-    <section class="mypage-section">
-        <h2>회원정보수정</h2>
+    <div class="basic-info-container">
+        <section class="mypage-section user-basic-info">
+            <h2>기본 정보</h2>
+            <form method="post" action="{% url 'account:update_info' %}" class="basic-info-form">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="username">아이디</label>
+                    <input type="text" id="username" value="{{ user.username }}" class="form-control" readonly>
+                </div>
+                <div class="form-group">
+                    <label for="email">이메일</label>
+                    <input type="email" id="email" value="{{ user.email }}" class="form-control" readonly>
+                </div>
+                <div class="form-group">
+                    <label for="date_joined">가입일</label>
+                    <input type="text" id="date_joined" value="{{ user.date_joined|date:"Y-m-d" }}" class="form-control" readonly>
+                </div>
+            </form>
+        </section>
 
-        <!-- 비밀번호 변경 폼 -->
-        <form method="post" action="{% url 'account:password_change' %}" class="password-change-form">
-            {% csrf_token %}
-            <div class="form-group">
-                <label for="id_old_password">현재 비밀번호</label>
-                <input type="password" name="old_password" id="id_old_password" class="form-control" required>
-            </div>
-
-            <div class="form-group">
-                <label for="id_new_password1">새 비밀번호</label>
-                <input type="password" name="new_password1" id="id_new_password1" class="form-control" required>
-            </div>
-
-            <div class="form-group">
-                <label for="id_new_password2">새 비밀번호 확인</label>
-                <input type="password" name="new_password2" id="id_new_password2" class="form-control" required>
-            </div>
-
-            <button type="submit" class="btn-submit">비밀번호 변경</button>
-        </form>
-    </section>
-
-    <section class="mypage-section">
-        <h2>찜 한 영상</h2>
-        <!-- 찜한 영상 보기 버튼 -->
-        <a href="{% url 'account:my_liked_video' %}" class="btn-link">찜한 영상 보기</a>
-    </section>
+        <div class="button-container">
+            <button class="btn-link" id="open-modal">비밀번호 변경</button>
+            <a href="{% url 'account:my_liked_video' %}" class="btn-link">찜한 영상 보기</a>
+        </div>
+    </div>
 </div>
 
-<style>
-    /* 페이지 전체 컨테이너 */
-    .mypage-container {
-        width: 60%;
-        margin: 0 auto;
-        height: 771px;
-        padding: 40px;
-        background: #f9f9f9;
-        border-radius: 8px;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    }
+<!-- 비밀번호 변경 모달 -->
+<div id="modal" class="modal">
+    <div class="modal-content">
+        <span class="close" id="close-modal">&times;</span>
+        <h2>비밀번호 변경</h2>
+        <form id="password-change-form" method="post" action="{% url 'account:password_change' %}" class="password-form">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="old_password">기존 비밀번호</label>
+                <input type="password" id="old_password" name="old_password" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label for="new_password">새 비밀번호</label>
+                <input type="password" id="new_password" name="new_password1" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label for="confirm_password">비밀번호 확인</label>
+                <input type="password" id="confirm_password" name="new_password2" class="form-control" required>
+            </div>
+            <div id="password-requirements">
+                <small id="length-requirement">✔ 8자 이상</small>
+                <small id="uppercase-requirement">✔ 영문</small>
+                <small id="number-requirement">✔ 숫자</small>
+                <small id="special-requirement">✔ 특수문자</small>
+            </div>
+            <button type="submit" class="btn-link">저장</button>
+        </form>
+    </div>
+</div>
 
-    /* 헤더 스타일 */
-    .mypage-header {
-        text-align: center;
-        margin-bottom: 20px;
-    }
+<!-- 성공 모달 -->
+<div id="success-modal" class="modal">
+    <div class="modal-content">
+        <span class="close" id="close-success-modal">&times;</span>
+        <h2>비밀번호 변경 완료</h2>
+        <p>비밀번호가 성공적으로 변경되었습니다!</p>
+        <button class="btn-link" id="close-success-btn">닫기</button>
+    </div>
+</div>
 
-    .mypage-header h1 {
-        font-size: 24px;
-        color: #333;
-    }
 
-    /* 섹션 스타일 */
-    .mypage-section {
-        margin-top: 20px;
-    }
 
-    .mypage-section h2 {
-        font-size: 20px;
-        margin-bottom: 10px;
-        color: #333;
-    }
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // 비밀번호 유효성 검사
+        const newPasswordInput = document.getElementById('new_password');
+        const lengthRequirement = document.getElementById('length-requirement');
+        const uppercaseRequirement = document.getElementById('uppercase-requirement');
+        const numberRequirement = document.getElementById('number-requirement');
+        const specialRequirement = document.getElementById('special-requirement');
 
-    /* 버튼 스타일 */
-    .btn-submit, .btn-link {
-        display: block;
-        width: 100%;
-        padding: 10px;
-        font-size: 16px;
-        color: #fff;
-        background-color: #007bff;
-        text-align: center;
-        text-decoration: none;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        transition: background-color 0.3s;
-    }
+        // 비밀번호 입력 이벤트 처리
+        newPasswordInput.addEventListener('input', () => {
+            const password = newPasswordInput.value;
 
-    .btn-submit:hover, .btn-link:hover {
-        background-color: #0056b3;
-    }
+            console.log('Password:', password);
+            console.log('Length valid:', password.length >= 8);
+            console.log('Contains letter:', /[A-Za-z]/.test(password));
+            console.log('Contains number:', /\d/.test(password));
+            console.log('Contains special:', /[!@#$%^&*(),.?":{}|<>]/.test(password));
 
-    /* 비밀번호 변경 폼 */
-    .password-change-form {
-        background: #fff;
-        padding: 20px;
-        border-radius: 8px;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    }
+            // 8자 이상
+            if (password.length >= 8) {
+                lengthRequirement.classList.add('valid');
+                lengthRequirement.classList.remove('invalid');
+            } else {
+                lengthRequirement.classList.add('invalid');
+                lengthRequirement.classList.remove('valid');
+            }
 
-    .password-change-form .form-group {
-        margin-bottom: 15px;
-    }
+            // 영문 포함
+            if (/[A-Za-z]/.test(password)) {
+                uppercaseRequirement.classList.add('valid');
+                uppercaseRequirement.classList.remove('invalid');
+            } else {
+                uppercaseRequirement.classList.add('invalid');
+                uppercaseRequirement.classList.remove('valid');
+            }
 
-    .password-change-form label {
-        display: block;
-        margin-bottom: 5px;
-        font-size: 14px;
-        color: #555;
-    }
+            // 숫자 포함
+            if (/\d/.test(password)) {
+                numberRequirement.classList.add('valid');
+                numberRequirement.classList.remove('invalid');
+            } else {
+                numberRequirement.classList.add('invalid');
+                numberRequirement.classList.remove('valid');
+            }
 
-    .password-change-form input {
-        width: 100%;
-        padding: 10px;
-        font-size: 14px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-    }
+            // 특수문자 포함
+            if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+                specialRequirement.classList.add('valid');
+                specialRequirement.classList.remove('invalid');
+            } else {
+                specialRequirement.classList.add('invalid');
+                specialRequirement.classList.remove('valid');
+            }
 
-    .password-change-form input:focus {
-        outline: none;
-        border-color: #007bff;
-    }
-</style>
+            console.log('Class states:');
+            console.log('Length:', lengthRequirement.classList);
+            console.log('Uppercase:', uppercaseRequirement.classList);
+            console.log('Number:', numberRequirement.classList);
+            console.log('Special:', specialRequirement.classList);
+        });
+
+        // 모달 열기 및 닫기
+        const modal = document.getElementById('modal');
+        const successModal = document.getElementById('success-modal');
+        const openModalButton = document.getElementById('open-modal');
+        const closeModalButton = document.getElementById('close-modal');
+        const closeSuccessModalButton = document.getElementById('close-success-modal');
+        const closeSuccessBtn = document.getElementById('close-success-btn');
+
+        // 모달 열기
+        openModalButton.addEventListener('click', () => {
+            modal.style.display = 'block';
+        });
+
+        // 모달 닫기
+        closeModalButton.addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+
+        closeSuccessModalButton.addEventListener('click', () => {
+            successModal.style.display = 'none';
+        });
+
+        closeSuccessBtn.addEventListener('click', () => {
+            successModal.style.display = 'none';
+        });
+
+        // 비밀번호 변경 폼 처리
+        const passwordChangeForm = document.getElementById('password-change-form');
+        passwordChangeForm.addEventListener('submit', function (event) {
+            event.preventDefault();
+            const formData = new FormData(passwordChangeForm);
+
+            fetch(passwordChangeForm.action, {
+                method: 'POST',
+                body: formData,
+            })
+                .then(response => {
+                    if (response.ok) {
+                        modal.style.display = 'none';
+                        successModal.style.display = 'block';
+                    } else {
+                        return response.json().then(data => {
+                            alert(data.errors ? JSON.stringify(data.errors) : '비밀번호 변경에 실패했습니다.');
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('서버와의 통신 중 문제가 발생했습니다.');
+                });
+        });
+    });
+
+
+</script>
 {% endblock %}
