@@ -31,8 +31,9 @@ header h1 {
 header p {
     margin: 0;
     font-size: 1rem; /* 부제목 크기 조정 */
-    color: #555; /* 부제목 색상 조정 */
+    color: #333; /* 부제목 색상 조정 */
     text-align: center;
+    opacity:.5 /*투명도*/
 }
 
 .issue-container {
@@ -44,6 +45,7 @@ header p {
     padding: 0; /* 추가적인 패딩 제거 */
     justify-content: center; /* 가운데 정렬 */
     box-sizing: border-box; /* 여백 포함 크기 계산 */
+    margin-bottom : 4rem;
 }
 
 .issue-card {
@@ -51,24 +53,25 @@ header p {
     border: 1px solid #ccc;
     border-radius: 16px; /* 둥근 모서리를 기존 8px에서 16px로 변경 */
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    padding: 1.5rem;
-    width: 400px;
-    height: 500px;
+    padding: 2rem;
+    width: 350px;
+    height: 470px;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
     position: relative;
+    padding-top: 1rem;
 }
 
 
 .issue-card h2.issue-date {
-    font-size: 1.4rem;
+    font-size: 1.1rem;
     font-weight: bold;
     color: #333;
     text-align: center;
-    margin-bottom: 1rem;
+    margin-bottom: 0.3rem;
+    margin-top: 0.8rem;
 }
 
 .issue-card:hover {
@@ -112,7 +115,7 @@ header p {
 
 .issue-title {
     font-weight: normal; /* 얇은 글씨 */
-    color: #666; /* 덜 진한 회색으로 변경 (기존 #000에서 더 연한 색상) */
+    color: #333; /* 덜 진한 회색으로 변경 (기존 #000에서 더 연한 색상) */
     font-size: 0.9rem; /* 텍스트 크기 */
     margin: 0;
     line-height: 1.5; /* 줄 간격 */

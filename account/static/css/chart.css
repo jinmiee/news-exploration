@@ -32,7 +32,7 @@ body {
 
 .chart-header {
     text-align: center;
-    margin-top: 3rem;
+    margin-top: 4rem;
     margin-bottom: 2rem;
 }
 
@@ -45,7 +45,7 @@ body {
 .subtitle {
     color: #333;
     font-size: 1.1rem;
-    opacity:.5
+    opacity:.5 /*투명도*/
 }
 
 /* ===== 뉴스 리스트 ===== */

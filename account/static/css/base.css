@@ -1,9 +1,9 @@
 /* ===== CSS 변수 ===== */
 :root {
-    --primary-color: #2c3e50; /* 기존 색상 유지 */
-    --secondary-color: #3498db; /* 기존 색상 유지 */
+    --primary-color: #333; /* 기존 색상 유지 */
+    --secondary-color: #007bff; /* 기존 색상 유지 */
     --accent-color: #e74c3c;
-    --text-color: #2c3e50;
+    --text-color: #333;
     --background-color: #ecf0f1;
 }
 
