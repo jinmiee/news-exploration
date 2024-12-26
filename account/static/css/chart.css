@@ -26,11 +26,12 @@ body {
 
 /* ===== 컨테이너 스타일 ===== */
 .chart-container {
+    width: 100%;
+    max-width: 1140px;
     background: white;
     border-radius: var(--border-radius);
     padding: 2rem;
     box-shadow: var(--card-shadow);
-    max-width: 1140px;
     margin: 0 auto;
     box-sizing: border-box;
 }
@@ -60,7 +61,7 @@ body {
     margin-top: 2rem;
     list-style: none;
     padding: 0;
-    max-width: 1000px; /* 리스트의 최대 너비 */
+    max-width: 1140px; /* 리스트의 최대 너비 */
     margin-left: auto; /* 자동으로 좌우 여백 설정 */
     margin-right: auto;
     justify-items: center; /* 각 항목을 수평 가운데 정렬 */
@@ -80,7 +81,7 @@ body {
     border-radius: var(--border-radius);
     box-shadow: var(--card-shadow);
     transition: transform var(--transition-duration), box-shadow var(--transition-duration);
-    max-width: 900px; /* 전체 화면 폭에 맞춤 */
+    max-width: 1140px; /* 전체 화면 폭에 맞춤 */
     margin-left: auto; /* 자동 중앙 정렬 */
     margin-right: auto;
 }
