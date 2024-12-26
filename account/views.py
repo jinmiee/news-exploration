@@ -563,17 +563,26 @@ def like_video(request, video_id):
 # @login_required
 def my_liked_videos(request):
     liked_videos = YouTubeData.objects.filter(like__user=request.user)  
-    
 
+    # 각 동영상에 cleaned_title 추가
+    processed_videos = []
     for video in liked_videos:
-        print(video)
         video.id = str(video._id)
-        print(video.id)
+        processed_videos.append({
+            "id": video.id,
+            "title": video.title,
+            "cleaned_title": clean_title(video.title),
+            "views": video.views,
+            "likes": video.likes,
+            "url": video.url,
+            "upload_date": video.upload_date,
+            "thumbnail": video.thumbnail,
+        })
 
     context = {
-        'liked_videos': liked_videos,
+        'liked_videos': processed_videos,
         'section': 'mypage'
-    }         
+    }
     return render(request, 'analysis/mypage/my_liked_videos.html', context)
 
 def delete_from_liked(request, id):

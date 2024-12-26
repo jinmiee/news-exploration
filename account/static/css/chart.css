@@ -17,6 +17,11 @@ body {
     background-color: var(--background-color);
     color: var(--text-color);
     line-height: 1.6;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start; /* 수직 정렬: 시작점 기준 */
+    flex-direction: column;
+    margin: 0;
 }
 
 /* ===== 컨테이너 스타일 ===== */
@@ -58,6 +63,7 @@ body {
     max-width: 1000px; /* 리스트의 최대 너비 */
     margin-left: auto; /* 자동으로 좌우 여백 설정 */
     margin-right: auto;
+    justify-items: center; /* 각 항목을 수평 가운데 정렬 */
 }
 
 .news-ul {
@@ -66,14 +72,15 @@ body {
 
 .news-item {
     display: flex;
-    align-items: flex-start;
+    flex-direction: row;
+    align-items: center;
     padding: 1rem; /* 내부 여백을 넉넉하게 설정 */
     margin-bottom: 1rem; /* 항목 간 여백 */
     background: white;
     border-radius: var(--border-radius);
     box-shadow: var(--card-shadow);
     transition: transform var(--transition-duration), box-shadow var(--transition-duration);
-    max-width: 1140px; /* 전체 화면 폭에 맞춤 */
+    max-width: 900px; /* 전체 화면 폭에 맞춤 */
     margin-left: auto; /* 자동 중앙 정렬 */
     margin-right: auto;
 }
@@ -103,7 +110,7 @@ body {
     justify-content: space-between;
     align-items: center;
     width: 100%;
-    padding: 0 1.5rem; /* 좌우 여백 */
+    padding: 0 1rem; /* 좌우 여백 */
 }
 
 .news-title {
@@ -123,7 +130,6 @@ body {
 
 .news-title:hover {
     color: var(--primary-color); /* 파란색으로 변경 */
-    text-decoration: underline; /* 마우스 올렸을 때 밑줄 추가 (선택사항) */
 }
 
 .news-info {
@@ -131,7 +137,7 @@ body {
     gap: 1rem;
     color: #666;
     font-size: 0.9rem;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
 }
 
 /* ===== 버튼 스타일 ===== */
