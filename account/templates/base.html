@@ -20,7 +20,6 @@
                     <a href="{% url 'account:mypage' %}" class="nav-link {% if section == 'mypage' %}active{% endif %}">마이페이지</a>
                     {% if user.is_authenticated %}
                         <div class="user-menu">
-                            <span>{{ user.username }}</span>
                             <a href="{% url 'account:logout' %}" class="btn-login">로그아웃</a>
                         </div>
                     {% else %}

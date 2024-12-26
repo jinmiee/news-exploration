@@ -37,7 +37,7 @@ body {
 }
 
 .navbar-container {
-    max-width: 1600px; /* 1140px에서 1600px로 증가 */
+    max-width: 1140px; /* 1140px에서 1600px로 증가 */
     margin: 0 auto;
     padding: 0 10px; /* 좌우 여백 최소화 */
     display: flex;
