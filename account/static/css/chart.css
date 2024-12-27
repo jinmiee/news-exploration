@@ -17,22 +17,28 @@ body {
     background-color: var(--background-color);
     color: var(--text-color);
     line-height: 1.6;
+    display: block;
+    align-items: flex-start; /* 수직 정렬: 시작점 기준 */
+    flex-direction: column;
+    margin: 0 auto;
+    max-width:1600px;
 }
 
 /* ===== 컨테이너 스타일 ===== */
 .chart-container {
+    width: 100%;
+    max-width: 1140px !important;
     background: white;
     border-radius: var(--border-radius);
     padding: 2rem;
     box-shadow: var(--card-shadow);
-    max-width: 1140px;
     margin: 0 auto;
     box-sizing: border-box;
 }
 
 .chart-header {
     text-align: center;
-    margin-top: 3rem;
+    margin-top: 4rem;
     margin-bottom: 2rem;
 }
 
@@ -45,7 +51,7 @@ body {
 .subtitle {
     color: #333;
     font-size: 1.1rem;
-    opacity:.5
+    opacity:.5 /*투명도*/
 }
 
 /* ===== 뉴스 리스트 ===== */
@@ -55,9 +61,10 @@ body {
     margin-top: 2rem;
     list-style: none;
     padding: 0;
-    max-width: 1000px; /* 리스트의 최대 너비 */
+    width: 100%;
     margin-left: auto; /* 자동으로 좌우 여백 설정 */
     margin-right: auto;
+    justify-items: center; /* 각 항목을 수평 가운데 정렬 */
 }
 
 .news-ul {
@@ -66,7 +73,8 @@ body {
 
 .news-item {
     display: flex;
-    align-items: flex-start;
+    flex-direction: row;
+    align-items: center;
     padding: 1rem; /* 내부 여백을 넉넉하게 설정 */
     margin-bottom: 1rem; /* 항목 간 여백 */
     background: white;
@@ -103,7 +111,7 @@ body {
     justify-content: space-between;
     align-items: center;
     width: 100%;
-    padding: 0 1.5rem; /* 좌우 여백 */
+    padding: 0 1rem; /* 좌우 여백 */
 }
 
 .news-title {
@@ -119,11 +127,11 @@ body {
     text-overflow: ellipsis;
     text-align: left;
     flex: 1; /* 제목이 왼쪽 공간을 차지하도록 설정 */
+    max-width: 100%; /* 제목이 컨테이너 안에서만 잘리도록 설정 */
 }
 
 .news-title:hover {
     color: var(--primary-color); /* 파란색으로 변경 */
-    text-decoration: underline; /* 마우스 올렸을 때 밑줄 추가 (선택사항) */
 }
 
 .news-info {
@@ -131,7 +139,7 @@ body {
     gap: 1rem;
     color: #666;
     font-size: 0.9rem;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
 }
 
 /* ===== 버튼 스타일 ===== */

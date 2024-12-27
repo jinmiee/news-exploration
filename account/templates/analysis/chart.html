@@ -29,8 +29,8 @@
                 <li class="news-item">
                     <div class="rank-badge">{{ forloop.counter }}</div>
                     <div class="news-content">
-                        <a href="#" class="news-title" data-video-url="{{ item.url }}" data-thumbnail="{{ item.thumbnail }}">
-                            {{ item.cleaned_title }}
+                        <a href="#" class="news-title" data-video-url="{{ item.url }}" data-thumbnail="{{ item.thumbnail }}" title="{{ item.cleaned_title }}">
+                            {{ item.cleaned_title|truncatechars:50}}
                         </a>
                         <!-- 오른쪽: 조회수, 좋아요, 날짜 -->
                         <div class="news-info">

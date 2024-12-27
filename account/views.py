@@ -4,7 +4,10 @@ pip install konlpy networkx matplotlib pandas
 from collections import defaultdict
 from datetime import timedelta, datetime
 
+from django.contrib.auth import update_session_auth_hash
+from django.contrib.auth.views import PasswordChangeView
 from django.http import JsonResponse
+from django.urls import reverse_lazy
 from django.utils import timezone
 
 from django.utils.timezone import localtime, make_aware, is_aware
@@ -14,7 +17,7 @@ from django.contrib.auth.decorators import login_required
 from bson import ObjectId
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-from .forms import UserRegistrationForm
+from .forms import UserRegistrationForm, CustomPasswordChangeForm
 from .models import YouTubeData, Like, WeeklyIssue, Chart, WeeklyIssueDuplicateVideo, ChartDuplicateVideo
 from urllib.parse import urlparse, parse_qs
 
@@ -51,17 +54,6 @@ from .tasks.processing_tasks import (
     extract_duplicates_for_weekly_issues,
     extract_duplicates_for_chart,
 )
-
-
-def trigger_chart_save(request):
-    """
-    스케줄링된 작업을 수동으로 실행
-    """
-    try:
-        save_top10_to_chart()  # processing_tasks.py에서 가져온 함수 호출
-        return JsonResponse({"message": "Chart 저장 작업이 성공적으로 실행되었습니다."}, status=200)
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
 
 def chart(request):
     """
@@ -563,17 +555,26 @@ def like_video(request, video_id):
 # @login_required
 def my_liked_videos(request):
     liked_videos = YouTubeData.objects.filter(like__user=request.user)  
-    
 
+    # 각 동영상에 cleaned_title 추가
+    processed_videos = []
     for video in liked_videos:
-        print(video)
         video.id = str(video._id)
-        print(video.id)
+        processed_videos.append({
+            "id": video.id,
+            "title": video.title,
+            "cleaned_title": clean_title(video.title),
+            "views": video.views,
+            "likes": video.likes,
+            "url": video.url,
+            "upload_date": video.upload_date,
+            "thumbnail": video.thumbnail,
+        })
 
     context = {
-        'liked_videos': liked_videos,
+        'liked_videos': processed_videos,
         'section': 'mypage'
-    }         
+    }
     return render(request, 'analysis/mypage/my_liked_videos.html', context)
 
 def delete_from_liked(request, id):
@@ -658,11 +659,38 @@ def submit_feedback(request):
         else:
             messages.error(request, "모든 필드를 입력해주세요.")
             return render(request, '/')
-        
-        
-    
-
-
 
 def feedback_done(request):
     return render(request, 'feedback/feedback_done.html')
+
+class CustomPasswordChangeView(PasswordChangeView):
+    form_class = CustomPasswordChangeForm  # 커스텀 폼 적용
+    success_url = reverse_lazy('account:password_change_done')  # 성공 후 이동할 URL
+    template_name = 'registration/password_change_form.html'  # 기존 템플릿 경로
+
+@login_required
+def update_info(request):
+    if request.method == 'POST':
+        email = request.POST.get('email', '')
+        user = request.user
+        if email:
+            user.email = email
+            user.save()
+            messages.success(request, '회원 정보가 성공적으로 수정되었습니다.')
+        else:
+            messages.error(request, '이메일을 입력해주세요.')
+        return redirect('account:mypage')  # 마이페이지로 리다이렉트
+
+    return render(request, 'update_info.html')
+
+@login_required
+def password_change(request):
+    if request.method == 'POST':
+        form = CustomPasswordChangeForm(user=request.user, data=request.POST)
+        if form.is_valid():
+            form.save()  # 비밀번호 저장
+            update_session_auth_hash(request, form.user)  # 세션 유지
+            return JsonResponse({'message': '비밀번호가 성공적으로 변경되었습니다!'}, status=200)
+        else:
+            return JsonResponse({'errors': form.errors.as_json()}, status=400)
+    return JsonResponse({'error': 'Invalid request method'}, status=405)

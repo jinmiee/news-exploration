@@ -1,13 +1,14 @@
 #video-frame {
     width: 100%; /* 동영상 너비를 컨테이너에 맞춤 */
     aspect-ratio: 16 / 9; /* 16:9 비율 유지 */
+    border-radius: 10px;
 }
 
 .analysis-title {
     text-align: center; /* 가운데 정렬 */
     font-size: 2rem; /* 폰트 크기 */
     margin-top: 0.5px; /* 아래 여백 */
-    margin-bottom: 20px; /* 아래 여백 */
+    margin-bottom: 40px; /* 아래 여백 */
     color: #333; /* 텍스트 색상 */
     font-weight: bold; /* 폰트 두께 */
 }
@@ -29,22 +30,55 @@
 }
 
 .comments-container {
-    flex: 2; /* 댓글 너비를 40%로 설정 */
+    flex: 2; /* 댓글 너비 */
     overflow-y: auto; /* 스크롤 활성화 */
-    border: 1px solid #ddd; /* 테두리 추가 */
-    padding: 10px; /* 내부 여백 */
+    border: 1px solid #ddd; /* 테두리 */
     background-color: #f9f9f9; /* 배경색 */
-    height: auto; /* 기본 높이 설정 */
-    box-sizing: border-box; /* 패딩 포함 */
+    padding: 10px; /* 내부 여백 */
+    height: 400px; /* 고정 높이 설정 */
+    box-sizing: border-box;
+    border-radius: 10px; /* 둥근 모서리 */
+    position: relative; /* 스크롤과 테두리 조정 */
+}
+
+/* 각 댓글 스타일 */
+.comment-item {
+    background-color: #ffffff; /* 댓글 배경 */
+    border: 1px solid #e0e0e0; /* 댓글 테두리 */
+    border-radius: 8px; /* 둥근 모서리 */
+    padding: 10px; /* 댓글 내부 여백 */
+    margin-bottom: 10px; /* 댓글 간 간격 */
+    box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1); /* 댓글 박스 그림자 */
+    font-size: 14px; /* 댓글 텍스트 크기 */
+    color: #333; /* 댓글 텍스트 색상 */
+}
+
+/* 스크롤바와 둥근 모서리 동시 적용 */
+.comments-container::-webkit-scrollbar {
+    width: 8px; /* 스크롤바 너비 */
+}
+
+/* 스크롤바 스타일 */
+.comments-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.comments-container::-webkit-scrollbar-thumb {
+    background-color: #ccc; /* 스크롤바 색상 */
+    border-radius: 10px; /* 둥근 스크롤바 */
+}
+
+.comments-container::-webkit-scrollbar-track {
+    background-color: transparent; /* 스크롤 트랙 투명하게 */
 }
 
 .video-info {
     text-align: center; /* 중앙 정렬 */
-    margin-top: 20px; /* 위쪽 여백 */
+    margin-top: 40px; /* 위쪽 여백 */
     font-size: 1rem; /* 글자 크기 */
     color: #333; /* 텍스트 색상 */
     border-top: 1px solid #ddd; /* 상단 테두리 */
-    padding-top: 10px; /* 내부 여백 */
+    padding-top: 30px; /* 내부 여백 */
 }
 
 /* video-info-container 스타일 */
@@ -115,6 +149,15 @@
 .top-navigation .back-button:hover {
     background-color: #f0f0f0; /* 호버 시 배경색 */
 }
+
+/* 관련된 동영상 섹션 */
+.related-videos p {
+    text-align: center; /* 텍스트 가운데 정렬 */
+    color: #999; /* 기존 색상 유지 */
+    margin-top: 20px; /* 위쪽 간격 */
+    font-size: 16px; /* 폰트 크기 조정 */
+}
+
 
 
 /* 햄버거 메뉴 슬라이더 */

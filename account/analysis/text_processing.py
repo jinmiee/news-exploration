@@ -4,6 +4,7 @@ from sklearn.preprocessing import MinMaxScaler
 from konlpy.tag import Okt
 import re
 from django.core.cache import cache
+from fuzzywuzzy import fuzz
 
 def clean_title(title):
     """
@@ -81,39 +82,30 @@ def clean_title(title):
     # 앞뒤 공백 제거
     return title.strip()
 
+
 def process_text(title, transcript=None):
     """
     제목과 스크립트를 전처리하여 결합한 텍스트 반환
     """
     okt = Okt()
-    # 제목 전처리
     cleaned_title = clean_title(title)
     stop_words = {'그', '저', '것', '수'}
-    processed_title = ' '.join([
-        word for word, tag in okt.pos(cleaned_title)
-        if tag in ['Noun', 'Verb', 'Adjective'] and word not in stop_words
-    ])
+    processed_title = ' '.join([word for word, tag in okt.pos(cleaned_title) if
+                                tag in ['Noun', 'Verb', 'Adjective'] and word not in stop_words])
 
-    # 스크립트 전처리
     script_text = ""
     if transcript:
-        if isinstance(transcript, list):  # transcript가 리스트일 경우
-            transcript_text = ' '.join([
-                item.get('text', '') for item in transcript
-                if isinstance(item, dict) and len(item.get('text', '')) > 2
-            ])
+        if isinstance(transcript, list):
+            transcript_text = ' '.join([item.get('text', '') for item in transcript if
+                                        isinstance(item, dict) and len(item.get('text', '')) > 2])
         else:
             print(f"Unexpected transcript format: {type(transcript)}")
             transcript_text = ""
+        script_text = ' '.join([word for word, tag in okt.pos(transcript_text) if
+                                tag in ['Noun', 'Verb', 'Adjective'] and word not in stop_words])
 
-        # 형태소 분석
-        script_text = ' '.join([
-            word for word, tag in okt.pos(transcript_text)
-            if tag in ['Noun', 'Verb', 'Adjective'] and word not in stop_words
-        ])
-
-    # 제목과 스크립트 결합
     return f"{processed_title} {script_text}".strip()
+
 
 def get_top10_chart_based(videos):
     """
@@ -129,47 +121,43 @@ def get_top10_chart_based(videos):
         corpus.append(combined_text)
         views_list.append(video.views)
 
-        # 원본 비디오에 cleaned_title 추가
         video.cleaned_title = clean_title(video.title)
         processed_videos.append(video)
 
-    # TF-IDF 계산
     vectorizer = TfidfVectorizer(max_features=5000, stop_words='english')
     tfidf_matrix = vectorizer.fit_transform(corpus)
 
-    # 조회수 정규화
+    tfidf_scores = tfidf_matrix.sum(axis=1).A.flatten()
     scaler = MinMaxScaler()
+    normalized_tfidf_scores = scaler.fit_transform(tfidf_scores.reshape(-1, 1)).flatten()
     normalized_views = scaler.fit_transform([[view] for view in views_list]).flatten()
 
-    # TF-IDF 가중치 + 조회수 점수 계산
-    weighted_scores = normalized_views + tfidf_matrix.sum(axis=1).A.flatten()
+    weighted_scores = 0.5 * normalized_views + 0.5 * normalized_tfidf_scores
 
-    # 상위 N개 선정
     initial_sorted_videos = sorted(
         zip(processed_videos, weighted_scores),
         key=lambda x: x[1],
         reverse=True
     )
 
-    # 코사인 유사도를 사용한 중복 제거
     similarity_matrix = cosine_similarity(tfidf_matrix)
     selected_videos = []
     seen_indices = set()
-    threshold = 0.7  # 중복 판단 기준 유사도
+    threshold = 0.6
 
     for i, (video, score) in enumerate(initial_sorted_videos):
         if i in seen_indices:
-            continue  # 이미 처리된 비디오 건너뜀
+            continue
 
-        # 현재 비디오를 선택
         selected_videos.append(video)
 
-        # 해당 비디오와 유사한 비디오를 찾아서 중복 처리
         for j in range(len(processed_videos)):
-            if similarity_matrix[i, j] > threshold:
+            if j in seen_indices:
+                continue
+            fuzzy_similarity = fuzz.ratio(video.cleaned_title, processed_videos[j].cleaned_title) / 100.0
+            if similarity_matrix[i, j] > threshold or fuzzy_similarity > 0.6:
                 seen_indices.add(j)
 
-        # 최대 10개까지만 유지
         if len(selected_videos) >= 10:
             break
 

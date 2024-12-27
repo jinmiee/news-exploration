@@ -26,8 +26,7 @@ urlpatterns = [
     
     path('login/', auth_views.LoginView.as_view(), name='login'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
-    path('password-change/', auth_views.PasswordChangeView.as_view(success_url=reverse_lazy('account:password_change_done')), name='password_change'),
-    path('password-change/done/', auth_views.PasswordChangeDoneView.as_view(), name='password_change_done'),
+    path('password-change/', views.CustomPasswordChangeView.as_view(), name='password_change'),    path('password-change/done/', auth_views.PasswordChangeDoneView.as_view(), name='password_change_done'),
     
     path('', views.chart, name='chart'),
     path('video-details/', views.video_details, name='video_details'),
@@ -50,7 +49,7 @@ urlpatterns = [
 
     path('signup/', views.register, name='signup'),
     path('find-password/', views.find_password, name='find_password'),
-    path('trigger-save-chart/', views.trigger_chart_save, name='trigger_save_chart'),
-    
 
+    path('update-info/', views.update_info, name='update_info'),  # 새 URL 추가
+path('password_change/', views.password_change, name='password_change'),
 ]

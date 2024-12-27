@@ -55,16 +55,16 @@
                 <iframe id="video-frame" src="https://www.youtube.com/embed/{{ video_id }}" frameborder="0" allowfullscreen></iframe>
             </div>
 
-            <!-- 오른쪽: 댓글 -->
+            <!-- 댓글 섹션 -->
             <div class="comments-container">
                 <h3 style="text-align: center;">댓글</h3>
-                <ul>
+                <div>
                     {% for comment in video_comments %}
-                        <li>{{ comment.comment }}</li>
+                        <div class="comment-item">{{ comment.comment }}</div>
                     {% empty %}
-                        <li>No comments available.</li>
+                        <div class="comment-item">No comments available.</div>
                     {% endfor %}
-                </ul>
+                </div>
             </div>
         </div>
 
