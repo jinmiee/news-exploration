@@ -288,42 +288,73 @@ def detail(request):
 
     # 비디오 데이터가 없을 경우 처리
     if not video:
-        return JsonResponse({"error": "해당 URL에 대한 비디오 데이터를 찾을 수 없습니다."}, status=404)
+        return JsonResponse({"error": "해당 URL��� 대한 비디오 데이터를 찾을 수 없습니다."}, status=404)
 
-    video_views = video.views
-    video_likes = video.likes
-    video_comments = video.comments
-    video_title = video.title
+    try:
+        # 제목과 설명 불용어 처리
+        cleaned_title = clean_title(video.title)
+        video_desc = f"{cleaned_title} {video.desc if video.desc else ''}"
+        
+        # transcript 데이터 처리
+        transcript_segments = []
+        for item in video.transcript:
+            if 'start' in item and 'text' in item:
+                start_time = int(float(item['start']))
+                minutes = start_time // 60
+                seconds = start_time % 60
+                time_str = f"{minutes:02d}:{seconds:02d}"
+                transcript_segments.append({
+                    'time': time_str,
+                    'text': item['text']
+                })
+        
+        # 연관어 분석 수행
+        graph, top_pairs, important_keywords, _ = analyze_related_words(
+            video_desc, 
+            video.transcript,
+            clean_title_func=clean_title
+        )
+        
+        network_graph = generate_network_graph(graph)
+        
+        # 키워드별 관련 뉴스 분류
+        categorized_news = {}
+        if important_keywords:
+            for keyword in important_keywords[:10]:  # 상위 10개 키워드만 처리
+                related_news = YouTubeData.objects.filter(
+                    Q(title__icontains=keyword) | 
+                    Q(desc__icontains=keyword)
+                ).exclude(url=video_url)[:6]  # 각 키워드당 최대 6개 뉴스
+                
+                if related_news:
+                    cleaned_news = []
+                    for news in related_news:
+                        news.title = clean_title(news.title)
+                        try:
+                            news.video_id = news.url.split('v=')[1].split('&')[0]
+                        except:
+                            news.video_id = None
+                        cleaned_news.append(news)
+                    categorized_news[keyword] = cleaned_news
 
-    # 주간 이슈인지 차트인지 확인
-    if WeeklyIssue.objects.filter(url=video_url).exists():
-        duplicates_model = WeeklyIssueDuplicateVideo
-    elif Chart.objects.filter(url=video_url).exists():
-        duplicates_model = ChartDuplicateVideo
-    else:
-        duplicates_model = None
+        context = {
+            'video_url': video_url,
+            'video_id': video_id,
+            'video_comments': video.comments,
+            'video_views': video.views,
+            'video_likes': video.likes,
+            'network_graph': network_graph,
+            'top_pairs': top_pairs,
+            'categorized_news': categorized_news,
+            'important_keywords': important_keywords,
+            'transcript_segments': transcript_segments
+        }
 
-    # 중복 동영상 가져오기
-    duplicates = []
-    if duplicates_model:
-        try:
-            duplicates = duplicates_model.objects.filter(title__icontains=video.title)
-        except Exception as e:
-            print(f"Error retrieving duplicates: {e}")
-            duplicates = []
+        return render(request, 'analysis/detail.html', context)
 
-    context = {
-        'video': video,
-        'video_id': video_id,
-        'video_url': video_url,
-        'video_title': video_title,
-        'video_views': video_views,
-        'video_likes': video_likes,
-        'video_comments': video_comments,
-        'related_videos': duplicates,  # 유사한 비디오들
-    }
-
-    return render(request, 'analysis/detail.html', context)
+    except Exception as e:
+        print(f"Error in detail function: {e}")
+        return JsonResponse({"error": str(e)}, status=500)
 
 
 from django.shortcuts import render
