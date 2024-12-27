@@ -196,3 +196,14 @@ class WeeklyIssueDuplicateVideo(models.Model):
             models.Index(fields=['upload_date']),
             models.Index(fields=['channel_name']),
         ]
+
+class RelatedWordAnalysis(models.Model):
+    video_id = models.CharField(max_length=255)  # 비디오 URL 또는 ID
+    network_graph = models.TextField()  # Base64로 인코딩된 네트워크 그래프 이미지
+    top_pairs = models.JSONField()  # 상위 연관어 쌍 데이터
+    important_keywords = models.JSONField()  # 중요 키워드 리스트
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'related_word_analysis'
