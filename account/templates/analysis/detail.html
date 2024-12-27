@@ -155,6 +155,60 @@
                 </div>
             </div>
         </div>
+        <div class="emotion-analysis-container">
+    <header class="header">
+        <h1>감정 분석</h1>
+    </header>
+
+    {% if error_message %}
+        <div class="error-message">
+            <p>{{ error_message }}</p>
+        </div>
+    {% else %}
+        <div class="video-title">
+            <h2>{{ video_title }}</h2>
+        </div>
+
+        <!-- 메인 컨텐츠 영역 -->
+        <div class="content" style="display: flex; width: 100%; justify-content: space-between; align-items: flex-start; gap: 20px;">
+            <!-- 좌측 섹션 -->
+            <div class="left-section" style="width: 32%; text-align: center;">
+                <h3>감정 분포</h3>
+                {% if pie_chart_image %}
+                    <img src="data:image/png;base64,{{ pie_chart_image }}" alt="Sentiment Pie Chart" style="width: 100%; max-height: 500px; object-fit: contain;">
+                {% else %}
+                    <p class="error">파이 차트 생성에 오류가 발생했습니다.</p>
+                {% endif %}
+            </div>
+
+            <!-- 중간 섹션 -->
+            <div class="middle-section" style="width: 32%; text-align: center;">
+                <h3>감정 단어 버블차트</h3>
+                {% if bubble_chart_image %}
+                    <img src="data:image/png;base64,{{ bubble_chart_image }}" alt="버블차트 이미지" style="width: 100%; max-height: 500px; object-fit: contain;">
+                {% else %}
+                    <p class="error">버블차트 생성에 오류가 발생했습니다.</p>
+                {% endif %}
+            </div>
+            <!-- 우측 섹션 -->
+            <div class="right-section" style="width: none; margin: 0 auto; text-align: center; display: flex; flex-direction: column; align-items: center;">
+                <h3>TOP10 감성 단어</h3>
+                {% if sentiment_table %}
+                    <div class="table-responsive" style="width: 100%; max-height: 500px; overflow-y: auto;">
+                        <table class="table table-bordered table-striped" style="margin: 0 auto; font-size: 18px;">
+                            {{ sentiment_table|safe }}
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="error">TF-IDF 분석에 오류가 발생했습니다.</p>
+                {% endif %}
+            </div>
+        </div>
+
+    {% endif %}
+</div>
+
+
 
         <!-- feedback 파트 -->
         {% include "feedback/feedback_form.html" %}

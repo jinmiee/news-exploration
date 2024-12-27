@@ -372,7 +372,7 @@ def save_bubble_chart_with_tfidf(comments, save_path='media/analysis_results/'):
     # 5. 감정 분석 결과 수집 및 색상 매핑
     sentiment_colors = {
         '긍정': '#5745e9',  # 긍정은 파란색
-        '중립': '#ffc75a',  # 중립은 회색
+        '중립': '#ffc75a',  # 중립은 노란색
         '부정': '#ff6f6f'  # 부정은 빨간색
     }
     word_color_mapping = {}
@@ -402,6 +402,14 @@ def save_bubble_chart_with_tfidf(comments, save_path='media/analysis_results/'):
 
         # 반지름 계산
         radii = [np.sqrt(freq) / 10 for freq in frequencies]
+
+        # 폰트 크기 계산
+        max_font_size = 60  # 최대 폰트 크기
+        min_font_size = 12  # 최소 폰트 크기
+        font_sizes = [
+            min_font_size + (max_font_size - min_font_size) * (freq / max(frequencies))
+            for freq in frequencies
+        ]
 
         # 원 배치 알고리즘 구현
         def pack_circles_from_center(radii):
@@ -445,7 +453,11 @@ def save_bubble_chart_with_tfidf(comments, save_path='media/analysis_results/'):
         for i, (x, y) in enumerate(positions):
             circle = plt.Circle((x, y), radii[i], color=colors[i], alpha=0.6)
             plt.gca().add_patch(circle)
-            plt.text(x, y, words[i], fontsize=10, ha='center', va='center', color='white')
+            plt.text(
+                x, y, words[i],
+                fontsize=font_sizes[i],  # 빈도수에 따라 폰트 크기 조정
+                ha='center', va='center', color='white'
+            )
 
         plt.axis('equal')
         plt.axis('off')
@@ -571,13 +583,22 @@ def save_visualizations_with_tfidf(comments, save_path='media/analysis_results/'
         """
         감정 비율을 기반으로 도넛 모양의 파이차트를 생성하고 Base64로 반환합니다.
         """
+        # 타이틀용 데이터 계산
+        max_sentiment = max(sentiment_ratios, key=sentiment_ratios.get)
+        max_ratio = sentiment_ratios[max_sentiment] * 100  # 비율을 퍼센트로 변환
+        title = f"{max_ratio:.1f}%로 {max_sentiment}적인 기사입니다."
+
         labels = [label.replace('\n', ' ') for label in sentiment_ratios.keys()]  # 멀티라인 텍스트 제거
         sizes = list(sentiment_ratios.values())  # 각 감정의 비율
         colors = ['#5745e9', '#ffc75a', '#ff6f6f']  # 각 감정의 색상 (긍정, 중립, 부정)
-        explode = (0.0, 0, 0)  # 긍정적인 감정을 강조
+        explode = (0.0 if max_sentiment == '긍정' else 0.0,  # 긍정 강조
+                   0.0 if max_sentiment == '중립' else 0.0,  # 중립 강조
+                   0.0 if max_sentiment == '부정' else 0.0)  # 부정 강조
 
         # 도넛 모양 파이차트 생성
         plt.figure(figsize=(6, 6))
+        plt.title(title, fontsize=14, weight='bold', color='#333')  # 타이틀 추가
+
         wedges, texts, autotexts = plt.pie(
             sizes,
             explode=explode,
@@ -617,6 +638,10 @@ def save_visualizations_with_tfidf(comments, save_path='media/analysis_results/'
     return wordcloud_base64, pie_chart_base64
 
 
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from collections import Counter
+
 def generate_tfidf_sentiment_visualizations(comments):
     # 1. 댓글 전처리
     try:
@@ -625,7 +650,6 @@ def generate_tfidf_sentiment_visualizations(comments):
         if not processed_comments:
             raise ValueError("처리된 댓글이 없습니다. 입력된 댓글을 확인해 주세요.")
         print(f"처리된 댓글의 개수: {len(processed_comments)}개\n")
-        print(f"처리된 댓글들: {processed_comments[:5]}...")  # 전처리된 댓글 출력 (상위 5개)
     except Exception as e:
         print(f"댓글 전처리 오류: {e}")
         return "댓글 전처리 오류"
@@ -679,31 +703,52 @@ def generate_tfidf_sentiment_visualizations(comments):
     # 9. 각 단어에 대해 감정 분석 수행
     for rank, (word, frequency) in enumerate(top_10_words, start=1):
         print(f"순위 {rank}, 단어: {word}, 빈도: {frequency}에 대해 감정 분석 중...")
-        sentiment = analyze_sentiment(word)
-        sentiment_results.append((rank, word, sentiment))  # 순위 추가
+        sentiment = analyze_sentiment(word)  # 감정 분석 수행
+        sentiment_results.append((rank, word, sentiment))
 
     # 10. 결과를 데이터프레임으로 변환
     sentiment_df = pd.DataFrame(sentiment_results, columns=["순위", "단어", "감정"])
 
-    # 11. HTML 스타일 추가
+    # 11. 감정별 색상 정의
+    sentiment_colors = {
+        '긍정': '#5745e9',  # 파란색
+        '중립': '#ffc75a',  # 노란색
+        '부정': '#ff6f6f'   # 빨간색
+    }
+
+    # 12. HTML 스타일 추가
+    def colorize_sentiment(row):
+        """감정에 따라 글자 색상을 변경하는 HTML 스타일 적용."""
+        color = sentiment_colors.get(row['감정'], '#000000')
+        return f'<span style="color: {color}; font-weight: bold;">{row["감정"]}</span>'
+
+    sentiment_df['감정'] = sentiment_df.apply(colorize_sentiment, axis=1)
+
     custom_style = """
     <style>
     .table {
         table-layout: auto;
         width: auto;
         max-width: 100%;
+        border-collapse: collapse;
     }
     .table th, .table td {
-        padding: 5px; /* 셀 내부 여백 최소화 */
-        text-align: center; /* 텍스트 중앙 정렬 */
-        white-space: nowrap; /* 셀 크기 단어 크기에 맞춤 */
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: center;
+        font-family: Arial, sans-serif;
+    }
+    .table th {
+        background-color: #f2f2f2;
+        font-weight: bold;
     }
     </style>
     """
 
-    # 12. HTML로 변환하여 반환
-    sentiment_html = custom_style + sentiment_df.to_html(index=False, classes="table table-bordered table-striped")
+    # 13. HTML로 변환하여 반환
+    sentiment_html = custom_style + sentiment_df.to_html(index=False, escape=False, classes="table")
     return sentiment_html
+
 
 
 def main():
