@@ -30,12 +30,7 @@ from django.utils.timezone import localtime, utc
 
 
 from .analysis.relate_analysis import analyze_related_words
-from .analysis.emotion_analysis import (
-    generate_wordcloud,
-    generate_pie_chart,
-    analyze_morphemes,
-    analyze_sentiment
-)
+
 from django.contrib.auth.models import User
 
 from sklearn.metrics.pairwise import cosine_similarity

@@ -19,7 +19,7 @@ font_path = 'account/static/fonts/NanumGothic.ttf'  # 폰트 경로 수정
 font_prop = fm.FontProperties(fname=font_path)  # 폰트 속성 설정
 plt.rcParams['font.family'] = font_prop.get_name()  # matplotlib에 폰트 설정
 
-custom_model_path = "account/analysis/custom_model"
+custom_model_path = "account/custom_model"
 
 # 전역 변수로 설정하여 재사용
 okt = Okt()
