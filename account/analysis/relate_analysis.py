@@ -1,3 +1,4 @@
+import platform
 from collections import Counter, defaultdict
 import networkx as nx
 import matplotlib
@@ -474,7 +475,10 @@ def generate_network_graph(G):
         try:
             # 나눔고딕 폰트 경로 지정
 # 폰트 경로 직접 지정
-            font_path = '/usr/share/fonts/truetype/nanum/NanumGothic.ttf'
+            if platform.system() == 'Windows':
+                font_path = "C:/Windows/Fonts/malgun.ttf"
+            else:  # Linux
+                font_path = '/usr/share/fonts/truetype/nanum/NanumGothic.ttf'
             font_prop = fm.FontProperties(fname=font_path)
             plt.rc('font', family=font_prop.get_name())
             plt.rcParams['axes.unicode_minus'] = False
@@ -495,13 +499,13 @@ def generate_network_graph(G):
         plt.figure(figsize=(16, 12), facecolor='none')
         
         # 한글 폰트 설정
-        try:
-            font_path = "C:/Windows/Fonts/malgun.ttf"
-            font_prop = matplotlib.font_manager.FontProperties(fname=font_path)
-            plt.rcParams['font.family'] = font_prop.get_name()
-        except:
-            logger.warning("기본 폰트를 사용합니다.")
-            plt.rcParams['font.family'] = 'Malgun Gothic'
+        # try:
+        #     font_path = "C:/Windows/Fonts/malgun.ttf"
+        #     font_prop = matplotlib.font_manager.FontProperties(fname=font_path)
+        #     plt.rcParams['font.family'] = font_prop.get_name()
+        # except:
+        #     logger.warning("기본 폰트를 사용합니다.")
+        #     plt.rcParams['font.family'] = 'Malgun Gothic'
         
         plt.figure(figsize=(16, 12), facecolor='white')
         # 축의 배경도 투명하게 설정

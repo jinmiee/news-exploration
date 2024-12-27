@@ -1,3 +1,5 @@
+
+import platform
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -11,7 +13,10 @@ import numpy as np
 
 # 로깅 설정
 logger = logging.getLogger(__name__)
-font_path = "C:/Windows/Fonts/malgun.ttf"  # Windows
+if platform.system() == 'Windows':
+    font_path = "C:/Windows/Fonts/malgun.ttf"
+else:  # Linux
+    font_path = '/usr/share/fonts/truetype/nanum/NanumGothic.ttf'
 font_prop = matplotlib.font_manager.FontProperties(fname=font_path)
 plt.rcParams['font.family'] = font_prop.get_name()
 
