@@ -330,114 +330,62 @@ def detail(request):
 
     return render(request, 'analysis/detail.html', context)
 
-from transformers import pipeline
+
 from django.shortcuts import render
-from konlpy.tag import Okt
+from django.http import HttpResponse
 from .models import YouTubeData
-
-# 감정 분석 파이프라인 설정
-sentiment_analysis_pipeline = pipeline("sentiment-analysis",truncation=True, padding=True, max_length=512)
-
-def analyze_sentiment(comment_text):
-    try:
-        from .analysis.emotion_analysis import analyze_sentiment as analyze_single_sentiment
-        return analyze_single_sentiment(comment_text)
-    except Exception as e:
-        print(f"감정 분석 오류: {e}")
-        return {
-            'comment': comment_text,
-            'sentiment': 'POSITIVE',
-            'confidence': 0.6
-        }
-
+from .analysis.emotion_analysis import save_visualizations_with_tfidf  # 워드클라우드 및 파이차트 생성 함수
+from .analysis.emotion_analysis import generate_tfidf_sentiment_visualizations  # 감정 분석 결과 HTML 생성 함수
+from .analysis.emotion_analysis import  save_bubble_chart_with_tfidf # 버블
 def emotion(request):
     video_url = request.GET.get('url')
-    print(f"요청된 비디오 URL: {video_url}")  # 디버깅 로그
-    
+    print(f"요청된 비디오 URL: {video_url}")
+
+    # 해당 비디오 URL에 대한 YouTube 데이터 조회
     video = YouTubeData.objects.filter(url=video_url).first()
-    
+
     if video and video.comments:
         try:
-            print(f"댓글 데이터 타입: {type(video.comments)}")  # 디버깅 로그
-            print(f"첫 번째 댓글 샘플: {video.comments[0] if video.comments else 'No comments'}")  # 디버깅 로그
-            
-            # 댓글 데이터 추출 및 유효성 검사
             video_comments = []
             for comment in video.comments[:100]:
                 if isinstance(comment, dict):
                     comment_text = comment.get('comment', '')
-                elif isinstance(comment, str):
-                    comment_text = comment
-                else:
+                else:  # dict가 아니면 그냥 문자열로 취급
                     comment_text = str(comment)
-                
+
                 if comment_text.strip():  # 빈 댓글 제외
                     video_comments.append(comment_text)
-            
-            print(f"처리할 댓글 수: {len(video_comments)}")  # 디버깅 로그
-            
+
             if not video_comments:
                 raise ValueError("유효한 댓글이 없습니다.")
-            
-            # 감정 분석
-            analyzed_comments = []
-            for comment in video_comments:
-                try:
-                    result = analyze_sentiment(comment)
-                    analyzed_comments.append(result)
-                except Exception as e:
-                    print(f"개별 댓글 분석 오류: {e}")  # 디버깅 로그
-                    continue
-            
-            if not analyzed_comments:
-                raise ValueError("감정 분석 결과가 없습니다.")
-            
+
+            # TF-IDF 분석 후 시각화 (워드클라우드 및 파이차트)
+            wordcloud_base64, pie_chart_base64 = save_visualizations_with_tfidf(video_comments)
+
+            # TF-IDF 기반 감정 분석 결과 버블차트 생성
+            bubble_chart_base64 = save_bubble_chart_with_tfidf(video_comments)
+
+            # 감정 분석 결과 HTML 테이블 생성
+            sentiment_html = generate_tfidf_sentiment_visualizations(video_comments)
+
+            # 결과를 템플릿에 전달
             context = {
-                'section': 'emotion',
-                'video_title': video.title,
-                'video_id': request.GET.get('id'),  # video.video_id 대신 요청에서 가져옴
-                'analyzed_comments': analyzed_comments[:10],
+                'wordcloud_image': wordcloud_base64,
+                'pie_chart_image': pie_chart_base64,
+                'bubble_chart_image': bubble_chart_base64,  # 버블차트 추가
+                'sentiment_table': sentiment_html  # TF-IDF 분석 결과 테이블 전달
             }
-            
-            # 워드클라우드 생성
-            try:
-                wordcloud_image = generate_wordcloud(video_comments, analyzed_comments)
-                if wordcloud_image:
-                    context['wordcloud_image'] = wordcloud_image
-            except Exception as e:
-                print(f"워드클라우드 생성 오류: {e}")  # 디버깅 로그
-            
-            # 파이차트 생성
-            try:
-                pie_chart_image = generate_pie_chart(analyzed_comments)
-                if pie_chart_image:
-                    context['pie_chart_image'] = pie_chart_image
-            except Exception as e:
-                print(f"파이차트 생성 오류: {e}")  # 디버깅 로그
-            
-            # 형태소 분석
-            try:
-                rank_table = analyze_morphemes(analyzed_comments)
-                if rank_table:
-                    context['rank_table_by_morpheme'] = rank_table
-            except Exception as e:
-                print(f"형태소 분석 오류: {e}")  # 디버깅 로그
-            
             return render(request, 'analysis/emotion.html', context)
-            
+
         except Exception as e:
-            print(f"전체 처리 오류: {str(e)}")  # 디버깅 로그
-            context = {
-                'section': 'emotion',
-                'error_message': f'분석 처리 중 오류가 발생했습니다: {str(e)}'
-            }
+            print(f"오류 발생: {e}")
+            context = {'error_message': f"처리 중 오류가 발생했습니다: {str(e)}"}
+            return render(request, 'analysis/emotion.html', context)
     else:
-        context = {
-            'section': 'emotion',
-            'error_message': '비디오를 찾을 수 없거나 댓글이 없습니다.'
-        }
-    
-    return render(request, 'analysis/emotion.html', context)
+        context = {'error_message': '비디오가 없거나 댓글이 없습니다.'}
+        return render(request, 'analysis/emotion.html', context)
+
+
 
 from django.db.models import Q
 from functools import reduce

@@ -4,7 +4,6 @@
 {% block content %}
 <meta charset="UTF-8">
 <link rel="stylesheet" href="{% static 'css/emotion.css' %}">
-<meta charset="UTF-8">
 
 <div class="emotion-analysis-container">
     <header class="header">
@@ -20,74 +19,55 @@
             <h2>{{ video_title }}</h2>
         </div>
 
-        <!-- 워드클라우드와 긍부정 단어 순위 섹션 -->
-        <div class="wordcloud-ranking-section">
-            <!-- 왼쪽: 워드클라우드 -->
-            <div class="wordcloud">
-                <h3>워드클라우드</h3>
-                {% if not wordcloud_error %}
-                    <img src="data:image/png;base64,{{ wordcloud_image }}" alt="Word Cloud" class="responsive-image">
-                {% else %}
-                    <p class="error">{{ wordcloud_error }}</p>
-                {% endif %}
-
-                <!-- feedback 파트 -->
-                {% include "feedback/feedback_form.html" %}
-            </div>
-
-            <!-- 오른쪽: 긍부정 단어 순위 -->
-            <div class="ranking">
-                <h3>긍·부정 단어 순위</h3>
-                {% if not morpheme_error %}
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>단어</th>
-                                <th>빈도수</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for word, count in rank_table_by_morpheme %}
-                                <tr>
-                                    <td>{{ word }}</td>
-                                    <td>{{ count }}</td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                {% else %}
-                    <p class="error">{{ morpheme_error }}</p>
-                {% endif %}
-
-                <!-- 파이 그래프 -->
+        <!-- 메인 컨텐츠 영역 -->
+        <div class="content" style="display: flex; width: 100%; justify-content: space-between; align-items: flex-start; gap: 20px;">
+            <!-- 좌측 섹션 -->
+            <div class="left-section" style="width: 32%; text-align: center;">
                 <h3>감정 분포</h3>
-                {% if not piechart_error %}
-                    <img src="data:image/png;base64,{{ pie_chart_image }}" alt="Sentiment Pie Chart" class="responsive-image">
+                {% if pie_chart_image %}
+                    <img src="data:image/png;base64,{{ pie_chart_image }}" alt="Sentiment Pie Chart" style="width: 100%; max-height: 500px; object-fit: contain;">
                 {% else %}
-                    <p class="error">{{ piechart_error }}</p>
+                    <p class="error">파이 차트 생성에 오류가 발생했습니다.</p>
                 {% endif %}
             </div>
+
+            <!-- 중간 섹션 -->
+            <div class="middle-section" style="width: 32%; text-align: center;">
+                <h3>감정 단어 버블차트</h3>
+                {% if bubble_chart_image %}
+                    <img src="data:image/png;base64,{{ bubble_chart_image }}" alt="버블차트 이미지" style="width: 100%; max-height: 500px; object-fit: contain;">
+                {% else %}
+                    <p class="error">버블차트 생성에 오류가 발생했습니다.</p>
+                {% endif %}
+            </div>
+
+            <!-- 우측 섹션 -->
+            <div class="right-section" style="width: 32%; text-align: center;">
+                <h3>TOP10 감성 단어</h3>
+                {% if sentiment_table %}
+                    <div class="table-responsive" style="width: 100%; max-height: 500px; overflow-y: auto;">
+                        <table class="table table-bordered table-striped" style="margin: 0 auto; font-size: 18px;">
+                            {{ sentiment_table|safe }}
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="error">TF-IDF 분석에 오류가 발생했습니다.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 워드클라우드 -->
+        <div class="wordcloud" style="margin-top: 40px; text-align: center;">
+            <h3>워드클라우드</h3>
+            {% if wordcloud_image %}
+                <img src="data:image/png;base64,{{ wordcloud_image }}" alt="워드클라우드 이미지" style="width: 100%; max-height: 600px; object-fit: contain;">
+            {% else %}
+                <p class="error">워드클라우드 생성에 오류가 발생했습니다.</p>
+            {% endif %}
         </div>
     {% endif %}
 </div>
 
-<script>
-    // 별점 기능을 위한 JavaScript
-    const stars = document.querySelectorAll('.star');
-    const selectedRating = document.getElementById('selected-rating');
-
-    stars.forEach(star => {
-        star.addEventListener('click', () => {
-            const rating = star.getAttribute('data-value');
-            selectedRating.textContent = rating;
-
-            // 스타일을 변경하여 선택된 별점을 표시
-            stars.forEach(s => s.style.color = 'gray');
-            for (let i = 0; i < rating; i++) {
-                stars[i].style.color = 'gold';
-            }
-        });
-    });
-</script>
-
+<!-- feedback 파트 -->
+{% include "feedback/feedback_form.html" %}
 {% endblock %}

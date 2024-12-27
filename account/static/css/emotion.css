@@ -7,6 +7,18 @@
     margin-bottom: 2rem;
 }
 
+.emotion_container {
+    background: white;
+    border-radius: var(--border-radius);
+    padding: 2rem;
+    box-shadow: var(--card-shadow);
+    max-width: 1140px;
+    margin: 0 auto;
+    box-sizing: border-box;
+}
+
+
+
 /* 워드클라우드 스타일 */
 .wordcloud {
     width: 65%; /* 워드클라우드 영역을 더 크게 */
