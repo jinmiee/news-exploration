@@ -30,7 +30,8 @@ urlpatterns = [
     
     path('', views.chart, name='chart'),
     path('video-details/', views.video_details, name='video_details'),
-    path('detail/', views.detail, name='detail'),
+    path('detail/<str:video_id>/', views.detail, name='detail_by_id'),  # ID를 통한 접근
+    path('detail/', views.detail, name='detail_by_url'),  # URL을 통한 접근
     path('feedback/', views.submit_feedback, name='submit_feedback'),
     path('feedback_done/', views.feedback_done, name='feedback_done'),
 

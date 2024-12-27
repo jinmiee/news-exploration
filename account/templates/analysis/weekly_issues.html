@@ -60,7 +60,7 @@
                 <span class="issue-rank">{{ issue.rank }}</span>
                 <div class="issue-content">
                     <h3 class="issue-title">
-                        <a href="{% url 'account:detail' %}?url={{ issue.url }}" class="issue-link" title="{{ issue.title }}">
+                        <a href="{% url 'account:detail_by_url' %}?url={{ issue.url }}" class="issue-link" title="{{ issue.title }}">
                             {{ issue.title }}
                         </a>
                     </h3>

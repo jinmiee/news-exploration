@@ -279,105 +279,124 @@ def get_related_duplicate_videos(request):
 
 #상세분석
 # @login_required
-def detail(request):
-    video_url = request.GET.get('url')
-    video_id = request.GET.get('id')
+from bson import ObjectId
+from django.shortcuts import get_object_or_404
+from django.http import JsonResponse
 
-    # 선택된 비디오 데이터 가져오기
-    video = YouTubeData.objects.filter(url=video_url).first()
-
-    # 비디오 데이터가 없을 경우 처리
-    if not video:
-        return JsonResponse({"error": "해당 URL��� 대한 비디오 데이터를 찾을 수 없습니다."}, status=404)
-
+def detail(request, video_id=None):
+    """
+    video_id 또는 URL을 기반으로 비디오 데이터를 가져옵니다.
+    """
     try:
-        # 제목과 설명 불용어 처리
-        cleaned_title = clean_title(video.title)
-        video_desc = f"{cleaned_title} {video.desc if video.desc else ''}"
+        video = None
+        object_id = None
 
-        # transcript 데이터 처리
-        transcript_segments = []
-        for item in video.transcript:
-            if 'start' in item and 'text' in item:
-                start_time = int(float(item['start']))
-                minutes = start_time // 60
-                seconds = start_time % 60
-                time_str = f"{minutes:02d}:{seconds:02d}"
-                transcript_segments.append({
-                    'time': time_str,
-                    'text': item['text']
-                })
-
-        # 연관어 분석 수행
-        graph, top_pairs, important_keywords, _ = analyze_related_words(
-            video_desc,
-            video.transcript,
-            clean_title_func=clean_title
-        )
-
-        network_graph = generate_network_graph(graph)
-
-        # 키워드별 관련 뉴스 분류
-        categorized_news = {}
-        if important_keywords:
-            for keyword in important_keywords[:5]:  # 상위 5개 키워드만 처리하도록 수정
-                related_news = YouTubeData.objects.filter(
-                    Q(title__icontains=keyword) |
-                    Q(desc__icontains=keyword)
-                ).exclude(url=video_url)[:5]  # 6개에서 5개로 변경
-
-                if related_news:
-                    cleaned_news = []
-                    for news in related_news:
-                        news.title = clean_title(news.title)
-                        try:
-                            news.video_id = news.url.split('v=')[1].split('&')[0]
-                        except:
-                            news.video_id = None
-                        cleaned_news.append(news)
-                    categorized_news[keyword] = cleaned_news
-
-        # 댓글 처리
-        video_comments = []
-        if video.comments:
-            for comment in video.comments[:100]:  # 최대 100개만 처리
-                if isinstance(comment, dict):
-                    comment_text = comment.get('comment', '')
-                else:
-                    comment_text = str(comment)
-                if comment_text.strip():
-                    video_comments.append(comment_text)
-
-        # 댓글 분석 결과
-        if video_comments:
-            wordcloud_base64, pie_chart_base64 = save_visualizations_with_tfidf(video_comments)
-            bubble_chart_base64 = save_bubble_chart_with_tfidf(video_comments)
-            sentiment_html = generate_tfidf_sentiment_visualizations(video_comments)
+        # URL 또는 ID로 접근 구분
+        if video_id:
+            try:
+                # MongoDB ObjectId로 변환 및 데이터 조회
+                object_id = ObjectId(video_id)
+                video = get_object_or_404(YouTubeData, _id=object_id)
+            except Exception as e:
+                return JsonResponse({"error": f"Invalid video ID: {e}"}, status=400)
         else:
-            wordcloud_base64 = pie_chart_base64 = bubble_chart_base64 = sentiment_html = None
+            # GET 파라미터에서 url 사용
+            video_url = request.GET.get('url')
+            if not video_url:
+                return JsonResponse({"error": "URL 또는 video_id가 제공되지 않았습니다."}, status=400)
 
-        context = {
-            'video_url': video_url,
-            'video_id': video_id,
-            'video_comments': video.comments,
-            'video_views': video.views,
-            'video_likes': video.likes,
-            'network_graph': network_graph,
-            'categorized_news': categorized_news,
-            'important_keywords': important_keywords,
-            'transcript_segments': transcript_segments,
-            'wordcloud_image': wordcloud_base64,
-            'pie_chart_image': pie_chart_base64,
-            'bubble_chart_image': bubble_chart_base64,  # 버블차트 추가
-            'sentiment_table': sentiment_html  # TF-IDF 분석 결과 테이블 전달
-        }
+            video = YouTubeData.objects.filter(url=video_url).first()
+            if not video:
+                return JsonResponse({"error": "해당 URL에 대한 데이터를 찾을 수 없습니다."}, status=404)
 
-        return render(request, 'analysis/detail.html', context)
+        # 공통 처리 (video가 None인 경우를 방지)
+        if video:
+            cleaned_title = clean_title(video.title)
+            video_desc = f"{cleaned_title} {video.desc if video.desc else ''}"
+
+            # transcript 데이터 처리
+            transcript_segments = []
+            for item in video.transcript:
+                if 'start' in item and 'text' in item:
+                    start_time = int(float(item['start']))
+                    minutes = start_time // 60
+                    seconds = start_time % 60
+                    time_str = f"{minutes:02d}:{seconds:02d}"
+                    transcript_segments.append({
+                        'time': time_str,
+                        'text': item['text']
+                    })
+
+            # 연관어 분석 수행
+            graph, top_pairs, important_keywords, _ = analyze_related_words(
+                video_desc,
+                video.transcript,
+                clean_title_func=clean_title
+            )
+
+            network_graph = generate_network_graph(graph)
+
+            # 키워드별 관련 뉴스 분류
+            categorized_news = {}
+            if important_keywords:
+                for keyword in important_keywords[:5]:  # 상위 5개 키워드만 처리
+                    related_news = YouTubeData.objects.filter(
+                        Q(title__icontains=keyword) |
+                        Q(desc__icontains=keyword)
+                    ).exclude(_id=object_id)[:5]  # 현재 비디오 제외
+
+                    if related_news:
+                        cleaned_news = []
+                        for news in related_news:
+                            news.title = clean_title(news.title)
+                            try:
+                                news.video_id = news.url.split('v=')[1].split('&')[0]
+                            except:
+                                news.video_id = None
+                            cleaned_news.append(news)
+                        categorized_news[keyword] = cleaned_news
+
+            # 댓글 처리
+            video_comments = []
+            if video.comments:
+                for comment in video.comments[:100]:  # 최대 100개만 처리
+                    if isinstance(comment, dict):
+                        comment_text = comment.get('comment', '')
+                    else:
+                        comment_text = str(comment)
+                    if comment_text.strip():
+                        video_comments.append(comment_text)
+
+            # 댓글 분석 결과
+            if video_comments:
+                wordcloud_base64, pie_chart_base64 = save_visualizations_with_tfidf(video_comments)
+                bubble_chart_base64 = save_bubble_chart_with_tfidf(video_comments)
+                sentiment_html = generate_tfidf_sentiment_visualizations(video_comments)
+            else:
+                wordcloud_base64 = pie_chart_base64 = bubble_chart_base64 = sentiment_html = None
+
+            # 템플릿에 전달할 데이터 구성
+            context = {
+                'video_url': video.url,
+                'video_id': str(video._id),
+                'video_comments': video.comments,
+                'video_views': video.views,
+                'video_likes': video.likes,
+                'network_graph': network_graph,
+                'categorized_news': categorized_news,
+                'important_keywords': important_keywords,
+                'transcript_segments': transcript_segments,
+                'wordcloud_image': wordcloud_base64,
+                'pie_chart_image': pie_chart_base64,
+                'bubble_chart_image': bubble_chart_base64,  # 버블차트 추가
+                'sentiment_table': sentiment_html  # TF-IDF 분석 결과 테이블 전달
+            }
+
+            return render(request, 'analysis/detail.html', context)
 
     except Exception as e:
         print(f"Error in detail function: {e}")
         return JsonResponse({"error": str(e)}, status=500)
-
 
 from django.shortcuts import render
 from django.http import HttpResponse
