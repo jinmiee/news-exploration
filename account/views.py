@@ -294,7 +294,7 @@ def detail(request):
         # 제목과 설명 불용어 처리
         cleaned_title = clean_title(video.title)
         video_desc = f"{cleaned_title} {video.desc if video.desc else ''}"
-        
+
         # transcript 데이터 처리
         transcript_segments = []
         for item in video.transcript:
@@ -307,25 +307,25 @@ def detail(request):
                     'time': time_str,
                     'text': item['text']
                 })
-        
+
         # 연관어 분석 수행
         graph, top_pairs, important_keywords, _ = analyze_related_words(
-            video_desc, 
+            video_desc,
             video.transcript,
             clean_title_func=clean_title
         )
-        
+
         network_graph = generate_network_graph(graph)
-        
+
         # 키워드별 관련 뉴스 분류
         categorized_news = {}
         if important_keywords:
             for keyword in important_keywords[:5]:  # 상위 5개 키워드만 처리하도록 수정
                 related_news = YouTubeData.objects.filter(
-                    Q(title__icontains=keyword) | 
+                    Q(title__icontains=keyword) |
                     Q(desc__icontains=keyword)
                 ).exclude(url=video_url)[:5]  # 6개에서 5개로 변경
-                
+
                 if related_news:
                     cleaned_news = []
                     for news in related_news:
@@ -337,6 +337,25 @@ def detail(request):
                         cleaned_news.append(news)
                     categorized_news[keyword] = cleaned_news
 
+        # 댓글 처리
+        video_comments = []
+        if video.comments:
+            for comment in video.comments[:100]:  # 최대 100개만 처리
+                if isinstance(comment, dict):
+                    comment_text = comment.get('comment', '')
+                else:
+                    comment_text = str(comment)
+                if comment_text.strip():
+                    video_comments.append(comment_text)
+
+        # 댓글 분석 결과
+        if video_comments:
+            wordcloud_base64, pie_chart_base64 = save_visualizations_with_tfidf(video_comments)
+            bubble_chart_base64 = save_bubble_chart_with_tfidf(video_comments)
+            sentiment_html = generate_tfidf_sentiment_visualizations(video_comments)
+        else:
+            wordcloud_base64 = pie_chart_base64 = bubble_chart_base64 = sentiment_html = None
+
         context = {
             'video_url': video_url,
             'video_id': video_id,
@@ -346,7 +365,11 @@ def detail(request):
             'network_graph': network_graph,
             'categorized_news': categorized_news,
             'important_keywords': important_keywords,
-            'transcript_segments': transcript_segments
+            'transcript_segments': transcript_segments,
+            'wordcloud_image': wordcloud_base64,
+            'pie_chart_image': pie_chart_base64,
+            'bubble_chart_image': bubble_chart_base64,  # 버블차트 추가
+            'sentiment_table': sentiment_html  # TF-IDF 분석 결과 테이블 전달
         }
 
         return render(request, 'analysis/detail.html', context)
