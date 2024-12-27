@@ -49,7 +49,6 @@ urlpatterns = [
 
     path('signup/', views.register, name='signup'),
     path('find-password/', views.find_password, name='find_password'),
-    path('trigger-save-chart/', views.trigger_chart_save, name='trigger_save_chart'),
 
     path('update-info/', views.update_info, name='update_info'),  # 새 URL 추가
 path('password_change/', views.password_change, name='password_change'),

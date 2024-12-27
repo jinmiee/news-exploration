@@ -55,17 +55,6 @@ from .tasks.processing_tasks import (
     extract_duplicates_for_chart,
 )
 
-
-def trigger_chart_save(request):
-    """
-    스케줄링된 작업을 수동으로 실행
-    """
-    try:
-        save_top10_to_chart()  # processing_tasks.py에서 가져온 함수 호출
-        return JsonResponse({"message": "Chart 저장 작업이 성공적으로 실행되었습니다."}, status=200)
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
-
 def chart(request):
     """
     Chart 데이터를 템플릿으로 전달
