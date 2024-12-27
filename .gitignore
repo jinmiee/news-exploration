@@ -7,3 +7,5 @@ venv/
 ko.bin
 linux
 staticfiles/
+models/
+custom_model/
