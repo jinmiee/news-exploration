@@ -8,7 +8,7 @@
     text-align: center; /* 가운데 정렬 */
     font-size: 2rem; /* 폰트 크기 */
     margin-top: 0.5px; /* 아래 여백 */
-    margin-bottom: 20px; /* 아래 여백 */
+    margin-bottom: 40px; /* 아래 여백 */
     color: #333; /* 텍스트 색상 */
     font-weight: bold; /* 폰트 두께 */
 }
@@ -74,11 +74,11 @@
 
 .video-info {
     text-align: center; /* 중앙 정렬 */
-    margin-top: 20px; /* 위쪽 여백 */
+    margin-top: 40px; /* 위쪽 여백 */
     font-size: 1rem; /* 글자 크기 */
     color: #333; /* 텍스트 색상 */
     border-top: 1px solid #ddd; /* 상단 테두리 */
-    padding-top: 10px; /* 내부 여백 */
+    padding-top: 30px; /* 내부 여백 */
 }
 
 /* video-info-container 스타일 */
