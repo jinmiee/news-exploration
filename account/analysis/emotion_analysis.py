@@ -461,9 +461,10 @@ def save_bubble_chart_with_tfidf(comments, save_path='media/analysis_results/'):
 
         plt.axis('equal')
         plt.axis('off')
-        plt.title("감성어 TOP 10", fontsize=16)
 
         # 차트를 Base64로 반환
+
+
         buffer = BytesIO()
         plt.savefig(buffer, format="png")
         buffer.seek(0)
