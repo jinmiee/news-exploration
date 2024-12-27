@@ -102,79 +102,57 @@
             {% endif %}
         </div>
 
-        <!-- 연관어 분석 섹션 추가 -->
+        <!-- 연관어 분석 섹션 -->
         <div class="related-analysis-section">
             <h2>연관어 분석</h2>
             
-            <!-- 네트워크 그래프 -->
-            <div class="network-graph-container">
-                <h3>연관어 키워드 TOP 20</h3>
-                {% if network_graph %}
-                    <img src="data:image/png;base64,{{ network_graph }}" alt="연관어 네트워크 그래프" class="responsive-image">
-                {% else %}
-                    <p class="error-message">네트워크 그래프를 생성할 수 없습니다.</p>
-                {% endif %}
-            </div>
-
-            <!-- 상위 연관어 쌍 -->
-            <div class="word-pairs-section">
-                <h3>상위 연관어 쌍</h3>
-                <table class="word-pairs-table">
-                    <thead>
-                        <tr>
-                            <th>순위</th>
-                            <th>단어1</th>
-                            <th>단어2</th>
-                            <th>연관도</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for pair in top_pairs|slice:":20" %}
-                        <tr>
-                            <td>{{ forloop.counter }}</td>
-                            <td>{{ pair.0.0 }}</td>
-                            <td>{{ pair.0.1 }}</td>
-                            <td>{{ pair.1|floatformat:2 }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- 관련 뉴스 섹션 -->
-            <div class="related-news-section">
-                <h3>키워드별 관련 뉴스</h3>
-                <div class="keyword-tabs">
-                    {% for keyword in important_keywords %}
-                        {% if keyword in categorized_news %}
-                            <button class="keyword-tab" onclick="showCategory('{{ keyword }}')">{{ keyword }}</button>
-                        {% endif %}
-                    {% endfor %}
+            <!-- 컨텐츠를 감싸는 flex 컨테이너 추가 -->
+            <div class="analysis-content-wrapper">
+                <!-- 네트워크 그래프 -->
+                <div class="network-graph-container">
+                    <h3>연관어 키워드 TOP 10</h3>
+                    {% if network_graph %}
+                        <img src="data:image/png;base64,{{ network_graph }}" alt="연관어 네트워크 그래프" class="responsive-image">
+                    {% else %}
+                        <p class="error-message">네트워크 그래프를 생성할 수 없습니다.</p>
+                    {% endif %}
                 </div>
-                
-                {% for keyword, news_list in categorized_news.items %}
-                <div id="category-{{ keyword }}" class="news-category">
-                    <h4 class="keyword-title">'{{ keyword }}' 관련 뉴스</h4>
-                    <div class="related-news-list">
-                        {% for news in news_list %}
-                        <div class="news-item">
-                            <div class="news-thumbnail">
-                                {% if news.video_id %}
-                                    <img src="https://img.youtube.com/vi/{{ news.video_id }}/mqdefault.jpg" alt="뉴스 썸네일">
-                                {% endif %}
-                            </div>
-                            <div class="news-content">
-                                <h4>{{ news.title }}</h4>
-                                <div class="news-meta">
-                                    <span>조회수: {{ news.views|default:"0" }}</span>
-                                    <a href="{{ news.url }}" target="_blank" class="news-link">뉴스 보기</a>
-                                </div>
-                            </div>
-                        </div>
+
+                <!-- 관련 뉴스 섹션 -->
+                <div class="related-news-section">
+                    <h3>키워드별 관련 뉴스</h3>
+                    <div class="keyword-tabs">
+                        {% for keyword in important_keywords %}
+                            {% if keyword in categorized_news %}
+                                <button class="keyword-tab" onclick="showCategory('{{ keyword }}')">{{ keyword }}</button>
+                            {% endif %}
                         {% endfor %}
                     </div>
+                    
+                    {% for keyword, news_list in categorized_news.items %}
+                    <div id="category-{{ keyword }}" class="news-category">
+                        <h4 class="keyword-title">'{{ keyword }}' 관련 뉴스</h4>
+                        <div class="related-news-list">
+                            {% for news in news_list %}
+                            <div class="news-item">
+                                <div class="news-thumbnail">
+                                    {% if news.video_id %}
+                                        <img src="https://img.youtube.com/vi/{{ news.video_id }}/mqdefault.jpg" alt="뉴스 썸네일">
+                                    {% endif %}
+                                </div>
+                                <div class="news-content">
+                                    <h4>{{ news.title }}</h4>
+                                    <div class="news-meta">
+                                        <span>조회수: {{ news.views|default:"0" }}</span>
+                                        <a href="{{ news.url }}" target="_blank" class="news-link">뉴스 보기</a>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
                 </div>
-                {% endfor %}
             </div>
         </div>
 
@@ -189,46 +167,38 @@
             padding: 1rem;
         }
 
+        /* 수평 레이아웃을 위한 flex 컨테이너 스타일 */
+        .analysis-content-wrapper {
+            display: flex;
+            gap: 2rem;
+            align-items: stretch;
+            min-height: 600px;
+        }
+
+        /* 네트워크 그래프 컨테이너 스타일 */
         .network-graph-container {
-            margin-bottom: 2rem;
+            flex: 1;
             background-color: rgba(245, 245, 245, 0.8);
             border-radius: 8px;
             padding: 1rem;
         }
 
         .responsive-image {
-            max-width: 100%;
-            height: auto;
-        }
-
-        .word-pairs-section {
-            margin-bottom: 2rem;
-            background-color: rgba(245, 245, 245, 0.8);
-            border-radius: 8px;
-            padding: 1rem;
-        }
-
-        .word-pairs-table {
             width: 100%;
-            border-collapse: collapse;
-            margin-top: 1rem;
+            height: auto;
+            max-height: 520px;
+            object-fit: contain;
         }
 
-        .word-pairs-table th,
-        .word-pairs-table td {
-            padding: 8px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-        }
-
-        .word-pairs-table th {
-            background-color: #f0f0f0;
-        }
-
+        /* 관련 뉴스 섹션 스타일 */
         .related-news-section {
+            flex: 1;
             background-color: #f8f9fa;
             border-radius: 8px;
             padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            max-height: 600px;
         }
 
         .keyword-tabs {
@@ -256,10 +226,18 @@
             color: white;
         }
 
+        /* 뉴스 카테고리 컨테이너 */
         .news-category {
             display: none;
+            overflow-y: auto;
+            flex: 1;
         }
 
+        .news-category.active {
+            display: block;
+        }
+
+        /* 뉴스 아이템 스타일 */
         .news-item {
             display: flex;
             padding: 1rem;
@@ -289,6 +267,11 @@
             margin: 0 0 0.5rem 0;
             font-size: 1rem;
             color: #333;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .news-meta {
@@ -310,6 +293,22 @@
 
         .news-link:hover {
             background-color: #0056b3;
+        }
+
+        /* 반응형 디자인을 위한 미디어 쿼리 */
+        @media (max-width: 1200px) {
+            .analysis-content-wrapper {
+                flex-direction: column;
+            }
+
+            .network-graph-container,
+            .related-news-section {
+                width: 100%;
+            }
+
+            .responsive-image {
+                max-height: none;
+            }
         }
     </style>
 
@@ -448,10 +447,13 @@
             // 모든 카테고리 숨기기
             document.querySelectorAll('.news-category').forEach(cat => {
                 cat.style.display = 'none';
+                cat.classList.remove('active');
             });
             
             // 선택된 카테고리 보이기
-            document.getElementById('category-' + keyword).style.display = 'block';
+            const selectedCategory = document.getElementById('category-' + keyword);
+            selectedCategory.style.display = 'block';
+            selectedCategory.classList.add('active');
             
             // 탭 활성화 상태 변경
             document.querySelectorAll('.keyword-tab').forEach(tab => {

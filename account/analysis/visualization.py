@@ -1,4 +1,3 @@
-
 import platform
 import matplotlib
 matplotlib.use('Agg')
@@ -26,28 +25,38 @@ def generate_network_graph(G, node_clusters=None):
         plt.figure(figsize=(16, 12), facecolor='none')
         ax = plt.gca()
         ax.set_facecolor('none')
-
         
-        # 노드 위치 계산 (매번 다른 레이아웃)
-        pos = nx.spring_layout(G, k=2, iterations=50,  # iterations 줄임
-                             seed=42)  # 고정된 seed 사용
+        # 노드 위치 계산
+        pos = nx.spring_layout(G, k=2, iterations=50, seed=42)
         
-        # 노드 크기와 색상 계산
-        node_sizes = []
+        # 상위 10개 노드만 선택
         nodes = list(G.nodes())
+        node_sizes = []
         
+        # 노드의 연결 수와 가중치를 기준으로 상위 10개 노드 선택
+        node_importance = []
         for node in nodes:
-            # 노드 크기: 연결 수 + 가중치
-            size = (G.degree(node) + 1) * 700
+            importance = G.degree(node) + sum(d['weight'] for _, _, d in G.edges(node, data=True))
+            node_importance.append((node, importance))
+        
+        # 중요도 기준 상위 10개 노드 선택
+        top_nodes = [node for node, _ in sorted(node_importance, key=lambda x: x[1], reverse=True)[:10]]
+        
+        # 선택된 노드와 그들의 엣지만 포함하는 서브그래프 생성
+        G_sub = G.subgraph(top_nodes)
+        
+        # 노드 크기 계산
+        for node in G_sub.nodes():
+            size = (G_sub.degree(node) + 1) * 700
             node_sizes.append(size)
         
         # 엣지 그리기
-        edge_weights = nx.get_edge_attributes(G, 'weight')
+        edge_weights = nx.get_edge_attributes(G_sub, 'weight')
         if edge_weights:
             min_weight = min(edge_weights.values())
             max_weight = max(edge_weights.values())
             
-            sorted_edges = sorted(G.edges(data=True), 
+            sorted_edges = sorted(G_sub.edges(data=True), 
                                 key=lambda x: x[2]['weight'])
             
             for u, v, data in sorted_edges:
@@ -59,7 +68,7 @@ def generate_network_graph(G, node_clusters=None):
                     alpha = 0.3 + 0.6 * (weight - min_weight) / (max_weight - min_weight)
                     width = 1 + 8 * (weight - min_weight) / (max_weight - min_weight)
                 
-                nx.draw_networkx_edges(G, pos,
+                nx.draw_networkx_edges(G_sub, pos,
                                      edgelist=[(u, v)],
                                      width=width,
                                      edge_color='purple',
@@ -67,12 +76,12 @@ def generate_network_graph(G, node_clusters=None):
                                      style='solid')
         
         # 노드와 레이블 그리기
-        nx.draw_networkx_nodes(G, pos, 
+        nx.draw_networkx_nodes(G_sub, pos, 
                              node_size=node_sizes,
                              node_color='#1f77b4',
                              alpha=0.7)
         
-        nx.draw_networkx_labels(G, pos,
+        nx.draw_networkx_labels(G_sub, pos,
                               font_family=plt.rcParams['font.family'],
                               font_size=12,
                               font_weight='bold',
@@ -81,6 +90,7 @@ def generate_network_graph(G, node_clusters=None):
         plt.axis('off')
         plt.tight_layout(pad=20)
         
+        # 이미지 저장 및 반환
         buffer = BytesIO()
         plt.savefig(buffer, format='png',
                    bbox_inches='tight',

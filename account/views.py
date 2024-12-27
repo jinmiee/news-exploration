@@ -320,11 +320,11 @@ def detail(request):
         # 키워드별 관련 뉴스 분류
         categorized_news = {}
         if important_keywords:
-            for keyword in important_keywords[:10]:  # 상위 10개 키워드만 처리
+            for keyword in important_keywords[:5]:  # 상위 5개 키워드만 처리하도록 수정
                 related_news = YouTubeData.objects.filter(
                     Q(title__icontains=keyword) | 
                     Q(desc__icontains=keyword)
-                ).exclude(url=video_url)[:6]  # 각 키워드당 최대 6개 뉴스
+                ).exclude(url=video_url)[:5]  # 6개에서 5개로 변경
                 
                 if related_news:
                     cleaned_news = []
@@ -344,7 +344,6 @@ def detail(request):
             'video_views': video.views,
             'video_likes': video.likes,
             'network_graph': network_graph,
-            'top_pairs': top_pairs,
             'categorized_news': categorized_news,
             'important_keywords': important_keywords,
             'transcript_segments': transcript_segments
@@ -360,7 +359,7 @@ def detail(request):
 from django.shortcuts import render
 from django.http import HttpResponse
 from .models import YouTubeData
-from .analysis.emotion_analysis import save_visualizations_with_tfidf  # 워드클라우드 및 파이차트 생성 함수
+from .analysis.emotion_analysis import save_visualizations_with_tfidf  # 워드클��우드 및 파이차트 생성 함수
 from .analysis.emotion_analysis import generate_tfidf_sentiment_visualizations  # 감정 분석 결과 HTML 생성 함수
 from .analysis.emotion_analysis import  save_bubble_chart_with_tfidf # 버블
 def emotion(request):
@@ -477,7 +476,6 @@ def relate(request):
                 'video': video,
                 'video_title': cleaned_title,
                 'network_graph': network_graph,
-                'top_pairs': top_pairs,
                 'categorized_news': categorized_news,
                 'important_keywords': important_keywords,
                 'transcript_segments': transcript_segments
@@ -487,7 +485,7 @@ def relate(request):
             print(f"분석 중 오류 발생: {str(e)}")
             context = {
                 'section': 'relate',
-                'error_message': '분석 중 오류가 발생했습니다.'
+                'error_message': '분석 중 오류가 발생했습니��.'
             }
     else:
         context = {
