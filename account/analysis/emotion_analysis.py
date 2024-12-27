@@ -1,4 +1,7 @@
 import re
+import platform
+
+import matplotlib.font_manager
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 from io import BytesIO
@@ -13,11 +16,24 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 import numpy as np
 import os
 import pandas as pd
+import platform
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import matplotlib.font_manager
+import networkx as nx
+from io import BytesIO
+import base64
+import logging
 
 # 한글 폰트 경로 설정 (NanumGothic 사용)
-font_path = 'account/static/fonts/NanumGothic.ttf'  # 폰트 경로 수정
-font_prop = fm.FontProperties(fname=font_path)  # 폰트 속성 설정
-plt.rcParams['font.family'] = font_prop.get_name()  # matplotlib에 폰트 설정
+if platform.system() == 'Windows':
+    font_path = "C:/Windows/Fonts/malgun.ttf"
+else:  # Linux
+    font_path = '/usr/share/fonts/truetype/nanum/NanumGothic.ttf'
+font_prop = matplotlib.font_manager.FontProperties(fname=font_path)
+
+plt.rcParams['font.family'] = font_prop.get_name()
 
 custom_model_path = "account/custom_model"
 
