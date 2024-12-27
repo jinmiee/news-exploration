@@ -227,7 +227,7 @@
     function updateAnalysisButtons(videoUrl, videoId) {
         document.getElementById('analysis-detail-btn').href = "{% url 'account:detail' %}?url=" + encodeURIComponent(videoUrl) + "&id=" + encodeURIComponent(videoId);
         document.getElementById('analysis-emotion-btn').href = "{% url 'account:emotion' %}?url=" + encodeURIComponent(videoUrl) + "&id=" + encodeURIComponent(videoId);
-        document.getElementById('analysis-relate-btn').href = "{% url 'account:relate' %}?url=" + encodeURIComponent(videoUrl) + "&id=" + encodeURIComponent(videoId);
+        document.getElementById('analysis-relate-btn').href = "{% url 'account:relate' %}?url=" + encodeURIComponent(videoUrl);
     }
 
     function extractVideoId(url) {

@@ -24,7 +24,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from datasketch import MinHashLSH, MinHash
 import re
 from django.shortcuts import render
-from ..models import YouTubeData, RelatedWordAnalysis
+from ..models import YouTubeData, RelatedWordAnalysis, Chart
 from django.db.models import Q
 from time import time
 import pandas as pd
@@ -34,6 +34,88 @@ import matplotlib.pyplot as plt
 import base64
 from io import BytesIO
 
+
+def relate(request):
+    video_url = request.GET.get('url')
+    video = Chart.objects.filter(url=video_url).first()
+    
+    if video and video.transcript:
+        try:
+            # 1. 먼저 저장된 분석 결과가 있는지 확인
+            analysis = RelatedWordAnalysis.objects.filter(video_id=video.url).first()
+            
+            if analysis:
+                # 2A. 기존 분석 결과가 있으면 그대로 사용
+                context = {
+                    'section': 'relate',
+                    'video': video,
+                    'video_title': clean_title(video.title),
+                    'network_graph': analysis.network_graph,
+                    'top_pairs': analysis.top_pairs,
+                    'important_keywords': analysis.important_keywords,
+                    'transcript_segments': get_transcript_segments(video.transcript)
+                }
+            else:
+                # 2B. 없으면 실시간으로 분석 수행
+                cleaned_title = clean_title(video.title)
+                video_desc = f"{cleaned_title} {video.desc if video.desc else ''}"
+                
+                # transcript 데이터를 시간 단위로 구분하여 텍스트로 변환
+                transcript_segments = []
+                for item in video.transcript:
+                    if 'start' in item and 'text' in item:
+                        start_time = int(float(item['start']))
+                        minutes = start_time // 60
+                        seconds = start_time % 60
+                        time_str = f"{minutes:02d}:{seconds:02d}"
+                        transcript_segments.append({
+                            'time': time_str,
+                            'text': item['text']
+                        })
+                
+                # clean_title 함수를 파라미터로 전달
+                graph, top_pairs, important_keywords, performance_graph = analyze_related_words(
+                    video_desc,
+                    video.transcript,
+                    clean_title_func=clean_title
+                )
+
+                network_graph = generate_network_graph(graph)
+
+                # 분석 결과 저장
+                RelatedWordAnalysis.objects.create(
+                    video_id=video.url,
+                    network_graph=network_graph,
+                    top_pairs=top_pairs,
+                    important_keywords=important_keywords
+                )
+
+                context = {
+                    'section': 'relate',
+                    'video': video,
+                    'video_title': cleaned_title,
+                    'network_graph': network_graph,
+                    'silhouette_graph': performance_graph,
+                    'top_pairs': top_pairs,
+                    'important_keywords': important_keywords,
+                    'transcript_segments': transcript_segments
+                }
+
+            return render(request, 'analysis/relate.html', context)
+            
+        except Exception as e:
+            print(f"분석 중 오류 발생: {str(e)}")
+            context = {
+                'section': 'relate',
+                'error_message': '분석 중 오류가 발생했습니다.'
+            }
+    else:
+        context = {
+            'section': 'relate',
+            'error_message': '비디오 자막이 없거나 비디오를 찾을 수 없습니다.'
+        }
+    
+    return render(request, 'analysis/relate.html', context)
 
 
 
@@ -594,82 +676,18 @@ def generate_network_graph(G):
 #     process = psutil.Process()
 #     return process.memory_info().rss / 1024 / 1024
 
-def relate(request):
-    video_url = request.GET.get('url')
-    video_id = request.GET.get('id')
-    
-    video = YouTubeData.objects.filter(url=video_url).first()
-    
-    if video and video.transcript:
-        try:
-            # 저장된 분석 결과 확인
-            analysis = RelatedWordAnalysis.objects.filter(video_id=video.url).first()
-            
-            if analysis:
-                # 저장된 분석 결과 사용
-                context = {
-                    'section': 'relate',
-                    'video': video,
-                    'video_title': clean_title(video.title),
-                    'network_graph': analysis.network_graph,
-                    'top_pairs': analysis.top_pairs,
-                    'important_keywords': analysis.important_keywords,
-                    'transcript_segments': get_transcript_segments(video.transcript)
-                }
-            else:
-                # 기존 실시간 분석 로직 수행
-                from ..views import clean_title
-                
-                # 제목과 설명 불용어 처리
-                cleaned_title = clean_title(video.title)
-                video_desc = f"{cleaned_title} {video.desc if video.desc else ''}"
-                
-                # transcript 데이터를 시간 단위로 구분하여 텍스트로 변환
-                transcript_segments = []
-                for item in video.transcript:
-                    if 'start' in item and 'text' in item:
-                        start_time = int(float(item['start']))
-                        minutes = start_time // 60
-                        seconds = start_time % 60
-                        time_str = f"{minutes:02d}:{seconds:02d}"
-                        transcript_segments.append({
-                            'time': time_str,
-                            'text': item['text']
-                        })
-                
-                # clean_title 함수를 파라미터로 전달
-                graph, top_pairs, important_keywords, performance_graph = analyze_related_words(
-                    video_desc, 
-                    video.transcript,
-                    clean_title_func=clean_title
-                )
-                
-                network_graph = generate_network_graph(graph)
-                
-                context = {
-                    'section': 'relate',
-                    'video': video,
-                    'video_title': cleaned_title,
-                    'network_graph': network_graph,
-                    'silhouette_graph': performance_graph,
-                    'top_pairs': top_pairs,
-                    'important_keywords': important_keywords,
-                    'transcript_segments': transcript_segments
-                }
-
-            return render(request, 'analysis/relate.html', context)
-            
-        except Exception as e:
-            print(f"분석 중 오류 발생: {str(e)}")
-            context = {
-                'section': 'relate',
-                'error_message': '분석 중 오류가 발생했습니다.'
-            }
-    else:
-        context = {
-            'section': 'relate',
-            'error_message': '비디오 자막이 없거나 비디오를 찾을 수 없습니다.'
-        }
-    
-    return render(request, 'analysis/relate.html', context)
+def get_transcript_segments(transcript):
+    """자막 데이터를 시간 단위로 구분하여 텍스트로 변환"""
+    transcript_segments = []
+    for item in transcript:
+        if 'start' in item and 'text' in item:
+            start_time = int(float(item['start']))
+            minutes = start_time // 60
+            seconds = start_time % 60
+            time_str = f"{minutes:02d}:{seconds:02d}"
+            transcript_segments.append({
+                'time': time_str,
+                'text': item['text']
+            })
+    return transcript_segments
 
