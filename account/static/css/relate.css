@@ -2,7 +2,11 @@
 .relate-container {
     max-width: 1600px;
     margin: 0 auto;
-    padding: 5px;
+    padding: 20px;
+    background-color: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    min-height: 100vh;
 }
 
 /* 제목 스타일 추가 */
@@ -15,6 +19,13 @@
 }
 
 /* 네트워크 그래프 섹션 스타일 수정 */
+.network-graph {
+    width: 95%;
+    background-color: rgba(245, 245, 245, 0.8);
+    border-radius: 8px;
+    margin: 0;
+}
+
 .network-graph-section {
     width: 100%;
     max-width: 1200px;
@@ -22,135 +33,17 @@
     text-align: center;
 }
 
-.network-graph {
-    width: 100%;
-    margin-bottom: 20px;
-    background-color: rgba(245, 245, 245, 0.8);  /* 불투명한 회색 배경 */
-    border-radius: 8px;
-}
 
 .network-graph img {
     width: 100%;
-    max-width: 1400px;
     height: auto;
     border-radius: 8px;
-    display: block;  /* 이미지 주변 여백 제거 */
-    mix-blend-mode: multiply;  /* 이미지 블렌딩 모드 설정 */
+    display: block;
+    mix-blend-mode: multiply;
+    margin: 0;
 }
 
-/* 성능 평가 버튼 스타일 */
-.performance-btn {
-    padding: 12px 24px;
-    font-size: 1rem;
-    color: white;
-    background-color: #2196F3;
-    border: none;
-    border-radius: 25px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
 
-.performance-btn:hover {
-    background-color: #1976D2;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-}
-
-.performance-btn:disabled {
-    background-color: #90CAF9;
-    cursor: not-allowed;
-    transform: none;
-}
-
-/* 로딩 스피너 스타일 */
-.spinner {
-    width: 50px;
-    height: 50px;
-    border: 5px solid #f3f3f3;
-    border-top: 5px solid #2196F3;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin: 20px auto;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-/* 성능 평가 섹션 스타일 수정 */
-.performance-metrics-section {
-    margin: 2rem 0;
-    padding: 1rem;
-    background-color: #ffffff;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    width: 100%;
-}
-
-.performance-graph {
-    width: 100%;
-    margin: 0 auto;
-}
-
-.performance-graph img {
-    width: 100%;
-    height: auto;
-    border-radius: 8px;
-}
-
-/* 반응형 레이아웃 수정 */
-@media (max-width: 1024px) {
-    .network-graph img {
-        max-width: 100%;
-    }
-}
-
-.responsive-image {
-    max-width: 100%;
-    height: auto;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-/* 단어 순위 테이블 스타일 */
-.word-pairs {
-    width: 100%;
-}
-
-.word-pairs h2 {
-    margin: 19px 0 20px 0;
-    color: #333;
-    font-size: 19px;
-    text-align: center;
-    font-weight: bold;
-}
-
-.word-pairs table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 1rem;
-    font-size: 0.9rem;  /* 글자 크기 약간 축소 */
-}
-
-.word-pairs th,
-.word-pairs td {
-    padding: 8px;
-    text-align: center;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-}
-
-.word-pairs th {
-    background-color: rgba(255, 255, 255, 0.5);
-    font-weight: bold;
-    color: #333;
-}
-
-.word-pairs tr:hover {
-    background-color: rgba(255, 255, 255, 0.3);
-}
 
 /* 원문 스타일 */
 .original-text {
@@ -218,38 +111,85 @@
     color: #ffd700;
 }
 
+
+
+
+
 /* 콘텐츠 래퍼 스타일 수정 */
 .content-wrapper {
     display: flex;
-    gap: 2rem;
-    margin: 2rem 0;
-    align-items: flex-start;  /* 상단 정렬 */
+    gap: 5px;
+    margin: 2rem auto;
+    max-width: 1200px;
 }
 
 /* 왼쪽 섹션 (네트워크 그래프) */
 .left-section {
-    flex: 0.7;  /* 70% 너비 */
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+    width: calc(100% - 285px);
 }
+
+.section-title {
+    text-align: center;
+    margin: 40px 0 20px 0;
+    color: #333;
+    font-size: 55px;
+    font-weight: bold;
+}
+
 
 /* 오른쪽 섹션 (상위 연관어 쌍) */
 .right-section {
-    flex: 0.3;  /* 30% 너비 */
-    background-color: rgba(245, 245, 245, 0.8);  /* 불투명한 회색 배경 */
+    width: 300px;
+    background-color: rgba(245, 245, 245, 0.8);
     border-radius: 8px;
-    max-width: 400px;  /* 최대 너비 제한 */
-    padding: 0px 20px 20px 20px;
+    padding: 0px 10px 10px 10px;
+    margin-top: 130px;
 }
 
 /* 상위 연관어 쌍 */
 .scrollable-word-pairs {
-    max-height: 780px;  /* 최대 높이 설정 */
-    overflow-y: auto;   /* 세로 스크롤 추가 */
-    background-color: rgba(245, 245, 245, 0.8); /* 배경색 추가 */
-    border-radius: 8px; /* 모서리 둥글게 */
+    max-height: 520px;
+    overflow-y: auto;
+    background-color: rgba(245, 245, 245, 0.8);
+    border-radius: 8px;
+    width: 100%;
 }
+
+.word-pairs {
+    width: 100%;
+}
+
+.word-pairs h2 {
+    margin: 19px 0 20px 0;
+    color: #333;
+    font-size: 19px;
+    text-align: center;
+    font-weight: bold;
+}
+
+.word-pairs table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+    font-size: 0.9rem;
+}
+
+.word-pairs th,
+.word-pairs td {
+    padding: 8px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.word-pairs th {
+    background-color: rgba(255, 255, 255, 0.5);
+    font-weight: bold;
+    color: #333;
+}
+
+.word-pairs tr:hover {
+    background-color: rgba(255, 255, 255, 0.3);
+}
+
 
 
 
@@ -258,29 +198,55 @@
 /* 하단 컨텐츠 스타일 수정 */
 .bottom-content-wrapper {
     display: flex;
+    flex-direction: column;
     gap: 2rem;
-    margin: 2rem auto;  /* 중앙 정렬을 위해 auto로 변경 */
-    max-width: 1200px;  /* 네트워크 그래프와 동일한 최대 너비 */
+    margin: 2rem auto;
+    max-width: 1200px;
 }
 
 /* 스크립트와 연관어 쌍 섹션 */
+.word-pairs-section,
 .transcript-container {
     flex: 1;
+    min-width: 300px;
+    /* background-color: rgba(245, 245, 245, 0.8);
+    border-radius: 8px;
+    padding: 1rem; */
+}
+
+.transcript-container {
     background-color: rgba(240, 240, 240, 0.85);
     border-radius: 8px;
-    padding: 1.5rem;
-    max-height: 500px;
+    padding: 35px;
     overflow-y: auto;
+    max-height: 400px;
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
 }
+
 
 .transcript-segment {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 10rem;
-    margin-bottom: 1rem;
+    gap: 2rem;
+    /* margin-bottom: 1rem;
     padding: 1rem;
-    background-color: rgba(255, 255, 255, 0.3);
+    background-color: rgba(255, 255, 255, 0.3); */
     border-radius: 6px;
+    margin: 10px 0;
+    line-height: 1.5;
+    padding: 6px;
+    border-bottom: 1px solid #eee;
+    transition: background-color 0.2s;
+}
+
+.timestamp {
+    font-weight: bold;
+    color: #666;
+    /* margin-right: 5px; */
+    display: inline-block;
+    min-width: 60px;
 }
 
 .transcript-segment:nth-child(even) {
@@ -290,6 +256,13 @@
 .transcript-segment:nth-child(odd) {
     background-color: rgba(255, 255, 255, 0.8);
 }
+
+.transcript-segment:hover {
+    background-color: #f0f0f0;
+}
+
+
+
 
 .segment-item {
     display: flex;
@@ -316,18 +289,7 @@
     flex: 1;
 }
 
-/* 반응형 디자인 */
-@media (max-width: 1024px) {
-    .content-wrapper {
-        flex-direction: column;
-    }
-    
-    .left-section,
-    .right-section {
-        width: 100%;
-        max-width: none;
-    }
-}
+
 
 
 
@@ -336,13 +298,15 @@
 
 /* 관련 뉴스 섹션 스타일 수정 */
 .related-news-wrapper {
-    max-width: 1540px;  /* 최대 너비 1500px로 변경 */
+    max-width: 1200px;
 }
 
 .related-news-section {
-    background-color: rgba(245, 245, 245, 0.8);
+    background-color: #f8f9fa;
     border-radius: 8px;
-    padding: 2rem;
+    padding: 1rem;
+    max-width: 100%;
+    margin: 0 auto;
 }
 
 .news-category {
@@ -447,14 +411,11 @@
 }
 
 /* 반응형 디자인 */
-@media (max-width: 1024px) {
+/* @media (max-width: 1024px) {
     .related-news-list {
-        grid-template-columns: 1fr;  /* 모바일에서는 1열로 변경 */
-    }
-}
+        grid-template-columns: 1fr;  
+} */
 
-/* 실루엣 섹션 스타일 제거 */
-.silhouette-section {
-    display: none;
-}
+
+
 

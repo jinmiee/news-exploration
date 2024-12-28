@@ -13,7 +13,7 @@
         <div class="content-wrapper">
             <!-- 왼쪽: 네트워크 그래프 -->
             <div class="left-section">
-                <h2 class="section-title">연관어 키워드 TOP 20</h2>
+                <h2 class="section-title">연관어 키워드 TOP 10</h2>
                 <div class="network-graph">
                     <img src="data:image/png;base64,{{ network_graph }}" alt="연관어 네트워크 그래프" class="responsive-image">
                 </div>
@@ -47,36 +47,9 @@
             </div>
         </div>
 
-
-
         <!-- 하단 컨텐츠: 스크립트와 관련 뉴스 -->
         <div class="bottom-content-wrapper">
-            <!-- 스크립트 섹션 -->
-            <div class="transcript-container">
-                <h3>영상 스크립트</h3>
-                {% if transcript_segments %}
-                    {% for segment in transcript_segments %}
-                        {% if forloop.counter0|divisibleby:3 %}
-                            <div class="transcript-segment">
-                        {% endif %}
-                        
-                        <div class="segment-item">
-                            <span class="timestamp">{{ segment.time }}</span>
-                            <span class="text">{{ segment.text }}</span>
-                        </div>
-
-                        {% if forloop.counter|divisibleby:3 or forloop.last %}
-                            </div>
-                        {% endif %}
-                    {% endfor %}
-                {% else %}
-                    <p>자막이 없습니다.</p>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- 관련 뉴스 섹션은 그대로 유지 -->
-        <div class="related-news-wrapper">
+            <!-- 관련 뉴스 섹션 -->
             <div class="related-news-section">
                 <h3>키워드 TOP 10 관련 뉴스</h3>
                 <div class="keyword-tabs">
@@ -111,6 +84,29 @@
                 </div>
                 {% endfor %}
             </div>
+
+            <!-- 스크립트 섹션 -->
+            <div class="transcript-container">
+                <h3>영상 스크립트</h3>
+                {% if transcript_segments %}
+                    {% for segment in transcript_segments %}
+                        {% if forloop.counter0|divisibleby:3 %}
+                            <div class="transcript-segment">
+                        {% endif %}
+                        
+                        <div class="segment-item">
+                            <span class="timestamp">{{ segment.time }}</span>
+                            <span class="text">{{ segment.text }}</span>
+                        </div>
+
+                        {% if forloop.counter|divisibleby:3 or forloop.last %}
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                {% else %}
+                    <p>자막이 없습니다.</p>
+                {% endif %}
+            </div>
         </div>
 
         <!-- feedback 파트 -->
@@ -121,52 +117,8 @@
 </div>
 
 <style>
-.content-wrapper {
-    display: flex;
-    gap: 2rem;
-    margin: 2rem 0;
-    align-items: flex-start;
-}
-
-.left-section {
-    flex: 0.7;
-    display: flex;
-    flex-direction: column;
-    padding-top: 2.5rem;
-}
-
-.network-graph {
-    width: 100%;
-    background-color: rgba(245, 245, 245, 0.8);
-    border-radius: 8px;
-    /* margin-top: 1rem; */
-}
-
-.network-graph img {
-    width: 100%;
-    height: auto;
-    display: block;
-}
-
 .related-news-wrapper {
     flex: 0.4;
-}
-
-.transcript-container {
-    margin: 20px 0;
-    padding: 20px;
-    background-color: rgba(245, 245, 245, 0.8);
-    border-radius: 5px;
-    max-height: 550px;
-    overflow-y: auto;
-}
-
-.related-news-section {
-    background-color: #f8f9fa;
-    border-radius: 8px;
-    padding: 1rem;
-    max-width: 100%;
-    margin: 0 auto;
 }
 
 .keyword-tabs {
@@ -253,17 +205,7 @@
     background-color: #0056b3;
 }
 
-@media (max-width: 1024px) {
-    .content-wrapper {
-        flex-direction: column;
-    }
-    
-    .left-section,
-    .right-section {
-        width: 100%;
-        max-width: none;
-    }
-}
+
 
 .rating {
     margin: 2rem 0;
@@ -298,25 +240,9 @@
     margin: 0.5rem 0;
 }
 
-.transcript-segment {
-    margin: 10px 0;
-    line-height: 1.5;
-    padding: 6px;
-    border-bottom: 1px solid #eee;
-    transition: background-color 0.2s;
-}
 
-.transcript-segment:hover {
-    background-color: #f0f0f0;
-}
 
-.timestamp {
-    font-weight: bold;
-    color: #666;
-    margin-right: 10px;
-    display: inline-block;
-    min-width: 60px;
-}
+
 
 .text {
     color: #333;
@@ -331,87 +257,14 @@
     max-width: 1535px;
 }
 
-.word-pairs-section,
-.transcript-container {
-    flex: 1;
-    min-width: 300px;
-    background-color: rgba(245, 245, 245, 0.8);
-    border-radius: 8px;
-    padding: 1rem;
-}
-
-.word-pairs {
-    width: 100%;
-}
-
-.word-pairs table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 1rem;
-}
-
-.word-pairs th,
-.word-pairs td {
-    padding: 8px;
-    text-align: left;
-    border-bottom: 1px solid #ddd;
-}
-
-.word-pairs th {
-    background-color: #f0f0f0;
-}
-
 .no-news-message {
     text-align: center;
     padding: 2rem;
     color: #666;
     font-size: 1.1rem;
 }
-
-.silhouette-section {
-    margin: 2rem 0;
-    padding: 2rem;
-    background-color: #ffffff;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.silhouette-section h2 {
-    text-align: center;
-    margin-bottom: 1.5rem;
-    color: #333;
-    font-size: 1.5rem;
-}
-
-.silhouette-section img {
-    width: 100%;
-    max-width: 1000px;
-    height: auto;
-    margin: 0 auto;
-    display: block;
-    border-radius: 8px;
-}
-
-.section-title {
-    text-align: center;
-    margin: 20px 0 40px 0;
-    color: #333;
-    font-size: 55px;
-    font-weight: bold;
-}
-
-.right-section {
-    flex: 0.3;
-    margin: 35px 0 0 0;
-}
-
-
-
-.word-pairs table th,
-.word-pairs table td {
-    text-align: center;
-}
 </style>
+
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
