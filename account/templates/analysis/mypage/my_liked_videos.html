@@ -24,189 +24,36 @@
                 <li class="news-item">
                     <div class="rank-badge">{{ forloop.counter }}</div>
                     <div class="news-content">
-                        <a href="#" class="news-title" data-video-url="{{ item.url }}" data-thumbnail="{{ item.thumbnail }}" title="{{ item.cleaned_title }}">
-                             {{ item.cleaned_title }}
+                        <a href="{% url 'account:detail_by_id' item.id %}" class="news-title" title="{{ item.cleaned_title }}">
+                            {{ item.cleaned_title|truncatechars:50 }}
                         </a>
-                        <div class="news-info">
-                            <span class="info-item">
-                                <i class="fas fa-eye"></i>
-                                {{ item.views }}
-                            </span>
-                            <span class="info-item">
-                                <i class="fas fa-thumbs-up"></i>
-                                {{ item.likes }}
-                            </span>
                             <span class="info-item">
                                 <i class="fas fa-calendar"></i>
                                 {{ item.upload_date|date:"Y-m-d H:i" }}
                             </span>
-                    
                             {% if user.is_authenticated %}
-                                <form method="POST" action="{% url 'account:delete_from_liked' item.id %}">
-                                    {% csrf_token %}
-                                    <button type="submit">찜 취소</button>
-                                </form>
+                            <form method="POST" action="{% url 'account:delete_from_liked' item.id %}">
+                                {% csrf_token %}
+                                <button type="submit">찜 취소</button>
+                            </form>
                             {% else %}
-                                <a href="#" class="like-button" data-title="{{ item.title }}" data-url="{{ item.url }}">
-                                    ♡
-                                </a>
+                            <a href="#" class="like-button" data-title="{{ item.title }}" data-url="{{ item.url }}">
+                                ♡
+                            </a>
                             {% endif %}
-                        </div>
                     </div>
                 </li>
                 {% endfor %}
             </ul>
         </div>
-
-        <!-- 오른쪽 사이드바 -->
-        <div id="sidebar" class="video-sidebar" style="display: none;">
-            <div class="sidebar-header">
-                <h2>동영상 보기</h2>
-            </div>
-            <div id="video-container">
-                <div id="player-wrapper">
-                    <div id="youtube-player"></div>
-                    <div id="thumbnail-container" style="display: none;">
-                        <a id="thumbnail-link" href="" target="_blank" class="thumbnail-wrapper">
-                            <img id="thumbnail-img" src="" alt="동영상 썸네일">
-                            <div class="play-button-overlay">
-                                <i class="fas fa-play-circle"></i>
-                                <span>YouTube에서 보기</span>
-                            </div>
-                        </a>
-                    </div>
-                </div>
-            </div>
-
-            <div class="analysis-buttons">
-                <a id="analysis-detail-btn" href="#" class="btn-analysis">
-                    <i class="fas fa-chart-bar"></i>
-                    상세 분석
-                </a>
-                <a id="analysis-emotion-btn" href="#" class="btn-analysis">
-                    <i class="fas fa-smile"></i>
-                    감정 분석
-                </a>
-                <a id="analysis-relate-btn" href="#" class="btn-analysis">
-                    <i class="fas fa-project-diagram"></i>
-                    연관어 분석
-                </a>
-            </div>
-        </div>
-    </div>
 </div>
 
 <!-- YouTube API 로드 -->
 <script src="https://www.youtube.com/iframe_api"></script>
 
 <script>
-    let player;
-
-    function onYouTubeIframeAPIReady() {
-        player = new YT.Player('youtube-player', {
-            height: '315',
-            width: '560',
-            playerVars: {
-                'autoplay': 1,
-                'controls': 1,
-                'rel': 0,
-                'mute': 1
-            },
-            events: {
-                'onReady': onPlayerReady,
-                'onError': handlePlayerError,
-                'onStateChange': onPlayerStateChange
-            }
-        });
-    }
-
-    function onPlayerReady(event) {
-        console.log("YouTube Player가 준비되었습니다.");
-    }
-
-    function onPlayerStateChange(event) {
-        if (event.data === YT.PlayerState.PLAYING) {
-            document.getElementById('youtube-player').style.display = 'block';
-            document.getElementById('thumbnail-container').style.display = 'none';
-            player.unMute();
-        } else if (event.data === YT.PlayerState.ERROR) {
-            handlePlayerError();
-        }
-    }
-
-    function handlePlayerError() {
-        const activeTitle = document.querySelector('.news-title.active');
-        if (activeTitle) {
-            const videoUrl = activeTitle.getAttribute('data-video-url');
-            const thumbnailUrl = activeTitle.getAttribute('data-thumbnail');
-            showThumbnailMode(videoUrl, thumbnailUrl);
-        }
-    }
-
-    function showThumbnailMode(videoUrl, thumbnailUrl) {
-        const playerElement = document.getElementById('youtube-player');
-        const thumbnailContainer = document.getElementById('thumbnail-container');
-        const thumbnailImg = document.getElementById('thumbnail-img');
-        const thumbnailLink = document.getElementById('thumbnail-link');
-        
-        thumbnailImg.src = thumbnailUrl || `https://img.youtube.com/vi/${extractVideoId(videoUrl)}/maxresdefault.jpg`;
-        thumbnailLink.href = videoUrl;
-        
-        playerElement.style.display = 'none';
-        thumbnailContainer.style.display = 'block';
-    }
-
-    function loadVideo(videoUrl, thumbnailUrl) {
-        const videoId = extractVideoId(videoUrl);
-        const sidebar = document.getElementById('sidebar');
-        sidebar.style.display = 'block';
-
-        document.querySelectorAll('.news-title').forEach(title => {
-            title.classList.remove('active');
-        });
-        event.target.classList.add('active');
-
-        document.getElementById('youtube-player').style.display = 'block';
-        document.getElementById('thumbnail-container').style.display = 'none';
-
-        try {
-            player.loadVideoById({
-                videoId: videoId,
-                events: {
-                    'onError': handlePlayerError
-                }
-            });
-        } catch (error) {
-            console.error('동영상 로드 중 오류 발생:', error);
-            showThumbnailMode(videoUrl, thumbnailUrl);
-        }
-
-        updateAnalysisButtons(videoUrl, videoId);
-    }
-
-    function updateAnalysisButtons(videoUrl, videoId) {
-        document.getElementById('analysis-detail-btn').href = "{% url 'account:detail' %}?url=" + encodeURIComponent(videoUrl) + "&id=" + encodeURIComponent(videoId);
-        document.getElementById('analysis-emotion-btn').href = "{% url 'account:emotion' %}?url=" + encodeURIComponent(videoUrl) + "&id=" + encodeURIComponent(videoId);
-        document.getElementById('analysis-relate-btn').href = "{% url 'account:relate' %}?url=" + encodeURIComponent(videoUrl) + "&id=" + encodeURIComponent(videoId);
-    }
-
-    function extractVideoId(url) {
-        const regExp = /^.*(?:youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=)([^#&?]*).*/;
-        const match = url.match(regExp);
-        return match && match[1] ? match[1] : null;
-    }
-
-    document.querySelectorAll('.news-title').forEach(title => {
-        title.addEventListener('click', function(event) {
-            event.preventDefault();
-            const videoUrl = this.getAttribute('data-video-url');
-            const thumbnailUrl = this.getAttribute('data-thumbnail');
-            loadVideo(videoUrl, thumbnailUrl);
-        });
-    });
-
     document.addEventListener('DOMContentLoaded', function() {
-        // CSRF 토큰을 가져오는 함수
+        // CSRF 토큰 가져오는 함수
         function getCSRFToken() {
             const cookies = document.cookie.split(';');
             for (let cookie of cookies) {
@@ -218,85 +65,38 @@
             return null;
         }
 
-        window.likeVideo = function(videoId) {
-            if (!videoId) {
-                alert('동영상 ID를 찾을 수 없습니다.');
-                return;
-            }
+        // 찜하기 취소 버튼에 이벤트 추가
+        const unlikeButtons = document.querySelectorAll('.btn-unlike');
+        unlikeButtons.forEach(button => {
+            button.addEventListener('click', function(event) {
+                event.preventDefault();
 
-            const csrftoken = getCSRFToken();
-            
-            fetch(`/account/like/${videoId}/`, {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': csrftoken,
-                    'Content-Type': 'application/json',
-                },
-                credentials: 'include'
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.status === 'success') {
-                    const button = document.querySelector(`button[data-id="${videoId}"]`);
-                    if (data.is_liked) {
-                        button.innerHTML = '❤️';
+                const form = this.closest('form');
+                const csrftoken = getCSRFToken();
+
+                fetch(form.action, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrftoken,
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include',
+                })
+                .then(response => {
+                    if (response.ok) {
+                        location.reload();
                     } else {
-                        button.innerHTML = '♡';
+                        throw new Error('찜 취소 요청 실패');
                     }
-                    console.log('좋아요 상태 변경됨:', data.is_liked);  // 디버깅용
-                } else {
-                    alert(data.message || '오류가 발생했습니다.');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('오류가 발생했습니다. 다시 시도해주세요.');
-            });
-        };
-    });
-
-    document.addEventListener("DOMContentLoaded", function () {
-        const likeButtons = document.querySelectorAll(".like-button");
-        const modal = document.getElementById("login-modal");
-        const closeModal = document.getElementById("close-modal");
-    
-        likeButtons.forEach((button) => {
-            // 로그인하지 않은 상태의 버튼에만 이벤트 추가
-            if (!button.dataset.id) { 
-                button.addEventListener("click", function (event) {
-                    event.preventDefault();
-                    const title = button.getAttribute("data-title");
-                    const url = button.getAttribute("data-url");
-    
-                    // 모달 메시지 업데이트
-                    const message = document.getElementById("modal-message");
-                    message.textContent = title
-                        ? `찜기능을 사용하려면 로그인해주세요.`
-                        : "로그인 후 사용해주세요.";
-    
-                    // 모달 표시
-                    modal.style.display = "block";
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('오류가 발생했습니다. 다시 시도해주세요.');
                 });
-            }
-        });
-    
-        closeModal.addEventListener("click", function () {
-            modal.style.display = "none";
-        });
-    
-        // 모달 외부 클릭 시 닫기
-        window.addEventListener("click", function (event) {
-            if (event.target === modal) {
-                modal.style.display = "none";
-            }
+            });
         });
     });
-    
-    
 </script>
+
+
 {% endblock %}
