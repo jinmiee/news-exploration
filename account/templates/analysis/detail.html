@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="{% static 'css/detail.css' %}">
 {% endblock %}
 
-{% block title %}상세분석{% endblock %}
+{% block title %}상세페이지{% endblock %}
 
 {% block content %}
     <div class="chart-container">
@@ -100,7 +100,7 @@
 
         <div class="emotion-analysis-container">
             <header class="header">
-                <h1>감정 분석</h1>
+                <h3>감정 분석</h3>
             </header>
 
             {% if error_message %}
@@ -154,13 +154,13 @@
 
         <!-- 연관어 분석 섹션 -->
         <div class="related-analysis-section">
-            <h2>연관어 분석</h2>
+            <h3>연관어 분석</h3>
 
             <!-- 컨텐츠를 감싸는 flex 컨테이너 추가 -->
             <div class="analysis-content-wrapper">
                 <!-- 네트워크 그래프 -->
                 <div class="network-graph-container">
-                    <h3>연관어 키워드 TOP 10</h3>
+                    <h4>연관어 키워드 TOP 10</h4>
                     {% if network_graph %}
                         <img src="data:image/png;base64,{{ network_graph }}" alt="연관어 네트워크 그래프" class="responsive-image">
                     {% else %}
@@ -170,7 +170,7 @@
 
                 <!-- 관련 뉴스 섹션 -->
                 <div class="related-news-section">
-                    <h3>키워드별 관련 뉴스</h3>
+                    <h4>키워드별 관련 뉴스</h4>
                     <div class="keyword-tabs">
                         {% for keyword in important_keywords %}
                             {% if keyword in categorized_news %}
