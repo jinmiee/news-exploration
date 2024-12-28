@@ -1,6 +1,6 @@
 /* 컨테이너 스타일 */
 .relate-container {
-    max-width: 1600px;
+    max-width: 1140px;
     margin: 0 auto;
     padding: 20px;
     background-color: #ffffff;
@@ -409,13 +409,6 @@
 .news-category::-webkit-scrollbar-thumb:hover {
     background: #555;
 }
-
-/* 반응형 디자인 */
-/* @media (max-width: 1024px) {
-    .related-news-list {
-        grid-template-columns: 1fr;  
-} */
-
 
 
 
