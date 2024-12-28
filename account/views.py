@@ -388,6 +388,7 @@ def detail(request, video_id=None):
                 'transcript_segments': transcript_segments,
                 'wordcloud_image': wordcloud_base64,
                 'pie_chart_image': pie_chart_base64,
+                'top_pairs' : top_pairs,
                 'bubble_chart_image': bubble_chart_base64,  # 버블차트 추가
                 'sentiment_table': sentiment_html  # TF-IDF 분석 결과 테이블 전달
             }
@@ -520,7 +521,9 @@ def relate(request):
                 'network_graph': network_graph,
                 'categorized_news': categorized_news,
                 'important_keywords': important_keywords,
-                'transcript_segments': transcript_segments
+                'transcript_segments': transcript_segments,
+                'top_pairs' : top_pairs
+
             }
             
         except Exception as e:
