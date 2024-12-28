@@ -12,33 +12,63 @@
 
 /* ===== 기본 스타일 ===== */
 body {
-    margin: 0;
     font-family: 'Arial', sans-serif;
     background-color: var(--background-color);
     color: var(--text-color);
     line-height: 1.6;
-    display: block;
-    align-items: flex-start; /* 수직 정렬: 시작점 기준 */
-    flex-direction: column;
+    display: flex;
     margin: 0 auto;
-    max-width:1600px;
+    max-width:none;
+    justify-content: center; /* 수평 중앙 정렬 */
+    align-items: flex-start; /* 수직 정렬을 시작점으로 설정 */
+    flex-direction: column;
+    padding: 0;
+    height: 100%;
+    width: 100%;
 }
+
+main {
+    width: 100%;
+    max-width: none; /* 제한 해제 */
+    padding: 0;
+    margin: 0 auto; /* 중앙 정렬 */
+}
+
 
 /* ===== 컨테이너 스타일 ===== */
 .chart-container {
     width: 100%;
-    max-width: 1140px !important;
+    max-width: 1140px !important; /* 1140px로 고정 */
     background: white;
     border-radius: var(--border-radius);
-    padding: 2rem;
+    padding: 3rem;
     box-shadow: var(--card-shadow);
     margin: 0 auto;
     box-sizing: border-box;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+}
+
+
+
+.content-container {
+    width: 100%;
+    max-width: 1140px; /* 동일한 너비로 설정 */
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    overflow: hidden; /* 내부 요소가 넘치지 않도록 설정 */
+    margin: 0 auto;
+    flex-grow: 1; /* 남은 공간을 채우도록 설정 */
 }
 
 .chart-header {
     text-align: center;
-    margin-top: 4rem;
+    margin-top: 2rem;
     margin-bottom: 2rem;
 }
 
@@ -56,35 +86,38 @@ body {
 
 /* ===== 뉴스 리스트 ===== */
 .news-list {
-    display: grid;
-    gap: 1.5rem;
-    margin-top: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
     list-style: none;
     padding: 0;
-    width: 100%;
-    margin-left: auto; /* 자동으로 좌우 여백 설정 */
-    margin-right: auto;
-    justify-items: center; /* 각 항목을 수평 가운데 정렬 */
+    margin: 0 auto;
+    width: 100%; /* 리스트 너비를 부모 컨테이너에 맞춤 */
 }
 
 .news-ul {
-    padding-left: 0;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+    width: 100%; /* 리스트 너비를 부모 컨테이너에 맞춤 */
+    box-sizing: border-box; /* 패딩 포함 크기 계산 */
 }
 
 .news-item {
     display: flex;
-    flex-direction: row;
+    justify-content: space-between;
     align-items: center;
-    padding: 1rem; /* 내부 여백을 넉넉하게 설정 */
-    margin-bottom: 1rem; /* 항목 간 여백 */
+    padding: 1rem;
+    margin: 0 auto;
+    margin-bottom: 1rem; /* 항목 간 간격 추가 */
+    width: 100%; /* 리스트 항목이 컨테이너 안에서만 표시 */
+    max-width: 100%;
     background: white;
-    border-radius: var(--border-radius);
-    box-shadow: var(--card-shadow);
-    transition: transform var(--transition-duration), box-shadow var(--transition-duration);
-    max-width: 1140px; /* 전체 화면 폭에 맞춤 */
-    margin-left: auto; /* 자동 중앙 정렬 */
-    margin-right: auto;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    box-sizing: border-box; /* 패딩 포함 크기 계산 */
 }
+
 
 .news-item:hover {
     transform: translateY(-4px);
@@ -108,11 +141,21 @@ body {
 
 .news-content {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    justify-content: space-between; /* 제목과 날짜를 양쪽 정렬 */
+    align-items: center; /* 수직 가운데 정렬 */
     width: 100%;
     padding: 0 1rem; /* 좌우 여백 */
+    gap: 1rem; /* 제목과 날짜 간격 */
+    overflow: hidden; /* 내용이 넘치지 않도록 설정 */
 }
+
+.info-item {
+    font-size: 0.9rem;
+    color: #666;
+    flex-shrink: 0; /* 날짜가 압축되지 않도록 설정 */
+    white-space: nowrap; /* 날짜가 여러 줄로 표시되지 않도록 설정 */
+}
+
 
 .news-title {
     font-size: 1rem;
@@ -121,14 +164,13 @@ body {
     text-decoration: none;
     margin-right: 1rem;
     line-height: 1.2;
-    flex-grow: 1;
+    flex-grow: 1; /* 제목이 가능한 공간 차지 */
     white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis;
-    text-align: left;
-    flex: 1; /* 제목이 왼쪽 공간을 차지하도록 설정 */
-    max-width: 100%; /* 제목이 컨테이너 안에서만 잘리도록 설정 */
+    text-overflow: ellipsis; /* 제목이 길 경우 생략 표시(...) */
+    max-width: 70%; /* 제목이 차지할 최대 폭 설정 */
 }
+
 
 .news-title:hover {
     color: var(--primary-color); /* 파란색으로 변경 */
