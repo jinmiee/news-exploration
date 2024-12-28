@@ -224,7 +224,7 @@ def extract_duplicates_for_weekly_issues():
                 similarity = similarity_matrix[i, j]
 
                 # URL 동일성 및 높은 유사도 체크
-                if all_video.url == weekly_video.url or similarity >= 0.9999:
+                if all_video.url == weekly_video.url or similarity >= 0.9:
                     print(
                         f"DEBUG: 동일 데이터 또는 높은 유사도 - 유튜브 비디오(ID: {all_video._id}, URL: {all_video.url})와 주간 이슈 비디오(ID: {weekly_video._id}, URL: {weekly_video.url}) 유사도: {similarity}")
                     continue

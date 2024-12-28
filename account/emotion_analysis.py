@@ -599,7 +599,7 @@ def save_visualizations_with_tfidf(comments, save_path='media/analysis_results/'
         # 도넛 모양 파이차트 생성
         plt.figure(figsize=(6, 6))
         title_color = '#5745e9' if max_sentiment == '긍정' else '#ff6f6f'  # 타이틀 색상 결정
-        plt.title(title, fontsize=18, weight='bold', color=title_color, pad=30)  # 타이틀 추가
+        plt.title(title, fontsize=18, weight='bold', color=title_color, pad=60)  # 타이틀 추가
 
         wedges, texts, autotexts = plt.pie(
             sizes,

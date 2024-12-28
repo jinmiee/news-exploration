@@ -10,7 +10,7 @@ from django.http import JsonResponse
 from django.urls import reverse_lazy
 from django.utils import timezone
 
-from django.utils.timezone import localtime, make_aware, is_aware
+from django.utils.timezone import localtime, make_aware, is_aware, now
 from django.views.decorators.csrf import csrf_exempt
 import json
 from django.contrib.auth.decorators import login_required
@@ -228,17 +228,14 @@ from datetime import timedelta
 
 def get_related_duplicate_videos(request):
     try:
-        # 요청에서 URL을 가져옵니다.
         video_url = request.GET.get('url')
         if not video_url:
             return JsonResponse({"error": "URL 매개변수가 제공되지 않았습니다."}, status=400)
 
-        # WeeklyIssue 또는 Chart에서 해당 URL과 일치하는 동영상 가져오기
         video = WeeklyIssue.objects.filter(url=video_url).first() or Chart.objects.filter(url=video_url).first()
         if not video:
             return JsonResponse({"error": "해당 URL에 대한 기사를 찾을 수 없습니다."}, status=404)
 
-        # 중복 동영상 모델 선택
         if WeeklyIssue.objects.filter(url=video_url).exists():
             duplicates_model = WeeklyIssueDuplicateVideo
         elif Chart.objects.filter(url=video_url).exists():
@@ -246,19 +243,30 @@ def get_related_duplicate_videos(request):
         else:
             return JsonResponse({"error": "데이터 유형을 확인할 수 없습니다."}, status=400)
 
-        # 중복 검색 (유사도 + 업로드 날짜 범위 기준)
-        duplicates = []
-        for candidate in duplicates_model.objects.all():
-            similarity = fuzz.ratio(video.title, candidate.title)
-            if similarity > 70 : # 유사도가 70% 이상이고 업로드 날짜가 하루 이내인 경우
-                duplicates.append(candidate)
+        # 1. 대상 비디오 전처리
+        base_text = process_text(video.title, video.transcript or [])
 
-        # 디버깅 로그 출력
-        print(f"DEBUG: 중복 동영상 개수: {len(duplicates)}")
-        for duplicate in duplicates:
-            print(f"중복 동영상: {duplicate.title}, URL: {duplicate.url}, 유사도: {similarity}")
+        # 2. 후보 데이터 필터링 (7일 이내 데이터만)
+        recent_candidates = duplicates_model.objects.filter(
+            upload_date__gte=now() - timedelta(days=7)
+        )
 
-        # JSON 응답 생성
+        # 3. 후보 데이터 전처리
+        candidate_corpus = [process_text(candidate.title, candidate.transcript or []) for candidate in recent_candidates]
+
+        # 4. TF-IDF 및 유사도 계산
+        vectorizer = TfidfVectorizer(max_features=3000, stop_words='english', ngram_range=(1, 2))
+        tfidf_matrix = vectorizer.fit_transform(candidate_corpus)
+        base_vector = vectorizer.transform([base_text])
+        similarities = cosine_similarity(base_vector, tfidf_matrix).flatten()
+
+        # 5. 유사도 임계값 필터링
+        threshold = 0.6
+        duplicates = [
+            candidate for candidate, similarity in zip(recent_candidates, similarities)
+            if similarity > threshold
+        ]
+
         duplicate_list = [
             {
                 "title": duplicate.title,
