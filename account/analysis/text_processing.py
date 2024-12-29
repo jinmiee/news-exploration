@@ -1,3 +1,4 @@
+import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import MinMaxScaler
@@ -5,6 +6,9 @@ from konlpy.tag import Okt
 import re
 from django.core.cache import cache
 from fuzzywuzzy import fuzz
+from torch.utils.data import DataLoader
+from transformers import BertTokenizer, BertModel
+import torch
 
 def clean_title(title):
     """
@@ -106,12 +110,49 @@ def process_text(title, transcript=None):
 
     return f"{processed_title} {script_text}".strip()
 
+def get_bert_similarity_batch(corpus, batch_size=32):
+    """
+    BERT를 사용하여 문장 임베딩을 생성하고 코사인 유사도 행렬을 반환
+    """
+    tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased')
+    model = BertModel.from_pretrained('bert-base-multilingual-cased')
+    model.eval()
 
-def get_top10_chart_based(videos):
+    embeddings = []
+    for i in range(0, len(corpus), batch_size):
+        batch = corpus[i:i+batch_size]
+        inputs = tokenizer(batch, return_tensors='pt', truncation=True, padding=True, max_length=512)
+        with torch.no_grad():
+            outputs = model(**inputs)
+            # CLS 토큰의 출력 (Pooler Output)을 사용
+            sentence_embedding = outputs.pooler_output
+        embeddings.append(sentence_embedding.numpy())
+
+    # Numpy 배열로 변환 후 코사인 유사도 계산
+    import numpy as np
+    embeddings = np.vstack(embeddings)
+    similarity_matrix = cosine_similarity(embeddings)
+    return similarity_matrix
+
+
+def get_hybrid_similarity(tfidf_matrix, bert_similarity_matrix, weight_tfidf=0.5, weight_bert=0.5):
     """
-    TF-IDF와 조회수 정규화를 기반으로 상위 10개 영상을 선정하고,
-    코사인 유사도로 중복 제거.
+    TF-IDF와 BERT 기반 유사도를 결합하여 최종 유사도 매트릭스 생성
     """
+    combined_similarity = weight_tfidf * tfidf_matrix + weight_bert * bert_similarity_matrix
+    return combined_similarity
+
+def get_top10_chart_based(videos, num_clusters=5, additional_news=3):
+    """
+    클러스터링, TF-IDF, BERT 코사인 유사도를 결합해 혼합 전략으로 상위 10개 동영상을 선정
+    """
+    # 가중치 설정
+    TFIDF_WEIGHT = 0.4
+    VIEW_WEIGHT = 0.4
+    HYBRID_WEIGHT_TFIDF = 0.4
+    HYBRID_WEIGHT_BERT = 0.6
+
+    # 데이터 전처리
     corpus = []
     views_list = []
     processed_videos = []
@@ -124,41 +165,70 @@ def get_top10_chart_based(videos):
         video.cleaned_title = clean_title(video.title)
         processed_videos.append(video)
 
+    if not corpus:
+        print("Error: corpus is empty. No videos to process.")
+        return []
+
+    # TF-IDF 계산
     vectorizer = TfidfVectorizer(max_features=5000, stop_words='english')
     tfidf_matrix = vectorizer.fit_transform(corpus)
 
-    tfidf_scores = tfidf_matrix.sum(axis=1).A.flatten()
-    scaler = MinMaxScaler()
-    normalized_tfidf_scores = scaler.fit_transform(tfidf_scores.reshape(-1, 1)).flatten()
-    normalized_views = scaler.fit_transform([[view] for view in views_list]).flatten()
+    # BERT 계산
+    bert_similarity_matrix = get_bert_similarity_batch(corpus, batch_size=32)
 
-    weighted_scores = 0.5 * normalized_views + 0.5 * normalized_tfidf_scores
-
-    initial_sorted_videos = sorted(
-        zip(processed_videos, weighted_scores),
-        key=lambda x: x[1],
-        reverse=True
+    # Hybrid Similarity 계산
+    hybrid_similarity_matrix = get_hybrid_similarity(
+        tfidf_matrix,
+        bert_similarity_matrix,
+        HYBRID_WEIGHT_TFIDF,
+        HYBRID_WEIGHT_BERT
     )
 
-    similarity_matrix = cosine_similarity(tfidf_matrix)
-    selected_videos = []
-    seen_indices = set()
-    threshold = 0.6
+    # Hybrid Similarity Matrix 정규화
+    scaler = MinMaxScaler()
+    normalized_hybrid_similarity = scaler.fit_transform(hybrid_similarity_matrix)
 
-    for i, (video, score) in enumerate(initial_sorted_videos):
-        if i in seen_indices:
-            continue
+    # 클러스터링 수행 (K-Means)
+    from sklearn.cluster import KMeans
+    kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+    cluster_labels = kmeans.fit_predict(normalized_hybrid_similarity)
 
-        selected_videos.append(video)
+    # 클러스터별 대표 동영상 선택
+    clusters = {}
+    for i, label in enumerate(cluster_labels):
+        if label not in clusters:
+            clusters[label] = []
+        clusters[label].append((i, processed_videos[i], views_list[i]))  # (인덱스, 동영상 객체, 조회수)
 
-        for j in range(len(processed_videos)):
-            if j in seen_indices:
-                continue
-            fuzzy_similarity = fuzz.ratio(video.cleaned_title, processed_videos[j].cleaned_title) / 100.0
-            if similarity_matrix[i, j] > threshold or fuzzy_similarity > 0.6:
-                seen_indices.add(j)
+    cluster_representatives = []
+    for cluster, videos in clusters.items():
+        cluster_center = kmeans.cluster_centers_[cluster]
+        best_video = min(
+            videos,
+            key=lambda x: (
+                0.6 * np.linalg.norm(normalized_hybrid_similarity[x[0]] - cluster_center)  # 유사도 중심성
+                - 0.4 * x[2]  # 조회수
+            )
+        )
+        cluster_representatives.append(best_video[1])  # 동영상 객체 추가
 
-        if len(selected_videos) >= 10:
-            break
+    # 핵심 뉴스 추가 (조회수 기준)
+    remaining_videos = [
+        video for video in processed_videos if video not in cluster_representatives
+    ]
+    remaining_videos = sorted(remaining_videos, key=lambda x: x.views, reverse=True)
 
-    return selected_videos
+    # 부족한 개수만큼 조회수 기반 추가
+    additional_videos = remaining_videos[:additional_news]
+
+    # 최종 10개 동영상 선정
+    final_videos = cluster_representatives + additional_videos
+    final_videos = sorted(final_videos, key=lambda x: x.views, reverse=True)[:10]
+
+    # 디버깅 로그
+    print("선택된 대표 동영상:")
+    for video in final_videos:
+        print(f"- {video.cleaned_title} (조회수: {video.views})")
+
+    return final_videos
+

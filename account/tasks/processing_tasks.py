@@ -16,7 +16,7 @@ from django.utils.timezone import localtime, utc
 
 
 from sklearn.metrics.pairwise import cosine_similarity
-from account.analysis.text_processing import clean_title, process_text, get_top10_chart_based
+from account.analysis.text_processing import clean_title, process_text, get_top10_chart_based, get_hybrid_similarity,get_bert_similarity_batch
 
 from django.utils.timezone import localtime
 from datetime import timedelta
@@ -206,22 +206,38 @@ def extract_duplicates_for_weekly_issues():
         print(f"DEBUG: 주간 이슈 텍스트 전처리 완료. (크기: {len(weekly_corpus)})")
         print(f"DEBUG: 전체 유튜브 텍스트 전처리 완료. (크기: {len(all_corpus)})")
 
-        # 3. TF-IDF 및 유사도 계산
+        if not weekly_corpus or not all_corpus:
+            print("Error: corpus is empty.")
+            return
+
+        # 3. TF-IDF 계산
         vectorizer = TfidfVectorizer(max_features=5000, stop_words='english')
         weekly_tfidf_matrix = vectorizer.fit_transform(weekly_corpus)
         all_tfidf_matrix = vectorizer.transform(all_corpus)
 
-        print("DEBUG: TF-IDF 벡터화 완료.")
-        similarity_matrix = cosine_similarity(all_tfidf_matrix, weekly_tfidf_matrix)
-        print("DEBUG: 유사도 계산 완료.")
+        # 4. BERT 유사도 계산
+        weekly_bert_similarity = get_bert_similarity_batch(weekly_corpus, batch_size=32)
+        all_bert_similarity = get_bert_similarity_batch(all_corpus, batch_size=32)
 
-        # 4. 중복 판단
+        # 5. Hybrid 유사도 계산
+        weekly_hybrid_similarity = get_hybrid_similarity(
+            weekly_tfidf_matrix, weekly_bert_similarity,
+            weight_tfidf=0.6, weight_bert=0.4
+        )
+        all_hybrid_similarity = get_hybrid_similarity(
+            all_tfidf_matrix, all_bert_similarity,
+            weight_tfidf=0.6, weight_bert=0.4
+        )
+
+        print("DEBUG: Hybrid 유사도 계산 완료.")
+
+        # 6. 중복 판단
         threshold = 0.6
         duplicates = set()
 
         for i, all_video in enumerate(all_videos):
             for j, weekly_video in enumerate(weekly_videos):
-                similarity = similarity_matrix[i, j]
+                similarity = all_hybrid_similarity[i, j]
 
                 # URL 동일성 및 높은 유사도 체크
                 if all_video.url == weekly_video.url or similarity >= 0.9:
@@ -229,9 +245,7 @@ def extract_duplicates_for_weekly_issues():
                         f"DEBUG: 동일 데이터 또는 높은 유사도 - 유튜브 비디오(ID: {all_video._id}, URL: {all_video.url})와 주간 이슈 비디오(ID: {weekly_video._id}, URL: {weekly_video.url}) 유사도: {similarity}")
                     continue
 
-                # 중복 데이터로 간주할 조건
                 if similarity > threshold:
-                    # 중복 데이터가 이미 저장되었는지 확인
                     if not WeeklyIssueDuplicateVideo.objects.filter(url=all_video.url).exists():
                         duplicates.add(all_video._id)
                         print(
@@ -239,32 +253,28 @@ def extract_duplicates_for_weekly_issues():
 
         print(f"DEBUG: 총 {len(duplicates)}개의 중복 비디오를 탐지했습니다.")
 
-        # 5. 중복 동영상 저장
+        # 7. 중복 동영상 저장
         for duplicate_id in duplicates:
-            try:
-                duplicate_video = YouTubeData.objects.get(_id=duplicate_id)
+            duplicate_video = YouTubeData.objects.get(_id=duplicate_id)
 
-                # 저장 전에 중복 확인
-                if WeeklyIssueDuplicateVideo.objects.filter(url=duplicate_video.url).exists():
-                    print(f"DEBUG: 중복 비디오가 이미 저장됨 - URL: {duplicate_video.url}")
-                    continue
+            if WeeklyIssueDuplicateVideo.objects.filter(url=duplicate_video.url).exists():
+                print(f"DEBUG: 중복 비디오가 이미 저장됨 - URL: {duplicate_video.url}")
+                continue
 
-                WeeklyIssueDuplicateVideo.objects.update_or_create(
-                    _id=duplicate_video._id,
-                    defaults={
-                        "title": duplicate_video.title,
-                        "url": duplicate_video.url,
-                        "views": duplicate_video.views,
-                        "upload_date": duplicate_video.upload_date,
-                        "channel_name": duplicate_video.channel_name,
-                        "thumbnail": duplicate_video.thumbnail,
-                        "likes": duplicate_video.likes,
-                        "transcript": duplicate_video.transcript,
-                    }
-                )
-                print(f"DEBUG: 중복 비디오 저장 완료 - 제목: {duplicate_video.title}, URL: {duplicate_video.url}")
-            except Exception as save_error:
-                print(f"ERROR: 중복 비디오 저장 실패 - ID: {duplicate_id}, 오류: {save_error}")
+            WeeklyIssueDuplicateVideo.objects.update_or_create(
+                _id=duplicate_video._id,
+                defaults={
+                    "title": duplicate_video.title,
+                    "url": duplicate_video.url,
+                    "views": duplicate_video.views,
+                    "upload_date": duplicate_video.upload_date,
+                    "channel_name": duplicate_video.channel_name,
+                    "thumbnail": duplicate_video.thumbnail,
+                    "likes": duplicate_video.likes,
+                    "transcript": duplicate_video.transcript,
+                }
+            )
+            print(f"DEBUG: 중복 비디오 저장 완료 - 제목: {duplicate_video.title}, URL: {duplicate_video.url}")
 
         print(f"주간 이슈 기준 {len(duplicates)}개의 중복 동영상이 저장되었습니다.")
     except Exception as e:
@@ -275,40 +285,54 @@ def extract_duplicates_for_chart():
     차트 데이터를 기준으로 중복 동영상을 추출하고 ChartDuplicateVideo에 저장.
     """
     try:
-        # 차트 데이터와 전체 유튜브 데이터 가져오기
+        # 1. 차트 데이터와 전체 유튜브 데이터 가져오기
         chart_videos = list(Chart.objects.all())
         all_videos = list(YouTubeData.objects.all())
 
         print(f"DEBUG: 차트 비디오 개수: {len(chart_videos)}")
         print(f"DEBUG: 전체 유튜브 데이터 개수: {len(all_videos)}")
 
-        # 텍스트 전처리
+        # 2. 텍스트 전처리
         chart_corpus = [process_text(video.title, video.transcript or []) for video in chart_videos]
         all_corpus = [process_text(video.title, video.transcript or []) for video in all_videos]
 
         print(f"DEBUG: 차트 텍스트 전처리 완료. (크기: {len(chart_corpus)})")
         print(f"DEBUG: 전체 유튜브 텍스트 전처리 완료. (크기: {len(all_corpus)})")
 
-        # TF-IDF 및 유사도 계산
+        if not chart_corpus or not all_corpus:
+            print("Error: 텍스트 데이터가 비어 있습니다.")
+            return
+
+        # 3. TF-IDF 계산
         vectorizer = TfidfVectorizer(max_features=5000, stop_words='english')
         chart_tfidf_matrix = vectorizer.fit_transform(chart_corpus)
         all_tfidf_matrix = vectorizer.transform(all_corpus)
 
-        print("DEBUG: TF-IDF 벡터화 완료.")
+        # 4. BERT 유사도 계산
+        chart_bert_similarity = get_bert_similarity_batch(chart_corpus, batch_size=32)
+        all_bert_similarity = get_bert_similarity_batch(all_corpus, batch_size=32)
 
-        similarity_matrix = cosine_similarity(all_tfidf_matrix, chart_tfidf_matrix)
+        # 5. Hybrid 유사도 계산
+        chart_hybrid_similarity = get_hybrid_similarity(
+            chart_tfidf_matrix, chart_bert_similarity,
+            weight_tfidf=0.6, weight_bert=0.4
+        )
+        all_hybrid_similarity = get_hybrid_similarity(
+            all_tfidf_matrix, all_bert_similarity,
+            weight_tfidf=0.6, weight_bert=0.4
+        )
 
-        print("DEBUG: 유사도 계산 완료.")
+        print("DEBUG: 하이브리드 유사도 계산 완료.")
 
-        # 중복 판단
-        threshold = 0.6
+        # 6. 중복 판단
+        threshold = 0.6  # 유사도 임계값
         duplicates = set()
 
         for i, all_video in enumerate(all_videos):
             for j, chart_video in enumerate(chart_videos):
-                similarity = similarity_matrix[i, j]
+                similarity = all_hybrid_similarity[i, j]
 
-                # URL이 동일하거나 유사도가 1.0인 경우 건너뛰기
+                # URL이 동일하거나 유사도가 매우 높은 경우 건너뛰기
                 if all_video.url == chart_video.url or similarity >= 0.9:
                     print(
                         f"DEBUG: 동일 데이터 또는 높은 유사도 - 유튜브 비디오(ID: {all_video._id}, URL: {all_video.url})와 차트 비디오(ID: {chart_video._id}, URL: {chart_video.url}) 유사도: {similarity}")
@@ -316,7 +340,6 @@ def extract_duplicates_for_chart():
 
                 # 중복 데이터로 간주할 조건
                 if similarity > threshold:
-                    # 중복 동영상이 이미 저장되어 있는지 확인
                     if not ChartDuplicateVideo.objects.filter(url=all_video.url).exists():
                         duplicates.add(all_video._id)
                         print(
@@ -324,13 +347,12 @@ def extract_duplicates_for_chart():
 
         print(f"DEBUG: 총 {len(duplicates)}개의 중복 비디오를 탐지했습니다.")
 
-        # 중복 동영상 저장
+        # 7. 중복 동영상 저장
         for duplicate_id in duplicates:
             duplicate_video = YouTubeData.objects.get(_id=duplicate_id)
 
-            # 중복 동영상이 이미 저장된 경우 건너뜀
             if ChartDuplicateVideo.objects.filter(url=duplicate_video.url).exists():
-                print(f"DEBUG: 중복 비디오가 이미 존재합니다 - URL: {duplicate_video.url}")
+                print(f"DEBUG: 중복 비디오가 이미 저장됨 - URL: {duplicate_video.url}")
                 continue
 
             ChartDuplicateVideo.objects.update_or_create(
@@ -351,3 +373,4 @@ def extract_duplicates_for_chart():
         print(f"차트 기준 {len(duplicates)}개의 중복 동영상이 저장되었습니다.")
     except Exception as e:
         print(f"차트 중복 동영상 추출 오류: {e}")
+
