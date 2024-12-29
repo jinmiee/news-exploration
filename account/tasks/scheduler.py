@@ -20,7 +20,10 @@ def send_email_task():
 
 def start_scheduler(save_chart_to_mongo=None):
     from .processing_tasks import save_daily_top10, delete_expired_charts, save_top10_to_chart, extract_duplicates_for_weekly_issues, extract_duplicates_for_chart
-    
+    import logging
+
+    logging.basicConfig()
+    logging.getLogger('apscheduler').setLevel(logging.DEBUG)
 
     jobstores = {
         'default': MongoDBJobStore(
@@ -61,9 +64,9 @@ def start_scheduler(save_chart_to_mongo=None):
     add_job_if_not_exists(
         'save_top10_to_chart',
         save_top10_to_chart,
-        trigger=CronTrigger(minute=5)  # 매 시간 5분에 실행
+        trigger=CronTrigger(hour='*', minute=5),  # 매시 5분에 실행
     )
-    print("Chart 저장 작업이 1시간마다 실행되도록 등록되었습니다.")
+    print("Chart 저장 작업이 매시 5분에 실행되도록 등록되었습니다.")
 
     add_job_if_not_exists(
         'extract_weekly_duplicates',
@@ -75,9 +78,9 @@ def start_scheduler(save_chart_to_mongo=None):
     add_job_if_not_exists(
         'extract_chart_duplicates',
         extract_duplicates_for_chart,
-        trigger=CronTrigger(minute=5)  # 매 시간 5분에 실행
+        trigger=CronTrigger(hour='*', minute=5),  # 매시 5분에 실행
     )
-    print("Chart 중복 데이터 추출 작업이 1시간마다 실행되도록 등록되었습니다.")
+    print("Chart 중복 데이터 추출 작업이 매시 5분에 실행되도록 등록되었습니다.")
 
     add_job_if_not_exists(
         'delete_expired_charts',

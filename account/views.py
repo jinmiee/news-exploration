@@ -76,7 +76,7 @@ def chart(request):
             upload_date__gte=analysis_start_utc,
             upload_date__lt=analysis_end_utc
         )
-        chart_data = sorted(chart_data, key=lambda x: x.rank)
+        chart_data = sorted(chart_data, key=lambda x: x.rank)[:10]
 
         # QuerySet 개수를 확인하려면 .count()를 사용
         print("DEBUG: QuerySet count before sorting:", Chart.objects.filter(
@@ -87,6 +87,15 @@ def chart(request):
         # 리스트의 길이를 확인하려면 len()을 사용
         print("DEBUG: chart_data count after sorting:", len(chart_data))
         print(chart_data)
+
+        # Chart 업데이트 시간을 오전 11시 7분, 오후 11시 7분으로 설정
+        if now.hour < 11 or (now.hour == 11 and now.minute < 7):  # 오전 11시 7분 이전
+            chart_update_time = now.replace(hour=11, minute=7, second=0, microsecond=0)
+        elif now.hour < 23 or (now.hour == 23 and now.minute < 7):  # 오후 11시 7분 이전
+            chart_update_time = now.replace(hour=23, minute=7, second=0, microsecond=0)
+        else:  # 오후 11시 7분 이후
+            chart_update_time = (now + timedelta(days=1)).replace(hour=11, minute=7, second=0, microsecond=0)
+
         processed_chart_data = []
         for chart in chart_data:
             try:
@@ -108,14 +117,14 @@ def chart(request):
             except Exception as e:
                 print(f"Error processing chart data: {e}")
 
-        
-        
+
         # 템플릿에 전달할 데이터 구성
         context = {
         
             "top_news": processed_chart_data,
             "analysis_start": analysis_start,
-            "analysis_end": analysis_end
+            "analysis_end": analysis_end,
+            "chart_update_time": chart_update_time  # 업데이트 시간 추가
         }
 
         print("DEBUG: context", context)  # 전달 데이터 확인
