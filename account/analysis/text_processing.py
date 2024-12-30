@@ -111,9 +111,6 @@ def process_text(title, transcript=None):
     return f"{processed_title} {script_text}".strip()
 
 def get_bert_similarity_batch(corpus, batch_size=32):
-    """
-    BERT를 사용하여 문장 임베딩을 생성하고 코사인 유사도 행렬을 반환
-    """
     tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased')
     model = BertModel.from_pretrained('bert-base-multilingual-cased')
     model.eval()
@@ -124,14 +121,20 @@ def get_bert_similarity_batch(corpus, batch_size=32):
         inputs = tokenizer(batch, return_tensors='pt', truncation=True, padding=True, max_length=512)
         with torch.no_grad():
             outputs = model(**inputs)
-            # CLS 토큰의 출력 (Pooler Output)을 사용
             sentence_embedding = outputs.pooler_output
         embeddings.append(sentence_embedding.numpy())
 
-    # Numpy 배열로 변환 후 코사인 유사도 계산
-    import numpy as np
-    embeddings = np.vstack(embeddings)
+    # 모든 배치가 결합되었는지 확인
+    try:
+        embeddings = np.vstack(embeddings)
+    except ValueError as e:
+        raise ValueError(f"Error in vstack: {e}. Check batch processing.")
+
+    # 유사도 행렬 생성
     similarity_matrix = cosine_similarity(embeddings)
+
+    # 최종 출력 크기 디버깅
+    print(f"Generated BERT Similarity Matrix Shape: {similarity_matrix.shape}")
     return similarity_matrix
 
 
@@ -142,6 +145,7 @@ def get_hybrid_similarity(tfidf_matrix, bert_similarity_matrix, weight_tfidf=0.5
     combined_similarity = weight_tfidf * tfidf_matrix + weight_bert * bert_similarity_matrix
     return combined_similarity
 
+
 def get_top10_chart_based(videos, num_clusters=5, additional_news=3):
     """
     클러스터링, TF-IDF, BERT 코사인 유사도를 결합해 혼합 전략으로 상위 10개 동영상을 선정
@@ -151,6 +155,9 @@ def get_top10_chart_based(videos, num_clusters=5, additional_news=3):
     VIEW_WEIGHT = 0.4
     HYBRID_WEIGHT_TFIDF = 0.4
     HYBRID_WEIGHT_BERT = 0.6
+
+    # 클러스터 수를 데이터 크기에 따라 동적으로 조정
+    num_clusters = max(2, min(len(videos) // 5, 10))  # 최소 2개, 최대 10개 클러스터
 
     # 데이터 전처리
     corpus = []
@@ -166,23 +173,33 @@ def get_top10_chart_based(videos, num_clusters=5, additional_news=3):
         processed_videos.append(video)
 
     if not corpus:
-        print("Error: corpus is empty. No videos to process.")
-        return []
+        raise ValueError("Error: corpus is empty. No videos to process.")
 
     # TF-IDF 계산
     vectorizer = TfidfVectorizer(max_features=5000, stop_words='english')
     tfidf_matrix = vectorizer.fit_transform(corpus)
+    tfidf_similarity_matrix = cosine_similarity(tfidf_matrix)
+
+    print(f"TF-IDF Similarity Matrix Shape: {tfidf_similarity_matrix.shape}")  # 디버깅
 
     # BERT 계산
     bert_similarity_matrix = get_bert_similarity_batch(corpus, batch_size=32)
 
+    # BERT 유사도 행렬 크기 확인
+    print(f"BERT Similarity Matrix Shape: {bert_similarity_matrix.shape}")  # 디버깅
+
     # Hybrid Similarity 계산
+    if tfidf_similarity_matrix.shape != bert_similarity_matrix.shape:
+        raise ValueError(f"Shape mismatch: TF-IDF {tfidf_similarity_matrix.shape}, BERT {bert_similarity_matrix.shape}")
+
     hybrid_similarity_matrix = get_hybrid_similarity(
-        tfidf_matrix,
-        bert_similarity_matrix,
+        tfidf_similarity_matrix,  # TF-IDF 유사도 행렬
+        bert_similarity_matrix,  # BERT 유사도 행렬
         HYBRID_WEIGHT_TFIDF,
         HYBRID_WEIGHT_BERT
     )
+
+    print(f"Hybrid Similarity Matrix Shape: {hybrid_similarity_matrix.shape}")  # 디버깅
 
     # Hybrid Similarity Matrix 정규화
     scaler = MinMaxScaler()
@@ -203,26 +220,30 @@ def get_top10_chart_based(videos, num_clusters=5, additional_news=3):
     cluster_representatives = []
     for cluster, videos in clusters.items():
         cluster_center = kmeans.cluster_centers_[cluster]
-        best_video = min(
-            videos,
-            key=lambda x: (
-                0.6 * np.linalg.norm(normalized_hybrid_similarity[x[0]] - cluster_center)  # 유사도 중심성
-                - 0.4 * x[2]  # 조회수
+        if len(videos) > 0:
+            best_video = min(
+                videos,
+                key=lambda x: (
+                    0.6 * np.linalg.norm(normalized_hybrid_similarity[x[0]] - cluster_center)  # 유사도 중심성
+                    - 0.4 * x[2]  # 조회수
+                )
             )
-        )
-        cluster_representatives.append(best_video[1])  # 동영상 객체 추가
+            cluster_representatives.append(best_video[1])  # 동영상 객체 추가
 
     # 핵심 뉴스 추가 (조회수 기준)
-    remaining_videos = [
-        video for video in processed_videos if video not in cluster_representatives
-    ]
-    remaining_videos = sorted(remaining_videos, key=lambda x: x.views, reverse=True)
-
-    # 부족한 개수만큼 조회수 기반 추가
-    additional_videos = remaining_videos[:additional_news]
+    additional_videos_needed = max(0, 10 - len(cluster_representatives))
+    remaining_videos = sorted(
+        [video for video in processed_videos if video not in cluster_representatives],
+        key=lambda x: x.views,
+        reverse=True
+    )
+    additional_videos = remaining_videos[:additional_videos_needed]
 
     # 최종 10개 동영상 선정
     final_videos = cluster_representatives + additional_videos
+
+    # 중복 제거 후 상위 10개
+    final_videos = list({video.cleaned_title: video for video in final_videos}.values())
     final_videos = sorted(final_videos, key=lambda x: x.views, reverse=True)[:10]
 
     # 디버깅 로그
@@ -231,4 +252,8 @@ def get_top10_chart_based(videos, num_clusters=5, additional_news=3):
         print(f"- {video.cleaned_title} (조회수: {video.views})")
 
     return final_videos
+
+
+
+
 
