@@ -2,53 +2,48 @@
 pip install konlpy networkx matplotlib pandas
 '''
 from collections import defaultdict
-from datetime import timedelta, datetime
+from datetime import datetime
 
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.views import PasswordChangeView
-from django.http import JsonResponse
-from django.urls import reverse_lazy
-from django.utils import timezone
 
-from django.utils.timezone import localtime, make_aware, is_aware, now
+from django.urls import reverse_lazy
+
 from django.views.decorators.csrf import csrf_exempt
 import json
 from django.contrib.auth.decorators import login_required
-from bson import ObjectId
-from sklearn.feature_extraction.text import TfidfVectorizer
+
 
 from .forms import UserRegistrationForm, CustomPasswordChangeForm
-from .models import YouTubeData, Like, WeeklyIssue, Chart, WeeklyIssueDuplicateVideo, ChartDuplicateVideo
 from urllib.parse import urlparse, parse_qs
 
-from pytz import timezone
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+from django.utils.timezone import now
+
+import numpy as np
+import threading
+
 import pytz
 
 import matplotlib
 matplotlib.use('Agg')
-from django.utils.timezone import localtime, utc
+from django.utils.timezone import utc
 
 
+from fuzzywuzzy import fuzz
 from .analysis.relate_analysis import analyze_related_words
 
 from django.contrib.auth.models import User
 
 from sklearn.metrics.pairwise import cosine_similarity
-from .analysis.text_processing import clean_title, process_text, get_top10_chart_based
-from pymongo import MongoClient
-from pymongo.errors import DuplicateKeyError
+from .analysis.text_processing import clean_title, process_text, get_hybrid_similarity, get_bert_similarity_batch
+
 from django.utils.timezone import localtime
 from datetime import timedelta
 from .models import Like, YouTubeData, WeeklyIssue, Chart, WeeklyIssueDuplicateVideo, ChartDuplicateVideo
 from .analysis.visualization import generate_network_graph
-from .tasks.processing_tasks import (
-    save_top_videos,
-    save_top10_to_chart,
-    delete_expired_charts,
-    save_daily_top10,
-    extract_duplicates_for_weekly_issues,
-    extract_duplicates_for_chart,
-)
+
 
 def chart(request):
     """
@@ -232,19 +227,60 @@ def weekly_issues(request):
         print(f"Error in weekly_issues function: {e}")
         return JsonResponse({"error": str(e)}, status=500)
 
-from fuzzywuzzy import fuzz
-from datetime import timedelta
+# DistilBERT 모델 및 토크나이저 초기화 (글로벌 캐싱)
+from transformers import DistilBertTokenizer, DistilBertModel
+
+tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-multilingual-cased')
+model = DistilBertModel.from_pretrained('distilbert-base-multilingual-cased')
+model.eval()
+
+def calculate_tfidf_similarities(base_text, candidate_corpus):
+    """TF-IDF 유사도 계산"""
+    vectorizer = TfidfVectorizer(max_features=3000, stop_words='english', ngram_range=(1, 2))
+    tfidf_matrix = vectorizer.fit_transform(candidate_corpus)
+    base_vector = vectorizer.transform([base_text])
+    return cosine_similarity(base_vector, tfidf_matrix).flatten()
+
+def calculate_bert_similarities(base_text, candidate_corpus):
+    """DistilBERT 유사도 계산"""
+    bert_corpus = [base_text] + candidate_corpus
+    bert_similarity_matrix = get_bert_similarity_batch(bert_corpus, tokenizer, model)  # BERT 계산
+    return bert_similarity_matrix[0, 1:]  # 첫 번째 행의 나머지 요소 반환
+
+def get_similarities_parallel(base_text, candidate_corpus):
+    """TF-IDF와 BERT를 병렬로 실행"""
+    tfidf_similarities = []
+    bert_similarities = []
+
+    # TF-IDF와 BERT를 병렬로 계산
+    thread_tfidf = threading.Thread(target=lambda: tfidf_similarities.extend(
+        calculate_tfidf_similarities(base_text, candidate_corpus)
+    ))
+    thread_bert = threading.Thread(target=lambda: bert_similarities.extend(
+        calculate_bert_similarities(base_text, candidate_corpus)
+    ))
+
+    thread_tfidf.start()
+    thread_bert.start()
+
+    thread_tfidf.join()
+    thread_bert.join()
+
+    return np.array(tfidf_similarities), np.array(bert_similarities)
 
 def get_related_duplicate_videos(request):
     try:
+        # 1. 요청에서 URL 가져오기
         video_url = request.GET.get('url')
         if not video_url:
             return JsonResponse({"error": "URL 매개변수가 제공되지 않았습니다."}, status=400)
 
+        # 2. 대상 비디오 검색
         video = WeeklyIssue.objects.filter(url=video_url).first() or Chart.objects.filter(url=video_url).first()
         if not video:
             return JsonResponse({"error": "해당 URL에 대한 기사를 찾을 수 없습니다."}, status=404)
 
+        # 3. 중복 모델 결정
         if WeeklyIssue.objects.filter(url=video_url).exists():
             duplicates_model = WeeklyIssueDuplicateVideo
         elif Chart.objects.filter(url=video_url).exists():
@@ -252,30 +288,40 @@ def get_related_duplicate_videos(request):
         else:
             return JsonResponse({"error": "데이터 유형을 확인할 수 없습니다."}, status=400)
 
-        # 1. 대상 비디오 전처리
+        # 4. 대상 비디오 텍스트 전처리
         base_text = process_text(video.title, video.transcript or [])
 
-        # 2. 후보 데이터 필터링 (7일 이내 데이터만)
+        # 5. 7일 이내 후보 데이터 필터링
         recent_candidates = duplicates_model.objects.filter(
             upload_date__gte=now() - timedelta(days=7)
         )
+        if not recent_candidates.exists():
+            return JsonResponse({"duplicates": []}, safe=False, status=200)
 
-        # 3. 후보 데이터 전처리
-        candidate_corpus = [process_text(candidate.title, candidate.transcript or []) for candidate in recent_candidates]
-
-        # 4. TF-IDF 및 유사도 계산
-        vectorizer = TfidfVectorizer(max_features=3000, stop_words='english', ngram_range=(1, 2))
-        tfidf_matrix = vectorizer.fit_transform(candidate_corpus)
-        base_vector = vectorizer.transform([base_text])
-        similarities = cosine_similarity(base_vector, tfidf_matrix).flatten()
-
-        # 5. 유사도 임계값 필터링
-        threshold = 0.6
-        duplicates = [
-            candidate for candidate, similarity in zip(recent_candidates, similarities)
-            if similarity > threshold
+        # 후보 데이터 전처리
+        candidate_corpus = [
+            process_text(candidate.title, candidate.transcript or []) for candidate in recent_candidates
         ]
 
+        # 6. TF-IDF와 BERT 병렬로 실행
+        tfidf_similarities, bert_similarities = get_similarities_parallel(base_text, candidate_corpus)
+
+        # 7. Hybrid 유사도 계산 (TF-IDF와 BERT 결합)
+        hybrid_similarities = get_hybrid_similarity(
+            tfidf_similarities.reshape(-1, 1),  # TF-IDF 유사도
+            bert_similarities.reshape(-1, 1),  # BERT 유사도
+            weight_tfidf=0.5,
+            weight_bert=0.5
+        ).flatten()
+
+        # Hybrid 유사도 임계값 필터링
+        hybrid_threshold = 0.7
+        duplicates = [
+            candidate for candidate, similarity in zip(recent_candidates, hybrid_similarities)
+            if similarity > hybrid_threshold
+        ]
+
+        # 8. 결과 반환
         duplicate_list = [
             {
                 "title": duplicate.title,
