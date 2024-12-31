@@ -67,92 +67,98 @@
 <script src="https://www.youtube.com/iframe_api"></script>
 
 <script>
+    // URL에서 YouTube 동영상 ID를 추출하는 함수
     function extractVideoId(url) {
         const regExp = /^.*(?:youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=)([^#&?]*).*/;
         const match = url.match(regExp);
         return match && match[1] ? match[1] : null;
     }
 
+    // 뉴스 제목 클릭 이벤트 추가
     document.querySelectorAll('.news-title').forEach(title => {
         title.addEventListener('click', function(event) {
             // 기본 클릭 동작 유지 (URL로 이동)
             console.log("뉴스 제목 클릭됨:", this.textContent); // 디버깅용 메시지
         });
     });
-        // CSRF 토큰을 가져오는 함수
-        function getCSRFToken() {
-            return document.cookie.split(';').reduce((token, cookie) => {
-                const [name, value] = cookie.trim().split('=');
-                return name === 'csrftoken' ? value : token;
-            }, null);
+
+    // CSRF 토큰을 가져오는 함수
+    function getCSRFToken() {
+        const cookies = document.cookie.split(';'); // 쿠키를 ;로 분리
+        for (let cookie of cookies) { // 각 쿠키를 순회
+            const [name, value] = cookie.trim().split('='); // 이름과 값을 분리
+            if (name === 'csrftoken') { // 이름이 csrftoken일 경우 반환
+                return value;
+            }
+        }
+        return null; // 없으면 null 반환
+    }
+
+    // 찜하기 기능 함수
+    window.likeVideo = function(videoId) {
+        if (!videoId) { // 동영상 ID가 없는 경우 경고 표시
+            alert('동영상 ID를 찾을 수 없습니다.');
+            return;
         }
 
-        window.likeVideo = function(videoId) {
-            if (!videoId) {
-                alert('동영상 ID를 찾을 수 없습니다.');
-                return;
+        const csrftoken = getCSRFToken(); // CSRF 토큰 가져오기
+
+        fetch(`/account/like/${videoId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrftoken, // CSRF 토큰 추가
+                'Content-Type': 'application/json',
+            },
+            credentials: 'include' // 인증 정보 포함
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok'); // 네트워크 응답 체크
             }
+            return response.json();
+        })
+        .then(data => {
+            // 버튼의 찜 상태 업데이트
+            const button = document.querySelector(`button[data-id="${videoId}"]`);
+            if (data.is_liked) {
+                button.innerHTML = '❤️'; // 좋아요 상태
+            } else {
+                button.innerHTML = '♡'; // 좋아요 해제 상태
+            }
+            console.log('좋아요 상태 변경됨:', data.is_liked); // 디버깅용 로그
+        })
+        .catch(error => {
+            console.error('찜하기 중 오류 발생:', error); // 오류 처리
+        });
+    };
 
-            const csrftoken = getCSRFToken();
-            
-            fetch(`/account/like/${videoId}/`, {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': csrftoken,
-                    'Content-Type': 'application/json',
-                },
-                credentials: 'include'
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Network error: ${response.statusText}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                
-                const button = document.querySelector(`button[data-id="${videoId}"]`);
-                if (data.is_liked) {
-                    button.innerHTML = '❤️';
-                } else {
-                    button.innerHTML = '♡';
-                }
-                console.log('좋아요 상태 변경됨:', data.is_liked);  // 디버깅용
-                
-            })
-          
-        };
-    });
-
-    
+    // DOMContentLoaded 이벤트: DOM이 로드된 후 실행
     document.addEventListener("DOMContentLoaded", function () {
-        const likeButtons = document.querySelectorAll(".like-button");
-        const modal = document.getElementById("login-modal");
-        const closeModal = document.getElementById("close-modal");
-    
+        const likeButtons = document.querySelectorAll(".like-button"); // 모든 찜하기 버튼 선택
+        const modal = document.getElementById("login-modal"); // 로그인 모달
+        const closeModal = document.getElementById("close-modal"); // 모달 닫기 버튼
+
         likeButtons.forEach(button => {
-            if (!button.dataset.id) {
+            if (!button.dataset.id) { // 버튼에 ID가 없는 경우 (로그인 안 한 상태)
                 button.addEventListener("click", event => {
                     event.preventDefault();
                     const message = document.getElementById("modal-message");
-                    message.textContent = "로그인 후 사용해주세요.";
-                    modal.style.display = "block";
+                    message.textContent = "로그인 후 사용해주세요."; // 모달 메시지 설정
+                    modal.style.display = "block"; // 모달 표시
                 });
             }
         });
 
         closeModal.addEventListener("click", () => {
-            modal.style.display = "none";
+            modal.style.display = "none"; // 모달 닫기
         });
 
         // 모달 외부 클릭 시 닫기
         window.addEventListener("click", event => {
             if (event.target === modal) {
-                modal.style.display = "none";
+                modal.style.display = "none"; // 모달 닫기
             }
         });
     });
-    
-    
 </script>
 {% endblock %}
