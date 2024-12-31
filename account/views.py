@@ -392,8 +392,11 @@ def detail(request, video_id=None):
             else:
                 wordcloud_base64 = pie_chart_base64 = bubble_chart_base64 = sentiment_html = None
 
+            video_url_id = video.url.split('v=')[1].split('&')[0]
+
             # 템플릿에 전달할 데이터 구성
             context = {
+                'video_url_id' : video_url_id,
                 'video_url': video.url,
                 'video_id': str(video._id),
                 'video_comments': video.comments,
@@ -415,6 +418,7 @@ def detail(request, video_id=None):
     except Exception as e:
         print(f"Error in detail function: {e}")
         return JsonResponse({"error": str(e)}, status=500)
+
 
 from django.shortcuts import render
 from django.http import HttpResponse

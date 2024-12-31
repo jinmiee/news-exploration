@@ -53,10 +53,17 @@
         <!-- 영상 및 정보 -->
         <div class="content-container">
             <!-- 왼쪽: 영상 -->
+        
             <div class="video-container">
-                <iframe id="video-frame" src="https://www.youtube.com/embed/{{ video_id }}" frameborder="0" allowfullscreen></iframe>
+                <iframe
+                    id="video-frame"
+                    src="https://www.youtube.com/embed/{{ video_url_id }}"
+                    frameborder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowfullscreen>
+                </iframe>
             </div>
-
+            
             <!-- 댓글 섹션 -->
             <div class="comments-container">
                 <h3 style="text-align: center;">댓글</h3>
