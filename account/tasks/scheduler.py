@@ -42,22 +42,33 @@ def start_scheduler(save_chart_to_mongo=None):
     executors = {'default': ThreadPoolExecutor(20)}
     scheduler = BackgroundScheduler(jobstores=jobstores, executors=executors, timezone="Asia/Seoul")
 
-    # 중복 등록 방지 로직
+    # 스케줄러 상태 확인 함수
+    def ensure_scheduler_running():
+        if not scheduler.running or scheduler.state == 0:  # 0은 종료 상태
+            scheduler.start()
+            print("스케줄러가 시작되었습니다.")
+
+    # 중복 등록 방지 및 기존 작업 제거
     def add_job_if_not_exists(job_id, func, trigger, **kwargs):
         if not scheduler.get_job(job_id):
             scheduler.add_job(func, trigger=trigger, id=job_id, replace_existing=True, **kwargs)
+
+    # 스케줄러 시작
+    ensure_scheduler_running()
 
     # 작업 추가
     add_job_if_not_exists(
         'send_email',
         send_email_task,
-        trigger=CronTrigger(hour='11,23', minute=5)
+        trigger=CronTrigger(hour='11,23', minute=5),
+        max_instances=3  # 중복 실행 허용 추가
     )
 
     add_job_if_not_exists(
         'save_daily_top10',
         save_daily_top10,
-        trigger=CronTrigger(hour=0, minute=5)
+        trigger=CronTrigger(hour=0, minute=5),
+        max_instances = 3  # 최대 3개까지 중복 실행 허용
     )
     print("daily_top10 저장 작업이 실행됩니다.")
 
@@ -65,20 +76,23 @@ def start_scheduler(save_chart_to_mongo=None):
         'save_top10_to_chart',
         save_top10_to_chart,
         trigger=CronTrigger(hour='*', minute=5),  # 매시 5분에 실행
+        max_instances=3  # 최대 3개까지 중복 실행 허용
     )
     print("Chart 저장 작업이 매시 5분에 실행되도록 등록되었습니다.")
 
     add_job_if_not_exists(
         'extract_weekly_duplicates',
         extract_duplicates_for_weekly_issues,
-        trigger=CronTrigger(hour=0, minute=5)
+        trigger=CronTrigger(hour=0, minute=8),
+        max_instances=3  # 중복 실행 허용 추가
     )
     print("Weekly Issues 중복 데이터 추출 작업이 실행됩니다.")
 
     add_job_if_not_exists(
         'extract_chart_duplicates',
         extract_duplicates_for_chart,
-        trigger=CronTrigger(hour='*', minute=5),  # 매시 5분에 실행
+        trigger=CronTrigger(hour='*', minute=8),  # 매시 5분에 실행
+        max_instances=3  # 중복 실행 허용 추가
     )
     print("Chart 중복 데이터 추출 작업이 매시 5분에 실행되도록 등록되었습니다.")
 
@@ -89,11 +103,10 @@ def start_scheduler(save_chart_to_mongo=None):
     )
     print("스케줄러가 시작되었습니다: 24시간 지난 Chart 데이터를 삭제합니다.")
 
-
-    # 스케줄러 시작
-    scheduler.start()
-    print("스케쥴링이 실행되었습니다")
-
     # Django 종료 시 스케줄러 중지
+    def stop_scheduler():
+        if scheduler.running:
+            scheduler.shutdown(wait=True)  # 실행 중인 작업 완료 후 종료
+
     import atexit
-    atexit.register(lambda: scheduler.shutdown())
+    atexit.register(stop_scheduler)
