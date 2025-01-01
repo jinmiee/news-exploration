@@ -41,7 +41,7 @@ from .analysis.text_processing import clean_title, process_text, get_hybrid_simi
 
 from django.utils.timezone import localtime
 from datetime import timedelta
-from .models import Like, YouTubeData, WeeklyIssue, Chart, WeeklyIssueDuplicateVideo, ChartDuplicateVideo
+from .models import Like, YouTubeData, WeeklyIssue, Chart, WeeklyIssueDuplicateVideo, ChartDuplicateVideo ,RelatedWordAnalysis
 from .analysis.visualization import generate_network_graph
 
 
@@ -390,23 +390,26 @@ def detail(request, video_id=None):
                         'text': item['text']
                     })
 
-            # 연관어 분석 수행
-            graph, top_pairs, important_keywords, _ = analyze_related_words(
-                video_desc,
-                video.transcript,
-                clean_title_func=clean_title
-            )
-
-            network_graph = generate_network_graph(graph)
+            # RelatedWordAnalysis 모델에서 분석 결과 조회
+            analysis = RelatedWordAnalysis.objects.filter(video_id=video.url).first()
+            
+            if analysis:
+                network_graph = analysis.graph_image
+                top_pairs = analysis.top_pairs
+                important_keywords = analysis.keywords
+            else:
+                network_graph = None
+                top_pairs = []
+                important_keywords = []
 
             # 키워드별 관련 뉴스 분류
             categorized_news = {}
             if important_keywords:
-                for keyword in important_keywords[:5]:  # 상위 5개 키워드만 처리
+                for keyword in important_keywords[:5]:
                     related_news = YouTubeData.objects.filter(
                         Q(title__icontains=keyword) |
                         Q(desc__icontains=keyword)
-                    ).exclude(_id=object_id)[:5]  # 현재 비디오 제외
+                    ).exclude(_id=video._id)[:5]
 
                     if related_news:
                         cleaned_news = []
@@ -451,12 +454,14 @@ def detail(request, video_id=None):
                 'network_graph': network_graph,
                 'categorized_news': categorized_news,
                 'important_keywords': important_keywords,
-                'transcript_segments': transcript_segments,
+                
                 'wordcloud_image': wordcloud_base64,
                 'pie_chart_image': pie_chart_base64,
-                'top_pairs' : top_pairs,
+                
                 'bubble_chart_image': bubble_chart_base64,  # 버블차트 추가
-                'sentiment_table': sentiment_html  # TF-IDF 분석 결과 테이블 전달
+                'sentiment_table': sentiment_html,  # TF-IDF 분석 결과 테이블 전달,
+                'transcript_segments': transcript_segments,
+                'top_pairs': top_pairs
             }
 
             return render(request, 'analysis/detail.html', context)
@@ -536,6 +541,7 @@ def relate(request):
     if video and video.transcript:
         try:
             # 제목과 설명 불용어 처리
+            
             cleaned_title = clean_title(video.title)
             video_desc = f"{cleaned_title} {video.desc if video.desc else ''}"
             
@@ -553,11 +559,17 @@ def relate(request):
                     })
             
             # 성능 평가를 제외한 기본 분석 수행
-            graph, top_pairs, important_keywords, _ = analyze_related_words(
-                video_desc, 
-                video.transcript,
-                clean_title_func=clean_title
-            )
+            analysis = RelatedWordAnalysis.objects.filter(video_id=video.url).first()
+            if analysis:
+                graph = analysis.graph_image
+                top_pairs = analysis.top_pairs
+                important_keywords = analysis.keywords
+            else:
+                graph, top_pairs, important_keywords, _ = analyze_related_words(
+                    video_desc, 
+                    video.transcript,
+                    clean_title_func=clean_title
+                )
             
             network_graph = generate_network_graph(graph)
             
@@ -587,9 +599,11 @@ def relate(request):
                 'video_title': cleaned_title,
                 'network_graph': network_graph,
                 'categorized_news': categorized_news,
-                'important_keywords': important_keywords,
+                'network_graph' : graph,
                 'transcript_segments': transcript_segments,
-                'top_pairs' : top_pairs
+                'top_pairs' : top_pairs,
+                'important_keywords' : important_keywords
+                
 
             }
             
@@ -597,7 +611,7 @@ def relate(request):
             print(f"분석 중 오류 발생: {str(e)}")
             context = {
                 'section': 'relate',
-                'error_message': '분석 중 오류가 발생했습니��.'
+                'error_message': '분석 중 오류가 발생했습니다.'
             }
     else:
         context = {

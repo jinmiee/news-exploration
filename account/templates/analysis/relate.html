@@ -36,9 +36,9 @@
                             {% for pair in top_pairs|slice:":25" %}
                             <tr>
                                 <td>{{ forloop.counter }}</td>
-                                <td>{{ pair.0.0 }}</td>
-                                <td>{{ pair.0.1 }}</td>
-                                <td>{{ pair.1|floatformat:2 }}</td>
+                                <td>{{ pair.word1 }}</td>
+                                <td>{{ pair.word2 }}</td>
+                                <td>{{ pair.score|floatformat:2 }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
