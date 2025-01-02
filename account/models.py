@@ -130,10 +130,11 @@ class Chart(models.Model):
             models.Index(fields=['title']),  # 텍스트 인덱스는 유지
         ]
 
+from django.db.models import SET_NULL
 
 class Feedbacks(models.Model):
     _id = models.ObjectIdField(primary_key=True, default=ObjectId)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=SET_NULL, null=True)
     rating = models.PositiveBigIntegerField()
     feedback = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)

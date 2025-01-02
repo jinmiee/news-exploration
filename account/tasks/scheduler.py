@@ -11,8 +11,8 @@ def send_email_task():
     print("send_email_task 실행됨")  # 디버깅 로그
     from django.contrib.auth.models import User  # 함수 내부에서 import하여 초기화 시점 문제 방지
     users = User.objects.all()
-    subject = "차트업데이트 알림"
-    message = "새로운 뉴스가 업데이트 되었어요! 확인해보세요!."
+    subject = "그게 뭔데?! 차트업데이트 알림"
+    message = "새로운 뉴스가 업데이트 되었어요! 확인해보세요!. \n 뉴스 보러가기 --> http://15.168.46.71:5070/account/chart"
     from_email = "namsugb99@gmail.com"
     recipient_list = [user.email for user in users if user.email]
 
