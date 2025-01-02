@@ -13,7 +13,7 @@
 {% csrf_token %}
 <div class="chart-container">
     <header class="chart-header">
-        <h1>찜한 영상</h1>
+        <h1>{{ request.user }}님이 찜한 영상</h1>
         <p class="subtitle">이전에 저장한 좋아요 영상을 확인하세요.</p>
     </header>
 

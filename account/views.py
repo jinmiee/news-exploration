@@ -752,7 +752,7 @@ def submit_feedback(request):
 
         if feedback_text and rating:
             Feedbacks.objects.create(feedback=feedback_text, rating=int(rating), user=request.user)
-            messages.success(request, "피드백이 성공적으로 제출되었습니다!")
+            messages.success(request, "피드백이 성공적으로 제출되었습니다!")  # 피드백 제출 성공 메시지 admin 페이지에 표시
             return render(request, 'feedback/feedback_done.html')
         else:
             messages.error(request, "모든 필드를 입력해주세요.")
