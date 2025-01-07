@@ -79,7 +79,7 @@ def start_scheduler(save_chart_to_mongo=None):
     add_job_if_not_exists(
         'save_top10_to_chart',
         save_top10_to_chart,
-        trigger=CronTrigger(hour='*', minute=5),  # 매시 5분에 실행
+        trigger=CronTrigger(hour='11,23', minute=5),  # 매시 5분에 실행
         max_instances=3  # 최대 3개까지 중복 실행 허용
     )
     print("Chart 저장 작업이 매시 5분에 실행되도록 등록되었습니다.")
@@ -95,7 +95,7 @@ def start_scheduler(save_chart_to_mongo=None):
     add_job_if_not_exists(
         'extract_chart_duplicates',
         extract_duplicates_for_chart,
-        trigger=CronTrigger(hour='*', minute=10),  # 매시 5분에 실행
+        trigger=CronTrigger(hour='11,23', minute=10),  # 매시 5분에 실행
         max_instances=3  # 중복 실행 허용 추가
     )
     print("Chart 중복 데이터 추출 작업이 매시 5분에 실행되도록 등록되었습니다.")
@@ -103,7 +103,7 @@ def start_scheduler(save_chart_to_mongo=None):
     add_job_if_not_exists(
         'delete_expired_charts',
         delete_expired_charts,
-        trigger=CronTrigger(hour=1)
+        trigger=CronTrigger(hour=0)
     )
     print("스케줄러가 시작되었습니다: 24시간 지난 Chart 데이터를 삭제합니다.")
 
