@@ -85,12 +85,18 @@ def chart(request):
         print(chart_data)
 
         # Chart 업데이트 시간을 오전 11시 7분, 오후 11시 7분으로 설정
-        if now.hour < 11 or (now.hour == 11 and now.minute < 7):  # 오전 11시 7분 이전
+        if now < now.replace(hour=11, minute=7, second=0, microsecond=0):  # 현재 시간이 오전 11시 7분 이전
             chart_update_time = now.replace(hour=11, minute=7, second=0, microsecond=0)
-        elif now.hour < 23 or (now.hour == 23 and now.minute < 7):  # 오후 11시 7분 이전
+            analysis_start = (now - timedelta(days=1)).replace(hour=23, minute=7, second=0, microsecond=0)
+            analysis_end = now.replace(hour=11, minute=7, second=0, microsecond=0)
+        elif now < now.replace(hour=23, minute=7, second=0, microsecond=0):  # 현재 시간이 오전 11시 7분 이후, 오후 11시 7분 이전
             chart_update_time = now.replace(hour=23, minute=7, second=0, microsecond=0)
-        else:  # 오후 11시 7분 이후
+            analysis_start = now.replace(hour=11, minute=7, second=0, microsecond=0)
+            analysis_end = now.replace(hour=23, minute=7, second=0, microsecond=0)
+        else:  # 현재 시간이 오후 11시 7분 이후
             chart_update_time = (now + timedelta(days=1)).replace(hour=11, minute=7, second=0, microsecond=0)
+            analysis_start = now.replace(hour=23, minute=7, second=0, microsecond=0)
+            analysis_end = (now + timedelta(days=1)).replace(hour=11, minute=7, second=0, microsecond=0)
 
         processed_chart_data = []
         for chart in chart_data:
