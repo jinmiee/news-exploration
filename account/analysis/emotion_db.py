@@ -572,7 +572,6 @@ def save_all_historical_bubble_charts_CHART():
                 print(f"Video {issue.title}에 댓글이 없습니다. 스킵합니다.")
                 continue
 
-
             # 버블 차트 생성 및 저장
             try:
                 upload_date = issue.upload_date  # upload_date 추가 **수정됨**
@@ -606,8 +605,6 @@ def save_all_historical_bubble_charts_CHART():
 
     except Exception as e:
         print(f"save_all_historical_bubble_charts 실행 중 오류 발생: {e}")
-
-
 
 
 
@@ -870,24 +867,13 @@ def save_all_visualizations():
                 # `upload_date` 추가 **수정됨**
                 upload_date = issue.upload_date  # upload_date를 issue에서 가져옴
                 video_url = issue.url
-                wordcloud_base64, pie_chart_base64 = save_visualizations_with_tfidf(issue.comments, upload_date,video_url)
+                wordcloud_base64, pie_chart_base64 = save_visualizations_with_tfidf(issue.comments,video_url ,upload_date)
 
                 # 분석 결과가 없으면 예외 처리
                 if not wordcloud_base64 or not pie_chart_base64:
                     raise ValueError(f"Wordcloud or Pie chart generation failed for {issue.title}")
 
                 print(f"{issue.title}의 워드클라우드 및 파이차트 저장 성공!")
-
-                # MongoDB에 결과 저장
-                document = {
-                    "upload_date": upload_date,  # `upload_date` 추가 **수정됨**
-                    "wordcloud_image": wordcloud_base64,
-                    "pie_chart_image": pie_chart_base64,
-                    "video_url": issue.url  # 비디오 URL 저장
-                }
-
-                inserted_id = collection.insert_one(document).inserted_id
-                print(f"MongoDB 저장 완료! ID: {inserted_id}")
 
             except Exception as e:
                 print(f"Video {issue.title}의 분석 및 저장 중 오류 발생: {e}")
