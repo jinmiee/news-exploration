@@ -122,7 +122,7 @@ def start_scheduler(save_chart_to_mongo=None):
         trigger=CronTrigger(hour=0, minute=7),
         max_instances=3  # 중복 실행 허용 추가
     )
-    print("스케줄러가 시작되었습니다: save_all_visualizations가 11시 8분에 실행됩니다")
+    print("스케줄러가 시작되었습니다: 파이차트 시각화(주간이슈)가 0시 7분에 실행됩니다")
 
     add_job_if_not_exists(
         'save_all_visualizations_chart',
@@ -130,7 +130,7 @@ def start_scheduler(save_chart_to_mongo=None):
         trigger=CronTrigger(hour='11,23', minute=7),
         max_instances=3  # 중복 실행 허용 추가
     )
-    print("스케줄러가 시작되었습니다: save_all_visualizations_chart가 11시 8분에 실행됩니다")
+    print("스케줄러가 시작되었습니다: 파이차트 시각화(차트)가 11시 7분에 실행됩니다")
 
 
 
@@ -145,7 +145,7 @@ def start_scheduler(save_chart_to_mongo=None):
         trigger=CronTrigger(hour=0, minute=7),
         max_instances = 3  # 중복 실행 허용 추가
     )
-    print("스케줄러가 시작되었습니다: save_all_visualizations가 11시 8분에 실행됩니다")
+    print("스케줄러가 시작되었습니다: 버블차트 시각화(주간이슈) 0시 7분에 실행됩니다")
 
 
 
@@ -155,7 +155,7 @@ def start_scheduler(save_chart_to_mongo=None):
         trigger=CronTrigger(hour='11,23',minute=7),
         max_instances=3  # 중복 실행 허용 추가
     )
-    print("스케줄러가 시작되었습니다: save_all_visualizations_chart가 11시 8분에 실행됩니다")
+    print("스케줄러가 시작되었습니다: 버블차트 시각화(차트)가 11시 7분에 실행됩니다")
 
 ###########################
 
@@ -165,7 +165,7 @@ def start_scheduler(save_chart_to_mongo=None):
         trigger=CronTrigger(hour=0, minute=7),
         max_instances=3  # 중복 실행 허용 추가
     )
-    print("스케줄러가 시작되었습니다: save_all_issues_to_mongodb가 11시 9분에 실행됩니다 ")
+    print("스케줄러가 시작되었습니다: TOP10 Word 시각화(주간이슈)가 11시 9분에 실행됩니다 ")
 
 
     add_job_if_not_exists(
@@ -174,6 +174,6 @@ def start_scheduler(save_chart_to_mongo=None):
         trigger=CronTrigger(hour='11,23',minute=7),
         max_instances=3  # 중복 실행 허용 추가
     )
-    print("스케줄러가 시작되었습니다: save_all_issues_to_mongodb_chart가 11시 9분에 실행됩니다   ")
+    print("스케줄러가 시작되었습니다: TOP10 Word 시각화(차트)가 11시 9분에 실행됩니다   ")
 
 
