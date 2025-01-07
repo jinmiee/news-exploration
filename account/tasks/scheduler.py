@@ -87,7 +87,7 @@ def start_scheduler(save_chart_to_mongo=None):
     add_job_if_not_exists(
         'extract_weekly_duplicates',
         extract_duplicates_for_weekly_issues,
-        trigger=CronTrigger(hour=0, minute=8),
+        trigger=CronTrigger(hour=0, minute=10),
         max_instances=3  # 중복 실행 허용 추가
     )
     print("Weekly Issues 중복 데이터 추출 작업이 실행됩니다.")
@@ -95,7 +95,7 @@ def start_scheduler(save_chart_to_mongo=None):
     add_job_if_not_exists(
         'extract_chart_duplicates',
         extract_duplicates_for_chart,
-        trigger=CronTrigger(hour='*', minute=8),  # 매시 5분에 실행
+        trigger=CronTrigger(hour='*', minute=10),  # 매시 5분에 실행
         max_instances=3  # 중복 실행 허용 추가
     )
     print("Chart 중복 데이터 추출 작업이 매시 5분에 실행되도록 등록되었습니다.")
