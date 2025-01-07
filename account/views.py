@@ -41,7 +41,8 @@ from .analysis.text_processing import clean_title, process_text, get_hybrid_simi
 
 from django.utils.timezone import localtime
 from datetime import timedelta
-from .models import Like, YouTubeData, WeeklyIssue, Chart, WeeklyIssueDuplicateVideo, ChartDuplicateVideo ,RelatedWordAnalysis
+from .models import Like, YouTubeData, WeeklyIssue, Chart, WeeklyIssueDuplicateVideo, ChartDuplicateVideo, \
+    RelatedWordAnalysis, Top10Word, BubbleChart, WordcloudPiechart
 from .analysis.visualization import generate_network_graph
 
 
@@ -392,7 +393,7 @@ def detail(request, video_id=None):
 
             # RelatedWordAnalysis 모델에서 분석 결과 조회
             analysis = RelatedWordAnalysis.objects.filter(video_id=video.url).first()
-            
+
             if analysis:
                 network_graph = analysis.graph_image
                 top_pairs = analysis.top_pairs
@@ -433,19 +434,38 @@ def detail(request, video_id=None):
                     if comment_text.strip():
                         video_comments.append(comment_text)
 
-            # 댓글 분석 결과
-            if video_comments:
-                wordcloud_base64, pie_chart_base64 = save_visualizations_with_tfidf(video_comments)
-                bubble_chart_base64 = save_bubble_chart_with_tfidf(video_comments)
-                sentiment_html = generate_tfidf_sentiment_visualizations(video_comments)
+
+            top_words_instance = Top10Word.objects.filter(video_url=video.url).first()
+
+            if top_words_instance:
+                # top_words에서 순위, 단어, 감정을 가져오기
+                top_words = [{"순위": entry.get('순위'), "단어": entry.get('단어'), "감정": entry.get('감정')} for entry in
+                             top_words_instance.top_words]
             else:
-                wordcloud_base64 = pie_chart_base64 = bubble_chart_base64 = sentiment_html = None
+                # 기본값 설정
+                top_words = []
+
+
+            bubble_chart_instance = BubbleChart.objects.filter(video_url=video.url).first()
+
+            if bubble_chart_instance:
+                bubble_chart_base64 = bubble_chart_instance.chart_image
+            else:
+                bubble_chart_base64 = None
+
+
+            pie_chart_instance = WordcloudPiechart.objects.filter(video_url=video.url).first()
+            if pie_chart_instance:
+                pie_chart_base64 = pie_chart_instance.pie_chart_image
+            else:
+                pie_chart_base64 = None
+
 
             video_url_id = video.url.split('v=')[1].split('&')[0]
 
             # 템플릿에 전달할 데이터 구성
             context = {
-                'video_url_id' : video_url_id,
+                'video_url_id': video_url_id,
                 'video_url': video.url,
                 'video_id': str(video._id),
                 'video_comments': video.comments,
@@ -454,14 +474,11 @@ def detail(request, video_id=None):
                 'network_graph': network_graph,
                 'categorized_news': categorized_news,
                 'important_keywords': important_keywords,
-                
-                'wordcloud_image': wordcloud_base64,
                 'pie_chart_image': pie_chart_base64,
-                
                 'bubble_chart_image': bubble_chart_base64,  # 버블차트 추가
-                'sentiment_table': sentiment_html,  # TF-IDF 분석 결과 테이블 전달,
                 'transcript_segments': transcript_segments,
-                'top_pairs': top_pairs
+                'top_pairs': top_pairs,
+                'top_words' : top_words,
             }
 
             return render(request, 'analysis/detail.html', context)
@@ -474,46 +491,60 @@ def detail(request, video_id=None):
 from django.shortcuts import render
 from django.http import HttpResponse
 from .models import YouTubeData
-from .analysis.emotion_analysis import save_visualizations_with_tfidf  # 워드클��우드 및 파이차트 생성 함수
+from .analysis.emotion_analysis import save_visualizations_with_tfidf  # 워드클  우드 및 파이차트 생성 함수
 from .analysis.emotion_analysis import generate_tfidf_sentiment_visualizations  # 감정 분석 결과 HTML 생성 함수
 from .analysis.emotion_analysis import  save_bubble_chart_with_tfidf # 버블
+
 def emotion(request):
+    """
+    비디오 URL을 기반으로 감정 분석 데이터를 데이터베이스에서 조회하고 반환합니다.
+    """
     video_url = request.GET.get('url')
     print(f"요청된 비디오 URL: {video_url}")
 
-    # 해당 비디오 URL에 대한 YouTube 데이터 조회
+    # YouTubeData 모델에서 비디오 조회
     video = YouTubeData.objects.filter(url=video_url).first()
 
-    if video and video.comments:
+    if video:
         try:
-            video_comments = []
-            for comment in video.comments[:100]:
-                if isinstance(comment, dict):
-                    comment_text = comment.get('comment', '')
-                else:  # dict가 아니면 그냥 문자열로 취급
-                    comment_text = str(comment)
+            # 댓글 조회
+            video_comments = video.comments if video.comments else []
 
-                if comment_text.strip():  # 빈 댓글 제외
-                    video_comments.append(comment_text)
+            # 버블차트 데이터 조회
+            bubble_chart_instance = BubbleChart.objects.filter(video_url=video_url).first()
+            pie_chart_instance = WordcloudPiechart.objects.filter(video_url=video_url).first()
 
-            if not video_comments:
-                raise ValueError("유효한 댓글이 없습니다.")
+            # Top10Word 데이터 조회
+            top_words_instance = Top10Word.objects.filter(video_url=video_url).first()
 
-            # TF-IDF 분석 후 시각화 (워드클라우드 및 파이차트)
-            wordcloud_base64, pie_chart_base64 = save_visualizations_with_tfidf(video_comments)
 
-            # TF-IDF 기반 감정 분석 결과 버블차트 생성
-            bubble_chart_base64 = save_bubble_chart_with_tfidf(video_comments)
+            if top_words_instance:
+                # top_words에서 순위, 단어, 감정을 가져오기
+                top_words = [{"순위": entry.get('순위'), "단어": entry.get('단어'), "감정": entry.get('감정')} for entry in
+                             top_words_instance.top_words]
+            else:
+                top_words = []  # 기본값 설정
 
-            # 감정 분석 결과 HTML 테이블 생성
-            sentiment_html = generate_tfidf_sentiment_visualizations(video_comments)
+            # 버블차트 데이터
+            if bubble_chart_instance:
+                bubble_chart_base64 = bubble_chart_instance.chart_image
+            else:
+                bubble_chart_base64 = None
+
+            # 파이차트 데이터
+            if pie_chart_instance:
+                pie_chart_base64 = pie_chart_instance.pie_chart_image
+            else:
+                pie_chart_base64 = None
 
             # 결과를 템플릿에 전달
             context = {
-                'wordcloud_image': wordcloud_base64,
+                'video_url': video_url,
+                'video_comments': video_comments[:100],  # 최대 100개의 댓글만 표시
+                'wordcloud_image': pie_chart_base64,
                 'pie_chart_image': pie_chart_base64,
                 'bubble_chart_image': bubble_chart_base64,  # 버블차트 추가
-                'sentiment_table': sentiment_html  # TF-IDF 분석 결과 테이블 전달
+                'top_words': top_words,  # Top10Word 데이터를 전달
             }
             return render(request, 'analysis/emotion.html', context)
 
@@ -521,7 +552,9 @@ def emotion(request):
             print(f"오류 발생: {e}")
             context = {'error_message': f"처리 중 오류가 발생했습니다: {str(e)}"}
             return render(request, 'analysis/emotion.html', context)
+
     else:
+        # 비디오를 찾을 수 없는 경우 처리
         context = {'error_message': '비디오가 없거나 댓글이 없습니다.'}
         return render(request, 'analysis/emotion.html', context)
 

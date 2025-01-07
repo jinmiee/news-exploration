@@ -211,3 +211,41 @@ class RelatedWordAnalysis(models.Model):
 
     class Meta:
         db_table = 'chart_relation_analysis'
+
+
+
+
+class BubbleChart(models.Model):
+    _id = models.ObjectIdField(primary_key=True,default=ObjectId)  # Django 기본 ID 필드 (자동 생성)
+    video_url = models.URLField(max_length=500, unique=True)  # 유튜브 URL
+    timestamp = models.DateTimeField(auto_now_add=True)  # 데이터 생성 시간
+    chart_image = models.TextField()  # Base64로 인코딩된 이미지 데이터
+
+    def str(self):
+        return self.video_url
+
+    class Meta:
+        db_table = 'bubble_chart'  # 테이블 이름 정의
+
+
+class WordcloudPiechart(models.Model):
+    _id = models.ObjectIdField(primary_key=True,default=ObjectId)  # MongoDB ObjectId 길이에 맞게 설정
+    timestamp = models.DateTimeField()  # 타임스탬프
+    wordcloud_image = models.TextField()  # Base64로 인코딩된 워드클라우드 이미지
+    pie_chart_image = models.TextField()  # Base64로 인코딩된 파이 차트 이미지
+    video_url = models.URLField()  # YouTube 비디오 URL
+
+    class Meta:
+        db_table = "wordcloud_pie_chart"  # 테이블 이름 설정
+
+    def str(self):
+        return f"WordcloudPiechart for Video: {self.video_url}"
+
+class Top10Word(models.Model):
+    _id = models.ObjectIdField(primary_key=True,default=ObjectId)  # MongoDB ObjectId로 저장
+    timestamp = models.DateTimeField(auto_now_add=True)  # 타임스탬프
+    video_url = models.URLField()  # 비디오 URL
+    top_words = models.JSONField()  # 순위, 단어, 감정을 포함한 JSON 형식
+
+    class Meta:
+        db_table = "top10_words"  # 테이블 이름 설

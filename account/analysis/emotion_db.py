@@ -15,6 +15,9 @@ import numpy as np
 import os
 import pandas as pd
 import matplotlib
+from account.views import chart
+
+
 matplotlib.use('Agg')
 import networkx as nx
 import logging
@@ -336,10 +339,13 @@ def analyze_sentiment(word):
         return '중립'  # 오류 발생 시 중립 반환
 
 
-def save_bubble_chart_with_tfidf(comments, video_url):
+def save_bubble_chart_with_tfidf(comments, video_url,upload_date ):
     # 비디오 URL이 None인 경우 오류 발생
     if video_url is None:
         raise ValueError("비디오 URL이 제공되지 않았습니다. 반드시 video_url을 전달해야 합니다.")
+
+    if upload_date is None:
+        raise ValueError("업로드 날짜가 제공되지 않았습니다. 반드시 video_url을 전달해야 합니다.")
 
     # 1. 댓글 전처리 (불필요한 문자 제거 등)
     preprocessed_comments = [preprocess_text(comment) for comment in comments]
@@ -409,7 +415,7 @@ def save_bubble_chart_with_tfidf(comments, video_url):
         radii = [np.sqrt(freq) / 10 for freq in frequencies]
 
         # 폰트 크기 계산
-        max_font_size = 60  # 최대 폰트 크기
+        max_font_size = 50  # 최대 폰트 크기
         min_font_size = 12  # 최소 폰트 크기
         font_sizes = [
             min_font_size + (max_font_size - min_font_size) * (freq / max(frequencies))
@@ -454,6 +460,7 @@ def save_bubble_chart_with_tfidf(comments, video_url):
         positions = pack_circles_from_center(radii)
 
         # 시각화
+        plt.title('')
         plt.figure(figsize=(10, 10))
         for i, (x, y) in enumerate(positions):
             circle = plt.Circle((x, y), radii[i], color=colors[i], alpha=0.6)
@@ -466,7 +473,6 @@ def save_bubble_chart_with_tfidf(comments, video_url):
 
         plt.axis('equal')
         plt.axis('off')
-        plt.title("감성어 TOP 10", fontsize=16)
 
         # 차트를 Base64로 반환
         buffer = BytesIO()
@@ -486,7 +492,7 @@ def save_bubble_chart_with_tfidf(comments, video_url):
         collection = db['bubble_chart']
 
         document = {
-            "timestamp": datetime.datetime.now(),
+            "upload_date": upload_date,
             "video_url": video_url,  # 비디오 URL 저장
             "chart_image": bubble_chart_base64,  # 'chart_image' 필드에 버블 차트 이미지 저장
         }
@@ -502,7 +508,9 @@ def save_bubble_chart_with_tfidf(comments, video_url):
 
     return bubble_chart_base64
 
-from account.models import WeeklyIssue
+from account.models import WeeklyIssue, Chart
+
+
 #버블차트  DB에 저장
 def save_all_historical_bubble_charts():
 
@@ -520,10 +528,24 @@ def save_all_historical_bubble_charts():
                 print(f"Video {issue.title}에 댓글이 없습니다. 스킵합니다.")
                 continue
 
-            # 버블 차트 생성 및 MongoDB 저장
+            # 버블 차트 생성 및 저장
             try:
+                upload_date = issue.upload_date
+                video_url = issue.url
                 # save_bubble_chart_with_tfidf 함수에 필요한 인자 전달
-                bubble_chart_base64 = save_bubble_chart_with_tfidf(issue.comments, issue.url)
+                bubble_chart_base64 = save_bubble_chart_with_tfidf(issue.comments, video_url, upload_date)
+
+                document = {
+                    "upload_date": upload_date,
+                    "video_url": video_url,  # 비디오 URL 저장
+                    "chart_image": bubble_chart_base64,  # 'chart_image' 필드에 버블 차트 이미지 저장
+                }
+
+
+                # 버블 차트를 생성한 후 필요한 데이터를 저장
+                issue.bubble_chart = bubble_chart_base64  # 예시로 추가된 필드, 실제로 차트를 저장할 방법에 맞게 수정 필요
+                issue.save()  # 데이터를 저장 (필드가 없다면 모델에 맞게 필드 추가 필요)
+
                 print(f"{issue.title}의 버블 차트 생성 및 저장 성공!")
             except Exception as e:
                 print(f"Video {issue.title}의 버블 차트 생성 중 오류 발생: {e}")
@@ -532,7 +554,64 @@ def save_all_historical_bubble_charts():
 
     except Exception as e:
         print(f"save_all_historical_bubble_charts 실행 중 오류 발생: {e}")
-def save_visualizations_with_tfidf(comments, video_url ):
+
+
+
+def save_all_historical_bubble_charts_CHART():
+    try:
+        # Chart의 모든 데이터를 가져옵니다.
+        all_issues = Chart.objects.all()
+
+        if not all_issues.exists():
+            print("Chart에 저장된 데이터가 없습니다.")
+            return
+
+        for issue in all_issues:
+            # 댓글이 없는 경우 스킵
+            if not issue.comments:
+                print(f"Video {issue.title}에 댓글이 없습니다. 스킵합니다.")
+                continue
+
+
+            # 버블 차트 생성 및 저장
+            try:
+                upload_date = issue.upload_date  # upload_date 추가 **수정됨**
+                video_url = issue.url  # video_url 추가 **수정됨**
+
+                # save_bubble_chart_with_tfidf 함수에 필요한 인자 전달
+                bubble_chart_base64 = save_bubble_chart_with_tfidf(issue.comments, video_url, upload_date)  # 수정됨
+
+                document = {
+                    "upload_date": upload_date,
+                    "video_url": video_url,  # 비디오 URL 저장
+                    "chart_image": bubble_chart_base64,  # 'chart_image' 필드에 버블 차트 이미지 저장
+                }
+
+                # 버블 차트를 MongoDB에 저장
+                client = MongoClient("mongodb://entks:entks@hello-news.site:27777/")
+                db = client['youtube_data']
+                collection = db['bubble_chart']
+                inserted_id = collection.insert_one(document).inserted_id
+                print(f"MongoDB 저장 완료! ID: {inserted_id}")
+
+                # Chart에 버블 차트 이미지 저장
+                issue.bubble_chart = bubble_chart_base64  # 예시로 추가된 필드, 실제로 차트를 저장할 방법에 맞게 수정 필요
+                issue.save()  # 데이터를 저장 (필드가 없다면 모델에 맞게 필드 추가 필요)
+
+                print(f"{issue.title}의 버블 차트 생성 및 저장 성공!")
+            except Exception as e:
+                print(f"Video {issue.title}의 버블 차트 생성 중 오류 발생: {e}")
+
+        print("모든 버블 차트 생성 및 저장 작업 완료.")
+
+    except Exception as e:
+        print(f"save_all_historical_bubble_charts 실행 중 오류 발생: {e}")
+
+
+
+
+
+def save_visualizations_with_tfidf(comments, video_url, upload_date):
     """
     댓글을 받아 TF-IDF 분석을 통해 중요한 단어를 추출하고,
     감정 분석 후 워드클라우드와 파이차트를 생성하여 Base64로 반환합니다.
@@ -596,6 +675,9 @@ def save_visualizations_with_tfidf(comments, video_url ):
         sentiment = analyze_sentiment(word)  # 해당 단어의 감정 분석
         word_color_mapping[word] = sentiment_colors[sentiment]  # 색상 지정
 
+
+
+
     def save_wordcloud_base64(word_count, word_color_mapping):
 # 감정 분석 후 각 감정별 단어를 수집하여 워드클라우드와 파이차트를 생성하는 함수
 
@@ -652,7 +734,7 @@ def save_visualizations_with_tfidf(comments, video_url ):
 
         # 도넛 모양 파이차트 생성
         plt.figure(figsize=(6, 6))
-        plt.title(title, fontsize=14, weight='bold', color='#333')  # 타이틀 추가
+        plt.title(title, fontsize=18, weight='bold', color='#333', pad=30)  # 타이틀 추가
 
         wedges, texts, autotexts = plt.pie(
             sizes,
@@ -667,9 +749,9 @@ def save_visualizations_with_tfidf(comments, video_url ):
 
         # 텍스트 스타일 설정
         for text in texts:
-            text.set_fontsize(10)
+            text.set_fontsize(15)
         for autotext in autotexts:
-            autotext.set_fontsize(10)
+            autotext.set_fontsize(12)
             autotext.set_color('white')
 
         plt.axis('equal')  # 원 형태로 만듦
@@ -695,7 +777,7 @@ def save_visualizations_with_tfidf(comments, video_url ):
         collection = db['wordcloud_pie_chart']
 
         document = {
-            "timestamp": datetime.datetime.now(),
+            "upload_date": upload_date,
             "wordcloud_image": wordcloud_base64,
             "pie_chart_image": pie_chart_base64,
             "video_url": video_url  # 비디오 URL 저장
@@ -752,6 +834,7 @@ def remove_duplicate_documents():
     finally:
         client.close()
 
+
 def save_all_visualizations():
     try:
         # WeeklyIssue 모델에서 모든 데이터를 가져옴
@@ -767,18 +850,37 @@ def save_all_visualizations():
                 print(f"Video {issue.title}에 댓글이 없습니다. 스킵합니다.")
                 continue
 
-            # TF-IDF 분석 및 감정 분석 후 워드클라우드, 파이차트 생성
+            # MongoDB 연결 설정
             try:
-                wordcloud_base64, pie_chart_base64 = save_visualizations_with_tfidf(issue.comments, issue.url)
-                print(f"{issue.title}의 워드클라우드 및 파이차트 저장 성공!")
-
-                # MongoDB에 결과 저장
                 client = MongoClient("mongodb://entks:entks@hello-news.site:27777/")
                 db = client['youtube_data']
                 collection = db['wordcloud_pie_chart']
+            except Exception as e:
+                print(f"MongoDB 연결 오류: {e}")
+                continue
 
+            # MongoDB에서 중복 데이터 확인
+            existing_document = collection.find_one({"video_url": issue.url})
+            if existing_document:
+                print(f"Video {issue.title}의 데이터가 이미 존재합니다. 스킵합니다.")
+                continue
+
+            # TF-IDF 분석 및 감정 분석 후 워드클라우드, 파이차트 생성
+            try:
+                # `upload_date` 추가 **수정됨**
+                upload_date = issue.upload_date  # upload_date를 issue에서 가져옴
+                video_url = issue.url
+                wordcloud_base64, pie_chart_base64 = save_visualizations_with_tfidf(issue.comments, upload_date,video_url)
+
+                # 분석 결과가 없으면 예외 처리
+                if not wordcloud_base64 or not pie_chart_base64:
+                    raise ValueError(f"Wordcloud or Pie chart generation failed for {issue.title}")
+
+                print(f"{issue.title}의 워드클라우드 및 파이차트 저장 성공!")
+
+                # MongoDB에 결과 저장
                 document = {
-                    "timestamp": datetime.datetime.now(),
+                    "upload_date": upload_date,  # `upload_date` 추가 **수정됨**
                     "wordcloud_image": wordcloud_base64,
                     "pie_chart_image": pie_chart_base64,
                     "video_url": issue.url  # 비디오 URL 저장
@@ -795,7 +897,71 @@ def save_all_visualizations():
     except Exception as e:
         print(f"save_all_visualizations 실행 중 오류 발생: {e}")
 
-def generate_tfidf_sentiment_visualizations(comments, video_url):
+
+
+# 차트에서 가져옴
+def save_all_visualizations_chart():
+    try:
+        # WeeklyIssue 모델에서 모든 데이터를 가져옴
+        all_issues = Chart.objects.all()
+
+        if not all_issues.exists():
+            print("Chart에 저장된 데이터가 없습니다.")
+            return
+
+        for issue in all_issues:
+            # 댓글이 없는 경우 스킵
+            if not issue.comments:
+                print(f"Video {issue.title}에 댓글이 없습니다. 스킵합니다.")
+                continue
+
+            # MongoDB 연결 설정
+            client = MongoClient("mongodb://entks:entks@hello-news.site:27777/")
+            db = client['youtube_data']
+            collection = db['wordcloud_pie_chart']
+
+            # MongoDB에서 중복 데이터 확인
+            existing_document = collection.find_one({"video_url": issue.url})
+            if existing_document:
+                print(f"Video {issue.title}의 데이터가 이미 존재합니다. 스킵합니다.")
+                # 중복된 경우 아래 코드로 삭제 후 재생성할 수 있음
+                # collection.delete_one({"video_url": issue.url})
+                # print(f"Video {issue.title}의 기존 데이터를 삭제했습니다.")
+                continue
+
+            # TF-IDF 분석 및 감정 분석 후 워드클라우드, 파이차트 생성
+            try:
+                # `upload_date` 추가 **수정됨**
+                upload_date = issue.upload_date  # upload_date를 issue에서 가져옴
+                video_url = issue.url
+                wordcloud_base64, pie_chart_base64 = save_visualizations_with_tfidf(issue.comments, upload_date, video_url)
+
+                print(f"{issue.title}의 워드클라우드 및 파이차트 저장 성공!")
+
+                # MongoDB에 결과 저장
+                document = {
+                    "upload_date": issue.upload_date,
+                    "wordcloud_image": wordcloud_base64,
+                    "pie_chart_image": pie_chart_base64,
+                    "video_url": issue.url  # 비디오 URL 저장
+                }
+
+                inserted_id = collection.insert_one(document).inserted_id
+                print(f"MongoDB 저장 완료! ID: {inserted_id}")
+
+            except Exception as e:
+                print(f"Video {issue.title}의 분석 및 저장 중 오류 발생: {e}")
+
+        print("모든 데이터에 대한 분석 및 저장 작업 완료.")
+
+    except Exception as e:
+        print(f"save_all_visualizations 실행 중 오류 발생: {e}")
+
+
+
+
+
+def generate_tfidf_sentiment_visualizations(comments, video_url, upload_date ):
     # 1. 댓글 전처리
     try:
         print("댓글 전처리 시작...")
@@ -867,7 +1033,7 @@ def generate_tfidf_sentiment_visualizations(comments, video_url):
 
         # 저장할 문서 생성
         document = {
-            "timestamp": datetime.datetime.now(),
+            "upload_date": upload_date,
             "video_url": video_url,  # 동영상 URL 추가
             "top_words": []
         }
@@ -929,6 +1095,7 @@ def generate_tfidf_sentiment_visualizations(comments, video_url):
 
 # DB에 저장
 def save_all_issues_to_mongodb():
+    client = None  # client 변수를 finally 블록에서 참조하기 위해 초기화
     try:
         print("WeeklyIssue 데이터를 처리하여 MongoDB에 저장을 시작합니다.")
         # WeeklyIssue의 모든 데이터를 가져옵니다.
@@ -953,19 +1120,26 @@ def save_all_issues_to_mongodb():
                 # generate_tfidf_sentiment_visualizations 호출
                 comments = issue.comments
                 video_url = issue.url
+                upload_date = issue.upload_date
                 print(f"'{issue.title}'에 대해 데이터 처리 시작...")
 
-                sentiment_html = generate_tfidf_sentiment_visualizations(comments, video_url)
+                sentiment_html = generate_tfidf_sentiment_visualizations(comments, video_url, upload_date)
                 if sentiment_html.startswith("오류"):
                     print(f"'{issue.title}'의 데이터 처리 중 오류가 발생했습니다. 스킵합니다.")
                     continue
 
+                # 기존 데이터 중복 확인 및 삭제
+                existing_document = collection.find_one({"video_url": video_url})
+                if existing_document:
+                    collection.delete_one({"_id": existing_document["_id"]})
+                    print(f"'{issue.title}'의 기존 데이터가 중복되어 삭제되었습니다.")
+
                 # MongoDB에 저장
                 document = {
-                    "timestamp": datetime.datetime.now(),
+                    "upload_date": upload_date,
                     "video_title": issue.title,
                     "video_url": video_url,
-                    "html": sentiment_html
+                    "top_words": []
                 }
 
                 inserted_id = collection.insert_one(document).inserted_id
@@ -980,7 +1154,74 @@ def save_all_issues_to_mongodb():
         print(f"save_all_issues_to_mongodb 실행 중 오류 발생: {e}")
 
     finally:
-        client.close()
+        if client:
+            client.close()
+
+
+def save_all_issues_to_mongodb_chart():
+    client = None  # client 변수를 finally 블록에서 참조하기 위해 초기화
+    try:
+        print("Chart 데이터를 처리하여 MongoDB에 저장을 시작합니다.")
+        # WeeklyIssue의 모든 데이터를 가져옵니다.
+        all_issues = Chart.objects.all()
+
+        if not all_issues.exists():
+            print("chart에 저장된 데이터가 없습니다.")
+            return
+
+        # MongoDB 연결 설정
+        client = MongoClient("mongodb://entks:entks@hello-news.site:27777/")
+        db = client['youtube_data']
+        collection = db['top10_words']
+
+        for issue in all_issues:
+            # 댓글이 없는 경우 스킵
+            if not issue.comments:
+                print(f"Video {issue.title}에 댓글이 없습니다. 스킵합니다.")
+                continue
+
+            try:
+                # generate_tfidf_sentiment_visualizations 호출
+                comments = issue.comments
+                video_url = issue.url
+                upload_date = issue.upload_date
+                print(f"'{issue.title}'에 대해 데이터 처리 시작...")
+
+                sentiment_html = generate_tfidf_sentiment_visualizations(comments, video_url,upload_date)
+                if sentiment_html.startswith("오류"):
+                    print(f"'{issue.title}'의 데이터 처리 중 오류가 발생했습니다. 스킵합니다.")
+                    continue
+
+                # 기존 데이터 중복 확인 및 삭제
+                existing_document = collection.find_one({"video_url": video_url})
+                if existing_document:
+                    collection.delete_one({"_id": existing_document["_id"]})
+                    print(f"'{issue.title}'의 기존 데이터가 중복되어 삭제되었습니다.")
+
+                # MongoDB에 저장
+                document = {
+                    "upload_date": upload_date,
+                    "video_title": issue.title,
+                    "video_url": video_url,
+                    "top_words": []
+                }
+
+                inserted_id = collection.insert_one(document).inserted_id
+                print(f"'{issue.title}'의 데이터가 MongoDB에 저장되었습니다. ID: {inserted_id}")
+
+            except Exception as e:
+                print(f"'{issue.title}' 처리 중 오류 발생: {e}")
+
+        print("모든 WeeklyIssue 데이터 저장 작업이 완료되었습니다.")
+
+    except Exception as e:
+        print(f"save_all_issues_to_mongodb 실행 중 오류 발생: {e}")
+
+    finally:
+        if client:
+            client.close()
+
+
 
 def remove_top10_word():
     try:
@@ -1020,3 +1261,25 @@ def remove_top10_word():
 
     finally:
         client.close()
+
+def save_wordcloud_with_tfidf(comments):
+    """
+    댓글을 기반으로 TF-IDF 워드클라우드 생성.
+    """
+    # TF-IDF 분석
+    tfidf_vectorizer = TfidfVectorizer(max_features=100)
+    tfidf_matrix = tfidf_vectorizer.fit_transform(comments)
+    feature_names = tfidf_vectorizer.get_feature_names_out()
+    scores = tfidf_matrix.sum(axis=0).A1
+
+    # 워드클라우드 생성
+    word_scores = dict(zip(feature_names, scores))
+    wordcloud = WordCloud(width=800, height=400, background_color="white").generate_from_frequencies(word_scores)
+
+    # 워드클라우드 이미지를 Base64로 변환
+    img_buffer = io.BytesIO()
+    wordcloud.to_image().save(img_buffer, format="PNG")
+    img_base64 = base64.b64encode(img_buffer.getvalue()).decode("utf-8")
+    img_buffer.close()
+
+    return img_base64

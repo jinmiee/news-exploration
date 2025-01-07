@@ -6,6 +6,10 @@ from apscheduler.triggers.interval import IntervalTrigger
 from django.core.mail import send_mail
 from pymongo import MongoClient
 
+from account.analysis.emotion_db import save_all_issues_to_mongodb, save_all_issues_to_mongodb_chart, \
+    save_all_visualizations_chart, save_all_visualizations, save_all_historical_bubble_charts, \
+    save_all_historical_bubble_charts_CHART
+
 
 def send_email_task():
     print("send_email_task 실행됨")  # 디버깅 로그
@@ -110,3 +114,66 @@ def start_scheduler(save_chart_to_mongo=None):
 
     import atexit
     atexit.register(stop_scheduler)
+
+    ##########################
+    add_job_if_not_exists(
+        'save_all_visualizations',
+        save_all_visualizations,
+        trigger=CronTrigger(hour=0, minute=7),
+        max_instances=3  # 중복 실행 허용 추가
+    )
+    print("스케줄러가 시작되었습니다: save_all_visualizations가 11시 8분에 실행됩니다")
+
+    add_job_if_not_exists(
+        'save_all_visualizations_chart',
+        save_all_visualizations_chart,
+        trigger=CronTrigger(hour='11,23', minute=7),
+        max_instances=3  # 중복 실행 허용 추가
+    )
+    print("스케줄러가 시작되었습니다: save_all_visualizations_chart가 11시 8분에 실행됩니다")
+
+
+
+
+
+
+
+##########################
+    add_job_if_not_exists(
+        'save_all_historical_bubble_charts',
+        save_all_historical_bubble_charts,
+        trigger=CronTrigger(hour=0, minute=7),
+        max_instances = 3  # 중복 실행 허용 추가
+    )
+    print("스케줄러가 시작되었습니다: save_all_visualizations가 11시 8분에 실행됩니다")
+
+
+
+    add_job_if_not_exists(
+        'save_all_historical_bubble_charts_CHART',
+        save_all_historical_bubble_charts_CHART,
+        trigger=CronTrigger(hour='11,23',minute=7),
+        max_instances=3  # 중복 실행 허용 추가
+    )
+    print("스케줄러가 시작되었습니다: save_all_visualizations_chart가 11시 8분에 실행됩니다")
+
+###########################
+
+    add_job_if_not_exists(
+        'save_all_issues_to_mongodb',
+        save_all_issues_to_mongodb,
+        trigger=CronTrigger(hour=0, minute=7),
+        max_instances=3  # 중복 실행 허용 추가
+    )
+    print("스케줄러가 시작되었습니다: save_all_issues_to_mongodb가 11시 9분에 실행됩니다 ")
+
+
+    add_job_if_not_exists(
+        'save_all_issues_to_mongodb_chart',
+        save_all_issues_to_mongodb_chart,
+        trigger=CronTrigger(hour='11,23',minute=7),
+        max_instances=3  # 중복 실행 허용 추가
+    )
+    print("스케줄러가 시작되었습니다: save_all_issues_to_mongodb_chart가 11시 9분에 실행됩니다   ")
+
+
