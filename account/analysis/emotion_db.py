@@ -1143,72 +1143,6 @@ def save_all_issues_to_mongodb():
         if client:
             client.close()
 
-
-def save_all_issues_to_mongodb_chart():
-    client = None  # client 변수를 finally 블록에서 참조하기 위해 초기화
-    try:
-        print("Chart 데이터를 처리하여 MongoDB에 저장을 시작합니다.")
-        # WeeklyIssue의 모든 데이터를 가져옵니다.
-        all_issues = Chart.objects.all()
-
-        if not all_issues.exists():
-            print("chart에 저장된 데이터가 없습니다.")
-            return
-
-        # MongoDB 연결 설정
-        client = MongoClient("mongodb://entks:entks@hello-news.site:27777/")
-        db = client['youtube_data']
-        collection = db['top10_words']
-
-        for issue in all_issues:
-            # 댓글이 없는 경우 스킵
-            if not issue.comments:
-                print(f"Video {issue.title}에 댓글이 없습니다. 스킵합니다.")
-                continue
-
-            try:
-                # generate_tfidf_sentiment_visualizations 호출
-                comments = issue.comments
-                video_url = issue.url
-                upload_date = issue.upload_date
-                print(f"'{issue.title}'에 대해 데이터 처리 시작...")
-
-                sentiment_html = generate_tfidf_sentiment_visualizations(comments, video_url,upload_date)
-                if sentiment_html.startswith("오류"):
-                    print(f"'{issue.title}'의 데이터 처리 중 오류가 발생했습니다. 스킵합니다.")
-                    continue
-
-                # 기존 데이터 중복 확인 및 삭제
-                existing_document = collection.find_one({"video_url": video_url})
-                if existing_document:
-                    collection.delete_one({"_id": existing_document["_id"]})
-                    print(f"'{issue.title}'의 기존 데이터가 중복되어 삭제되었습니다.")
-
-                # MongoDB에 저장
-                document = {
-                    "upload_date": upload_date,
-                    "video_title": issue.title,
-                    "video_url": video_url,
-                    "top_words": []
-                }
-
-                inserted_id = collection.insert_one(document).inserted_id
-                print(f"'{issue.title}'의 데이터가 MongoDB에 저장되었습니다. ID: {inserted_id}")
-
-            except Exception as e:
-                print(f"'{issue.title}' 처리 중 오류 발생: {e}")
-
-        print("모든 WeeklyIssue 데이터 저장 작업이 완료되었습니다.")
-
-    except Exception as e:
-        print(f"save_all_issues_to_mongodb 실행 중 오류 발생: {e}")
-
-    finally:
-        if client:
-            client.close()
-
-
-
 def remove_top10_word():
     try:
         # MongoDB 연결
@@ -1269,3 +1203,162 @@ def save_wordcloud_with_tfidf(comments):
     img_buffer.close()
 
     return img_base64
+
+def save_all_issues_to_mongodb_chart():
+    client = None  # client 변수를 finally 블록에서 참조하기 위해 초기화
+    try:
+        print("Chart 데이터를 처리하여 MongoDB에 저장을 시작합니다.")
+        # WeeklyIssue의 모든 데이터를 가져옵니다.
+        all_issues = Chart.objects.all()
+
+        if not all_issues.exists():
+            print("chart에 저장된 데이터가 없습니다.")
+            return
+
+        # MongoDB 연결 설정
+        client = MongoClient("mongodb://entks:entks@hello-news.site:27777/")
+        db = client['youtube_data']
+        collection = db['top10_words']
+
+        for issue in all_issues:
+            # 댓글이 없는 경우 스킵
+            if not issue.comments:
+                print(f"Video {issue.title}에 댓글이 없습니다. 스킵합니다.")
+                continue
+
+            try:
+                # generate_tfidf_sentiment_visualizations 호출
+                comments = issue.comments
+                video_url = issue.url
+                upload_date = issue.upload_date
+                title = issue.title
+                print(f"'{issue.title}'에 대해 데이터 처리 시작...")
+
+                sentiment_html ,sentiment_results = generate_tfidf_sentiment_visualizations(comments, video_url,upload_date)
+                if sentiment_html.startswith("오류"):
+                    print(f"'{issue.title}'의 데이터 처리 중 오류가 발생했습니다. 스킵합니다.")
+                    continue
+
+                # 기존 데이터 중복 확인 및 삭제
+                existing_document = collection.find_one({"video_url": video_url})
+                if existing_document:
+                    collection.delete_one({"_id": existing_document["_id"]})
+                    print(f"'{issue.title}'의 기존 데이터가 중복되어 삭제되었습니다.")
+
+                # MongoDB에 저장
+                document = {
+                    "video_title": title,
+                    "video_url": video_url,
+                    "upload_date": upload_date,
+                    "top_words": []
+                }
+
+                # 단어, 빈도, 감정 추가
+                for result in sentiment_results:
+                    document["top_words"].append({
+                        "순위": result["순위"],
+                        "단어": result["단어"],
+                        "감정": result["감정"]
+                    })
+
+                result = collection.update_one(
+                    {"video_url": video_url},
+                    {"$set": document},
+                    upsert=True
+                )
+
+                if result.upserted_id:
+                    print(f"'{issue.title}'의 데이터가 MongoDB에 저장되었습니다. ID: {result.upserted_id}")
+                else:
+                    print(f"'{issue.title}'의 기존 데이터가 업데이트되었습니다.")
+
+            except Exception as e:
+                print(f"'{issue.title}' 처리 중 오류 발생: {e}")
+
+        print("모든 WeeklyIssue 데이터 저장 작업이 완료되었습니다.")
+
+    except Exception as e:
+            print(f"save_all_issues_to_mongodb 실행 중 오류 발생: {e}")
+
+    finally:
+        if client:
+            client.close()
+
+
+def save_all_issues_to_mongodb():
+    client = None  # client 변수를 finally 블록에서 참조하기 위해 초기화
+    try:
+        print("WeeklyIssue 데이터를 처리하여 MongoDB에 저장을 시작합니다.")
+        # WeeklyIssue의 모든 데이터를 가져옵니다.
+        all_issues = WeeklyIssue.objects.all()
+
+        if not all_issues.exists():
+            print("WeeklyIssue에 저장된 데이터가 없습니다.")
+            return
+
+        # MongoDB 연결 설정
+        client = MongoClient("mongodb://entks:entks@hello-news.site:27777/")
+        db = client['youtube_data']
+        collection = db['top10_words']
+
+        for issue in all_issues:
+            # 댓글이 없는 경우 스킵
+            if not issue.comments:
+                print(f"Video {issue.title}에 댓글이 없습니다. 스킵합니다.")
+                continue
+
+            try:
+                # generate_tfidf_sentiment_visualizations 호출
+                comments = issue.comments
+                video_url = issue.url
+                upload_date = issue.upload_date
+                print(f"'{issue.title}'에 대해 데이터 처리 시작...")
+
+                sentiment_html, sentiment_results = generate_tfidf_sentiment_visualizations(comments, video_url, upload_date)
+                if sentiment_html.startswith("오류"):
+                    print(f"'{issue.title}'의 데이터 처리 중 오류가 발생했습니다. 스킵합니다.")
+                    continue
+
+                # 기존 데이터 중복 확인 및 삭제
+                existing_document = collection.find_one({"video_url": video_url})
+                if existing_document:
+                    collection.delete_one({"_id": existing_document["_id"]})
+                    print(f"'{issue.title}'의 기존 데이터가 중복되어 삭제되었습니다.")
+
+                # MongoDB에 저장
+                document = {
+                    "video_url": video_url,
+                    "upload_date": upload_date,
+                    "top_words": []
+                }
+
+                # 단어, 빈도, 감정 추가
+                for result in sentiment_results:
+                    document["top_words"].append({
+                        "순위": result["순위"],
+                        "단어": result["단어"],
+                        "감정": result["감정"]
+                    })
+
+                result = collection.update_one(
+                    {"video_url": video_url},
+                    {"$set": document},
+                    upsert=True
+                    )
+
+                if result.upserted_id:
+                    print(f"'{issue.title}'의 데이터가 MongoDB에 저장되었습니다. ID: {result.upserted_id}")
+                else:
+                    print(f"'{issue.title}'의 기존 데이터가 업데이트되었습니다.")
+
+            except Exception as e:
+                print(f"'{issue.title}' 처리 중 오류 발생: {e}")
+
+        print("모든 WeeklyIssue 데이터 저장 작업이 완료되었습니다.")
+
+    except Exception as e:
+        print(f"save_all_issues_to_mongodb 실행 중 오류 발생: {e}")
+
+    finally:
+        if client:
+            client.close()
