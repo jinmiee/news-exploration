@@ -46,6 +46,10 @@ from .models import Like, YouTubeData, WeeklyIssue, Chart, WeeklyIssueDuplicateV
 from .analysis.visualization import generate_network_graph
 
 
+def backtomain(request):
+    return render(request, 'main/main.html')
+
+
 def chart(request):
     """
     Chart 데이터를 템플릿으로 전달

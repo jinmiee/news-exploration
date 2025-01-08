@@ -28,6 +28,7 @@ urlpatterns = [
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
     path('password-change/', views.CustomPasswordChangeView.as_view(), name='password_change'),    path('password-change/done/', auth_views.PasswordChangeDoneView.as_view(), name='password_change_done'),
     
+    path('main/', views.backtomain, name='main'),
     path('', views.chart, name='chart'),
     path('video-details/', views.video_details, name='video_details'),
     path('detail/<str:video_id>/', views.detail, name='detail_by_id'),  # ID를 통한 접근
