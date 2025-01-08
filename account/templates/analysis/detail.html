@@ -142,33 +142,40 @@
                     </div>
                     <!-- 우측 섹션 -->
 
-                    <div class="right-section" style="width: 32%; margin: 0 auto; text-align: center; display: flex; flex-direction: column; align-items: center;">
-                        <h4>TOP10 감성 단어</h4>
-                        {% if top_words %}
-                            <div class="table-responsive" style="width: 100%; max-height: 425px; overflow-y: auto; position: relative; top: 30px;">
-                                <table class="table table-bordered table-striped" style="margin: 0 auto; font-size: 8px; width: 100%;">
-                                    <thead>
-                                        <tr>
-                                            <th>순위</th>
-                                            <th>단어</th>
-                                            <th>감성</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for word in top_words %}
-                                            <tr>
-                                                <td>{{ forloop.counter }}</td>
-                                                <td>{{ word.단어 }}</td>
-                                                <td>{{ word.감정 }}</td>
-                                            </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        {% else %}
-                            <p class="error">TOP10 단어를 불러오는 데 오류가 발생했습니다.</p>
-                        {% endif %}
-                    </div>
+                    <div class="right-section" style="width: 25%; margin: 0 auto; text-align: center; display: flex; flex-direction: column; align-items: center;">
+    <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem;">TOP10 감성 단어</h4>
+    {% if top_words %}
+        <div class="table-responsive" style="width: 100%; position: relative;">
+            <table class="table" style="margin: 0 auto; font-size: 14px; width: 100%; border-collapse: collapse; margin-bottom: 1rem;">
+                <thead>
+                    <tr>
+                        <th style="padding: 0.5rem; border: 1px solid #e2e8f0; background-color: #f8fafc; font-weight: 600; text-align: center;">순위</th>
+                        <th style="padding: 0.5rem; border: 1px solid #e2e8f0; background-color: #f8fafc; font-weight: 600; text-align: center;">단어</th>
+                        <th style="padding: 0.5rem; border: 1px solid #e2e8f0; background-color: #f8fafc; font-weight: 600; text-align: center;">감성</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for word in top_words %}
+                        <tr>
+                            <td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">{{ forloop.counter }}</td>
+                            <td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">{{ word.단어 }}</td>
+                            <td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;
+                                {% if word.감정 == '부정' %}
+                                    color: #FFA8A8;
+                                {% else %}
+                                    color: #9488F0;
+                                {% endif %}
+                            ">{{ word.감정 }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="error">TOP10 단어를 불러오는 데 오류가 발생했습니다.</p>
+    {% endif %}
+</div>
+
 
             {% endif %}
         </div>
