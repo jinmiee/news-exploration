@@ -58,16 +58,21 @@ def chart(request):
         now = localtime()
 
         # 기준 시간 설정
-        if now.hour < 11:  # 현재 시간이 오전 11시 이전
+        chart_update_time_am = now.replace(hour=11, minute=7, second=0, microsecond=0)  # 오전 11시 7분
+        chart_update_time_pm = now.replace(hour=23, minute=7, second=0, microsecond=0)  # 오후 11시 7분
+
+        if now < chart_update_time_am:  # 오전 11시 7분 이전
             analysis_start = (now - timedelta(days=1)).replace(hour=11, minute=0, second=0, microsecond=0)
             analysis_end = (now - timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)
-        elif now.hour < 23:  # 현재 시간이 오전 11시 이후, 오늘 오후 11시 이전
+        elif now < chart_update_time_pm:  # 오전 11시 7분 이후, 오후 11시 7분 이전
             analysis_start = (now - timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)
             analysis_end = now.replace(hour=11, minute=0, second=0, microsecond=0)
-        else:  # 현재 시간이 오후 11시 이후
+        else:  # 오후 11시 7분 이후
             analysis_start = now.replace(hour=11, minute=0, second=0, microsecond=0)
             analysis_end = now.replace(hour=23, minute=0, second=0, microsecond=0)
 
+
+        # UTC 변환
         analysis_start_utc = analysis_start.astimezone(utc)
         analysis_end_utc = analysis_end.astimezone(utc)
 
@@ -88,19 +93,17 @@ def chart(request):
         print("DEBUG: chart_data count after sorting:", len(chart_data))
         print(chart_data)
 
-        # Chart 업데이트 시간을 오전 11시 7분, 오후 11시 7분으로 설정
-        if now < now.replace(hour=11, minute=7, second=0, microsecond=0):  # 현재 시간이 오전 11시 7분 이전
-            chart_update_time = now.replace(hour=11, minute=7, second=0, microsecond=0)
-            analysis_start = (now - timedelta(days=1)).replace(hour=23, minute=7, second=0, microsecond=0)
-            analysis_end = now.replace(hour=11, minute=7, second=0, microsecond=0)
-        elif now < now.replace(hour=23, minute=7, second=0, microsecond=0):  # 현재 시간이 오전 11시 7분 이후, 오후 11시 7분 이전
-            chart_update_time = now.replace(hour=23, minute=7, second=0, microsecond=0)
-            analysis_start = now.replace(hour=11, minute=7, second=0, microsecond=0)
-            analysis_end = now.replace(hour=23, minute=7, second=0, microsecond=0)
-        else:  # 현재 시간이 오후 11시 7분 이후
+        # 차트 업데이트 시간 계산
+        if now < chart_update_time_am:
+            chart_update_time = chart_update_time_am
+        elif now < chart_update_time_pm:
+            chart_update_time = chart_update_time_pm
+        else:
             chart_update_time = (now + timedelta(days=1)).replace(hour=11, minute=7, second=0, microsecond=0)
-            analysis_start = now.replace(hour=23, minute=7, second=0, microsecond=0)
-            analysis_end = (now + timedelta(days=1)).replace(hour=11, minute=7, second=0, microsecond=0)
+
+        print(f"Analysis Start: {analysis_start}")
+        print(f"Analysis End: {analysis_end}")
+        print(f"Chart Update Time: {chart_update_time}")
 
         processed_chart_data = []
         for chart in chart_data:
@@ -116,17 +119,17 @@ def chart(request):
                     "upload_date": chart.upload_date,
                     "thumbnail": chart.thumbnail,
                     "id": str(chart._id),  # _id를 id로 매핑
-                    
+
                 })
                 if request.user.is_authenticated:
-                    processed_chart_data[-1]['is_liked_by_user'] = Like.objects.filter(user=request.user, youtube_data=YouTubeData.objects.get(_id = chart._id)).exists()
+                    processed_chart_data[-1]['is_liked_by_user'] = Like.objects.filter(user=request.user,
+                                                                                       youtube_data=YouTubeData.objects.get(
+                                                                                           _id=chart._id)).exists()
             except Exception as e:
                 print(f"Error processing chart data: {e}")
 
-
         # 템플릿에 전달할 데이터 구성
         context = {
-        
             "top_news": processed_chart_data,
             "analysis_start": analysis_start,
             "analysis_end": analysis_end,
