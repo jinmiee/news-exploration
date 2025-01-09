@@ -4,10 +4,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import MinMaxScaler
 from konlpy.tag import Okt
 import re
-from django.core.cache import cache
-from fuzzywuzzy import fuzz
-from torch.utils.data import DataLoader
-from transformers import BertTokenizer, BertModel
+from kobert_transformers import get_tokenizer
+from transformers import BertModel
 import torch
 
 def clean_title(title):
@@ -111,30 +109,32 @@ def process_text(title, transcript=None):
     return f"{processed_title} {script_text}".strip()
 
 def get_bert_similarity_batch(corpus, batch_size=32):
-    tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased')
-    model = BertModel.from_pretrained('bert-base-multilingual-cased')
+    """
+       KoBERT를 사용하여 문서 간 유사도를 계산하는 함수
+       """
+    tokenizer = get_tokenizer()
+    model = BertModel.from_pretrained('skt/kobert-base-v1')  # KoBERT 모델 로드
     model.eval()
 
     embeddings = []
     for i in range(0, len(corpus), batch_size):
-        batch = corpus[i:i+batch_size]
+        batch = corpus[i:i + batch_size]
         inputs = tokenizer(batch, return_tensors='pt', truncation=True, padding=True, max_length=512)
         with torch.no_grad():
             outputs = model(**inputs)
-            sentence_embedding = outputs.pooler_output
+            sentence_embedding = outputs.pooler_output  # [CLS] 토큰 임베딩 사용
         embeddings.append(sentence_embedding.numpy())
 
-    # 모든 배치가 결합되었는지 확인
+    # 모든 배치 결합
     try:
         embeddings = np.vstack(embeddings)
     except ValueError as e:
         raise ValueError(f"Error in vstack: {e}. Check batch processing.")
 
-    # 유사도 행렬 생성
+    # 코사인 유사도 계산
     similarity_matrix = cosine_similarity(embeddings)
 
-    # 최종 출력 크기 디버깅
-    print(f"Generated BERT Similarity Matrix Shape: {similarity_matrix.shape}")
+    print(f"Generated KoBERT Similarity Matrix Shape: {similarity_matrix.shape}")  # 디버깅 출력
     return similarity_matrix
 
 
@@ -144,6 +144,104 @@ def get_hybrid_similarity(tfidf_matrix, bert_similarity_matrix, weight_tfidf=0.5
     """
     combined_similarity = weight_tfidf * tfidf_matrix + weight_bert * bert_similarity_matrix
     return combined_similarity
+
+def extract_keywords(corpus, n_keywords=5):
+    """
+    TF-IDF를 사용하여 각 문서에서 중요한 키워드를 추출하는 함수
+
+    Parameters:
+    corpus (list): 문서 텍스트 리스트
+    n_keywords (int): 추출할 키워드 수
+
+    Returns:
+    dict: 각 문서별 중요한 키워드와 점수
+    """
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from konlpy.tag import Okt
+    import numpy as np
+
+    # 형태소 분석기 (Okt) 초기화
+    okt = Okt()
+
+    # 텍스트 전처리 함수
+    def preprocess_text(text):
+        # 명사만 추출
+        nouns = okt.nouns(text)
+        # 두 글자 이상의 명사만 선택
+        nouns = [noun for noun in nouns if len(noun) > 1]
+        return ' '.join(nouns)
+
+    # 텍스트 전처리
+    processed_corpus = [preprocess_text(text) for text in corpus]
+
+    # TF-IDF 벡터라이저 설정
+    tfidf = TfidfVectorizer(
+        max_features=1000,  # 최대 1000개의 단어만 포함
+        sublinear_tf=True,  # tf 값을 1 + log(tf)로 변환
+        min_df=2  # 최소 두 개의 문서에서 등장한 단어만 포함
+    )
+
+    # TF-IDF 행렬 생성
+    tfidf_matrix = tfidf.fit_transform(processed_corpus)
+
+    # 단어 리스트 가져오기
+    feature_names = np.array(tfidf.get_feature_names_out())
+
+    # 각 문서별로 상위 키워드 추출
+    keywords_by_doc = {}
+    for idx, doc in enumerate(processed_corpus):
+        # 문서별 TF-IDF 점수 추출
+        tfidf_scores = tfidf_matrix[idx].toarray()[0]
+        # 상위 n_keywords 단어의 인덱스 추출
+        top_indices = tfidf_scores.argsort()[-n_keywords:][::-1]
+        # 키워드와 점수 저장
+        keywords = []
+        for index in top_indices:
+            keyword = feature_names[index]
+            score = tfidf_scores[index]
+            if score > 0:  # 점수가 0보다 큰 경우만 포함
+                keywords.append({'keyword': keyword, 'score': float(score)})
+        keywords_by_doc[idx] = keywords
+
+    return keywords_by_doc
+
+
+# 파일 마지막에 아래 함수 추가
+def select_key_news(corpus, n_keywords=5, top_n=10):
+    """
+    TF-IDF 키워드 추출과 혼합 유사도를 사용해 주요 뉴스를 선정하는 함수.
+
+    Parameters:
+    corpus (list): 뉴스 텍스트 리스트
+    n_keywords (int): 추출할 키워드 수
+    top_n (int): 선정할 주요 뉴스 수
+
+    Returns:
+    list: 상위 주요 뉴스 텍스트와 키워드 리스트
+    """
+    # Step 1: TF-IDF 키워드 추출
+    keywords_by_doc = extract_keywords(corpus, n_keywords=n_keywords)
+
+    # Step 2: TF-IDF 및 BERT 혼합 유사도 계산
+    tfidf = TfidfVectorizer(max_features=5000, stop_words='english')
+    tfidf_matrix = tfidf.fit_transform(corpus)
+    bert_similarity_matrix = get_bert_similarity_batch(corpus)
+    hybrid_similarity_matrix = get_hybrid_similarity(
+        cosine_similarity(tfidf_matrix),
+        bert_similarity_matrix,
+        weight_tfidf=0.4,
+        weight_bert=0.6
+    )
+
+    # Step 3: 중요도 점수 계산 및 정렬
+    relevance_scores = hybrid_similarity_matrix.sum(axis=1)  # 유사도 합산
+    ranked_indices = np.argsort(relevance_scores)[::-1][:top_n]  # 상위 top_n 선정
+
+    # Step 4: 결과 반환
+    top_articles = [corpus[idx] for idx in ranked_indices]
+    top_keywords = [keywords_by_doc[idx] for idx in ranked_indices]
+
+    return top_articles, top_keywords
 
 
 def get_top10_chart_based(videos, num_clusters=5, additional_news=3):
