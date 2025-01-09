@@ -513,7 +513,6 @@ from account.models import WeeklyIssue, Chart
 
 #버블차트  DB에 저장
 def save_all_historical_bubble_charts():
-
     try:
         # WeeklyIssue의 모든 데이터를 가져옵니다.
         all_issues = WeeklyIssue.objects.all()
@@ -522,16 +521,27 @@ def save_all_historical_bubble_charts():
             print("WeeklyIssue에 저장된 데이터가 없습니다.")
             return
 
+        # MongoDB 클라이언트 연결
+        client = MongoClient("mongodb://entks:entks@hello-news.site:27777/")
+        db = client['youtube_data']
+        collection = db['bubble_chart']
+
         for issue in all_issues:
             # 댓글이 없는 경우 스킵
             if not issue.comments:
                 print(f"Video {issue.title}에 댓글이 없습니다. 스킵합니다.")
                 continue
 
+            # 중복 URL 확인
+            video_url = issue.url
+            if collection.find_one({"video_url": video_url}):
+                print(f"Video {issue.title}의 URL({video_url})이 이미 존재합니다. 스킵합니다.")
+                continue
+
             # 버블 차트 생성 및 저장
             try:
                 upload_date = issue.upload_date
-                video_url = issue.url
+
                 # save_bubble_chart_with_tfidf 함수에 필요한 인자 전달
                 bubble_chart_base64 = save_bubble_chart_with_tfidf(issue.comments, video_url, upload_date)
 
@@ -541,10 +551,13 @@ def save_all_historical_bubble_charts():
                     "chart_image": bubble_chart_base64,  # 'chart_image' 필드에 버블 차트 이미지 저장
                 }
 
+                # MongoDB에 버블 차트 저장
+                inserted_id = collection.insert_one(document).inserted_id
+                print(f"MongoDB 저장 완료! ID: {inserted_id}")
 
-                # 버블 차트를 생성한 후 필요한 데이터를 저장
-                issue.bubble_chart = bubble_chart_base64  # 예시로 추가된 필드, 실제로 차트를 저장할 방법에 맞게 수정 필요
-                issue.save()  # 데이터를 저장 (필드가 없다면 모델에 맞게 필드 추가 필요)
+                # WeeklyIssue 모델에 버블 차트 저장
+                issue.bubble_chart = bubble_chart_base64  # 실제 모델에 맞게 수정 필요
+                issue.save()
 
                 print(f"{issue.title}의 버블 차트 생성 및 저장 성공!")
             except Exception as e:
@@ -557,6 +570,7 @@ def save_all_historical_bubble_charts():
 
 
 
+
 def save_all_historical_bubble_charts_CHART():
     try:
         # Chart의 모든 데이터를 가져옵니다.
@@ -566,16 +580,26 @@ def save_all_historical_bubble_charts_CHART():
             print("Chart에 저장된 데이터가 없습니다.")
             return
 
+        # MongoDB 클라이언트 연결
+        client = MongoClient("mongodb://entks:entks@hello-news.site:27777/")
+        db = client['youtube_data']
+        collection = db['bubble_chart']
+
         for issue in all_issues:
             # 댓글이 없는 경우 스킵
             if not issue.comments:
                 print(f"Video {issue.title}에 댓글이 없습니다. 스킵합니다.")
                 continue
 
+            # 중복 URL 확인
+            video_url = issue.url  # video_url 추가 **수정됨**
+            if collection.find_one({"video_url": video_url}):
+                print(f"Video {issue.title}의 URL({video_url})이 이미 존재합니다. 스킵합니다.")
+                continue
+
             # 버블 차트 생성 및 저장
             try:
                 upload_date = issue.upload_date  # upload_date 추가 **수정됨**
-                video_url = issue.url  # video_url 추가 **수정됨**
 
                 # save_bubble_chart_with_tfidf 함수에 필요한 인자 전달
                 bubble_chart_base64 = save_bubble_chart_with_tfidf(issue.comments, video_url, upload_date)  # 수정됨
@@ -587,9 +611,6 @@ def save_all_historical_bubble_charts_CHART():
                 }
 
                 # 버블 차트를 MongoDB에 저장
-                client = MongoClient("mongodb://entks:entks@hello-news.site:27777/")
-                db = client['youtube_data']
-                collection = db['bubble_chart']
                 inserted_id = collection.insert_one(document).inserted_id
                 print(f"MongoDB 저장 완료! ID: {inserted_id}")
 
@@ -605,6 +626,7 @@ def save_all_historical_bubble_charts_CHART():
 
     except Exception as e:
         print(f"save_all_historical_bubble_charts 실행 중 오류 발생: {e}")
+
 
 
 
