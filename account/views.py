@@ -58,21 +58,16 @@ def chart(request):
         now = localtime()
 
         # 기준 시간 설정
-        chart_update_time_am = now.replace(hour=11, minute=7, second=0, microsecond=0)  # 오전 11시 7분
-        chart_update_time_pm = now.replace(hour=23, minute=7, second=0, microsecond=0)  # 오후 11시 7분
-
-        if now < chart_update_time_am:  # 오전 11시 7분 이전
+        if now.hour < 11:  # 현재 시간이 오전 11시 이전
             analysis_start = (now - timedelta(days=1)).replace(hour=11, minute=0, second=0, microsecond=0)
             analysis_end = (now - timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)
-        elif now < chart_update_time_pm:  # 오전 11시 7분 이후, 오후 11시 7분 이전
+        elif now.hour < 23:  # 현재 시간이 오전 11시 이후, 오늘 오후 11시 이전
             analysis_start = (now - timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)
             analysis_end = now.replace(hour=11, minute=0, second=0, microsecond=0)
-        else:  # 오후 11시 7분 이후
+        else:  # 현재 시간이 오후 11시 이후
             analysis_start = now.replace(hour=11, minute=0, second=0, microsecond=0)
             analysis_end = now.replace(hour=23, minute=0, second=0, microsecond=0)
 
-
-        # UTC 변환
         analysis_start_utc = analysis_start.astimezone(utc)
         analysis_end_utc = analysis_end.astimezone(utc)
 
@@ -93,17 +88,19 @@ def chart(request):
         print("DEBUG: chart_data count after sorting:", len(chart_data))
         print(chart_data)
 
-        # 차트 업데이트 시간 계산
-        if now < chart_update_time_am:
-            chart_update_time = chart_update_time_am
-        elif now < chart_update_time_pm:
-            chart_update_time = chart_update_time_pm
-        else:
+        # Chart 업데이트 시간을 오전 11시 7분, 오후 11시 7분으로 설정
+        if now < now.replace(hour=11, minute=7, second=0, microsecond=0):  # 현재 시간이 오전 11시 7분 이전
+            chart_update_time = now.replace(hour=11, minute=7, second=0, microsecond=0)
+            analysis_start = (now - timedelta(days=1)).replace(hour=23, minute=7, second=0, microsecond=0)
+            analysis_end = now.replace(hour=11, minute=7, second=0, microsecond=0)
+        elif now < now.replace(hour=23, minute=7, second=0, microsecond=0):  # 현재 시간이 오전 11시 7분 이후, 오후 11시 7분 이전
+            chart_update_time = now.replace(hour=23, minute=7, second=0, microsecond=0)
+            analysis_start = now.replace(hour=11, minute=7, second=0, microsecond=0)
+            analysis_end = now.replace(hour=23, minute=7, second=0, microsecond=0)
+        else:  # 현재 시간이 오후 11시 7분 이후
             chart_update_time = (now + timedelta(days=1)).replace(hour=11, minute=7, second=0, microsecond=0)
-
-        print(f"Analysis Start: {analysis_start}")
-        print(f"Analysis End: {analysis_end}")
-        print(f"Chart Update Time: {chart_update_time}")
+            analysis_start = now.replace(hour=23, minute=7, second=0, microsecond=0)
+            analysis_end = (now + timedelta(days=1)).replace(hour=11, minute=7, second=0, microsecond=0)
 
         processed_chart_data = []
         for chart in chart_data:
@@ -130,6 +127,7 @@ def chart(request):
 
         # 템플릿에 전달할 데이터 구성
         context = {
+
             "top_news": processed_chart_data,
             "analysis_start": analysis_start,
             "analysis_end": analysis_end,
@@ -241,48 +239,10 @@ def weekly_issues(request):
         print(f"Error in weekly_issues function: {e}")
         return JsonResponse({"error": str(e)}, status=500)
 
-# DistilBERT 모델 및 토크나이저 초기화 (글로벌 캐싱)
-from transformers import DistilBertTokenizer, DistilBertModel
-
-tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-multilingual-cased')
-model = DistilBertModel.from_pretrained('distilbert-base-multilingual-cased')
-model.eval()
-
-def calculate_tfidf_similarities(base_text, candidate_corpus):
-    """TF-IDF 유사도 계산"""
-    vectorizer = TfidfVectorizer(max_features=3000, stop_words='english', ngram_range=(1, 2))
-    tfidf_matrix = vectorizer.fit_transform(candidate_corpus)
-    base_vector = vectorizer.transform([base_text])
-    return cosine_similarity(base_vector, tfidf_matrix).flatten()
-
-def calculate_bert_similarities(base_text, candidate_corpus):
-    """DistilBERT 유사도 계산"""
-    bert_corpus = [base_text] + candidate_corpus
-    bert_similarity_matrix = get_bert_similarity_batch(bert_corpus, tokenizer, model)  # BERT 계산
-    return bert_similarity_matrix[0, 1:]  # 첫 번째 행의 나머지 요소 반환
-
-def get_similarities_parallel(base_text, candidate_corpus):
-    """TF-IDF와 BERT를 병렬로 실행"""
-    tfidf_similarities = []
-    bert_similarities = []
-
-    # TF-IDF와 BERT를 병렬로 계산
-    thread_tfidf = threading.Thread(target=lambda: tfidf_similarities.extend(
-        calculate_tfidf_similarities(base_text, candidate_corpus)
-    ))
-    thread_bert = threading.Thread(target=lambda: bert_similarities.extend(
-        calculate_bert_similarities(base_text, candidate_corpus)
-    ))
-
-    thread_tfidf.start()
-    thread_bert.start()
-
-    thread_tfidf.join()
-    thread_bert.join()
-
-    return np.array(tfidf_similarities), np.array(bert_similarities)
-
 def get_related_duplicate_videos(request):
+    """
+    주어진 URL에 대한 중복 동영상을 찾아 반환하는 함수.
+    """
     try:
         # 1. 요청에서 URL 가져오기
         video_url = request.GET.get('url')
@@ -294,7 +254,11 @@ def get_related_duplicate_videos(request):
         if not video:
             return JsonResponse({"error": "해당 URL에 대한 기사를 찾을 수 없습니다."}, status=404)
 
-        # 3. 중복 모델 결정
+        # 3. 대상 비디오의 텍스트 전처리
+        base_text = process_text(video.title, video.transcript or [])
+        print(f"DEBUG: Base text for similarity: {base_text}")
+
+        # 4. 중복 모델 결정
         if WeeklyIssue.objects.filter(url=video_url).exists():
             duplicates_model = WeeklyIssueDuplicateVideo
         elif Chart.objects.filter(url=video_url).exists():
@@ -302,40 +266,51 @@ def get_related_duplicate_videos(request):
         else:
             return JsonResponse({"error": "데이터 유형을 확인할 수 없습니다."}, status=400)
 
-        # 4. 대상 비디오 텍스트 전처리
-        base_text = process_text(video.title, video.transcript or [])
-
-        # 5. 7일 이내 후보 데이터 필터링
+        # 5. upload_date 기준으로 3일 이내의 후보 데이터 가져오기
+        upload_date = video.upload_date
         recent_candidates = duplicates_model.objects.filter(
-            upload_date__gte=now() - timedelta(days=7)
+            upload_date__gte=upload_date - timedelta(days=3),  # upload_date 기준 3일 이전
+            upload_date__lte=upload_date + timedelta(days=3)  # upload_date 기준 3일 이후
         )
         if not recent_candidates.exists():
             return JsonResponse({"duplicates": []}, safe=False, status=200)
 
-        # 후보 데이터 전처리
+        # 6. 후보 데이터 텍스트 전처리
         candidate_corpus = [
             process_text(candidate.title, candidate.transcript or []) for candidate in recent_candidates
         ]
 
-        # 6. TF-IDF와 BERT 병렬로 실행
-        tfidf_similarities, bert_similarities = get_similarities_parallel(base_text, candidate_corpus)
+        # 7. TF-IDF 계산
+        print("DEBUG: Calculating TF-IDF similarities...")
+        vectorizer = TfidfVectorizer(max_features=5000, stop_words='english')
+        tfidf_matrix = vectorizer.fit_transform(candidate_corpus)
+        base_vector = vectorizer.transform([base_text])
+        tfidf_similarities = cosine_similarity(base_vector, tfidf_matrix).flatten()
 
-        # 7. Hybrid 유사도 계산 (TF-IDF와 BERT 결합)
+        # 8. KoBERT 유사도 계산
+        print("DEBUG: Calculating KoBERT similarities...")
+        bert_corpus = [base_text] + candidate_corpus
+        bert_similarity_matrix = get_bert_similarity_batch(bert_corpus, batch_size=32)
+        bert_similarities = bert_similarity_matrix[0, 1:]
+
+        # 9. Hybrid 유사도 계산
+        print("DEBUG: Calculating hybrid similarities...")
         hybrid_similarities = get_hybrid_similarity(
-            tfidf_similarities.reshape(-1, 1),  # TF-IDF 유사도
-            bert_similarities.reshape(-1, 1),  # BERT 유사도
+            tfidf_similarities.reshape(-1, 1),
+            bert_similarities.reshape(-1, 1),
             weight_tfidf=0.5,
             weight_bert=0.5
         ).flatten()
 
-        # Hybrid 유사도 임계값 필터링
-        hybrid_threshold = 0.7
-        duplicates = [
-            candidate for candidate, similarity in zip(recent_candidates, hybrid_similarities)
-            if similarity > hybrid_threshold
-        ]
+        # 10. Hybrid 유사도 임계값 필터링
+        hybrid_threshold = 0.6  # 기존 0.7에서 0.6으로 조정
+        duplicates = []
+        for candidate, similarity in zip(recent_candidates, hybrid_similarities):
+            print(f"DEBUG: Title: {candidate.title}, Similarity: {similarity}")
+            if similarity > hybrid_threshold:
+                duplicates.append(candidate)
 
-        # 8. 결과 반환
+        # 11. 결과 반환
         duplicate_list = [
             {
                 "title": duplicate.title,

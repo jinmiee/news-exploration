@@ -132,12 +132,6 @@ def start_scheduler(save_chart_to_mongo=None):
     )
     print("스케줄러가 시작되었습니다: 파이차트 시각화(차트)가 11시 7분에 실행됩니다")
 
-
-
-
-
-
-
 ##########################
     add_job_if_not_exists(
         'save_all_historical_bubble_charts',
