@@ -129,7 +129,7 @@ logging.getLogger('transformers').setLevel(logging.ERROR)
 logging.getLogger('gensim').setLevel(logging.ERROR)
 
 # 상수 정의
-API_KEY = "koba-5JNWNQI-MH5EQJY-QINVNIQ-2IOA5IY"
+API_KEY = os.getenv("YOUTUBE_API_KEY")
 SIMILARITY_THRESHOLD = 0.73
 EDGE_THRESHOLD = 0.5
 TOP_KEYWORDS_COUNT = 20

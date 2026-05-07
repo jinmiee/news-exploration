@@ -6,6 +6,10 @@
 # import pytz
 # from youtube_transcript_api import YouTubeTranscriptApi
 # from isodate import parse_duration
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class YouTubeDataCollector:
     """
@@ -254,7 +258,7 @@ with DAG(
     # PythonOperator로 DAG 작업 정의
     collect_youtube_data = PythonOperator(
         task_id='collect_youtube_data',
-        python_callable=lambda: run_youtube_data_collection('AIzaSyCvpCCZTXW5WR6rK83ztMUgCLbg_o8Hswo'),  # API 키 전달
+        python_callable=lambda: run_youtube_data_collection(os.getenv("YOUTUBE_API_KEY")),  # API 키 전달
         dag=dag
     )
     collect_youtube_data

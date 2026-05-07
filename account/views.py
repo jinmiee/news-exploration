@@ -737,7 +737,7 @@ from django.core.mail import send_mail
 def send_password_reset_email(user, temp_password):
     subject = "비밀번호 초기화 내"
     message = f"안녕하세요 {user.username}님,\n\n초기화된 임시 비밀번호는 다음과 같습니다: {temp_password}\n로그인 후 비밀번호를 변경해주세요."
-    from_email = "namsugb99@gmail.com"
+    from_email = os.getenv("EMAIL_HOST_USER")
     recipient_list = [user.email]
     send_mail(subject, message, from_email, recipient_list)
 

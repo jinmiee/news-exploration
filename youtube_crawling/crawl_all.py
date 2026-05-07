@@ -3,13 +3,17 @@ from pymongo import MongoClient
 from datetime import datetime, timezone, timedelta
 import pandas as pd
 import pytz
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # MongoDB 설정
-client = MongoClient("mongodb://localhost:27017/")
+client = MongoClient(os.getenv("MONGO_URI"))
 db = client['youtube_data']
 
 # YouTube API 설정
-API_KEY = 'AIzaSyC9_BEfIDVhNZgeoAkVAV2P5YgEGQW7YTs'  # 공통 API 키 사용
+API_KEY = os.getenv("YOUTUBE_API_KEY")
 YOUTUBE_API_SERVICE_NAME = 'youtube'
 YOUTUBE_API_VERSION = 'v3'
 youtube = build(YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION, developerKey=API_KEY)

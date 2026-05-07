@@ -23,6 +23,10 @@ import networkx as nx
 import logging
 from pymongo import MongoClient
 import datetime
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 # 한글 폰트 경로 설정 (NanumGothic 사용)
@@ -487,7 +491,7 @@ def save_bubble_chart_with_tfidf(comments, video_url,upload_date ):
 
     # MongoDB 저장
     try:
-        client = MongoClient("mongodb://entks:entks@hello-news.site:27777/")
+        client = MongoClient(os.getenv("MONGO_URI"))
         db = client['youtube_data']
         collection = db['bubble_chart']
 
@@ -522,7 +526,7 @@ def save_all_historical_bubble_charts():
             return
 
         # MongoDB 클라이언트 연결
-        client = MongoClient("mongodb://entks:entks@hello-news.site:27777/")
+        client = MongoClient(os.getenv("MONGO_URI"))
         db = client['youtube_data']
         collection = db['bubble_chart']
 
@@ -581,7 +585,7 @@ def save_all_historical_bubble_charts_CHART():
             return
 
         # MongoDB 클라이언트 연결
-        client = MongoClient("mongodb://entks:entks@hello-news.site:27777/")
+        client = MongoClient(os.getenv("MONGO_URI"))
         db = client['youtube_data']
         collection = db['bubble_chart']
 
@@ -791,7 +795,7 @@ def save_visualizations_with_tfidf(comments, video_url, upload_date):
     pie_chart_base64 = save_pie_chart_base64(sentiment_ratios)
     # MongoDB 저장
     try:
-        client = MongoClient("mongodb://entks:entks@hello-news.site:27777/")
+        client = MongoClient(os.getenv("MONGO_URI"))
         db = client['youtube_data']
         collection = db['wordcloud_pie_chart']
 
@@ -817,7 +821,7 @@ def save_visualizations_with_tfidf(comments, video_url, upload_date):
 def remove_duplicate_documents():
     try:
         # MongoDB 연결
-        client = MongoClient("mongodb://entks:entks@hello-news.site:27777/")
+        client = MongoClient(os.getenv("MONGO_URI"))
         db = client['youtube_data']
         collection = db['wordcloud_pie_chart']
 
@@ -871,7 +875,7 @@ def save_all_visualizations():
 
             # MongoDB 연결 설정
             try:
-                client = MongoClient("mongodb://entks:entks@hello-news.site:27777/")
+                client = MongoClient(os.getenv("MONGO_URI"))
                 db = client['youtube_data']
                 collection = db['wordcloud_pie_chart']
             except Exception as e:
@@ -924,7 +928,7 @@ def save_all_visualizations_chart():
                 continue
 
             # MongoDB 연결 설정
-            client = MongoClient("mongodb://entks:entks@hello-news.site:27777/")
+            client = MongoClient(os.getenv("MONGO_URI"))
             db = client['youtube_data']
             collection = db['wordcloud_pie_chart']
 
@@ -1035,7 +1039,7 @@ def generate_tfidf_sentiment_visualizations(comments, video_url, upload_date ):
 
     # 10. MongoDB에 저장
     try:
-        client = MongoClient("mongodb://entks:entks@hello-news.site:27777/")
+        client = MongoClient(os.getenv("MONGO_URI"))
         db = client['youtube_data']
         collection = db['top10_words']
 
@@ -1114,7 +1118,7 @@ def save_all_issues_to_mongodb():
             return
 
         # MongoDB 연결 설정
-        client = MongoClient("mongodb://entks:entks@hello-news.site:27777/")
+        client = MongoClient(os.getenv("MONGO_URI"))
         db = client['youtube_data']
         collection = db['top10_words']
 
@@ -1168,7 +1172,7 @@ def save_all_issues_to_mongodb():
 def remove_top10_word():
     try:
         # MongoDB 연결
-        client = MongoClient("mongodb://entks:entks@hello-news.site:27777/")
+        client = MongoClient(os.getenv("MONGO_URI"))
         db = client['youtube_data']
         collection = db['top10_words']
 
@@ -1238,8 +1242,7 @@ def save_all_issues_to_mongodb_chart():
             return
 
         # MongoDB 연결 설정
-        client = MongoClient("mongodb://entks:entks@hello-news.site:27777/")
-        db = client['youtube_data']
+        client = MongoClient(os.getenv("MONGO_URI"))
         collection = db['top10_words']
 
         for issue in all_issues:
@@ -1319,7 +1322,7 @@ def save_all_issues_to_mongodb():
             return
 
         # MongoDB 연결 설정
-        client = MongoClient("mongodb://entks:entks@hello-news.site:27777/")
+        client = MongoClient(os.getenv("MONGO_URI"))
         db = client['youtube_data']
         collection = db['top10_words']
 

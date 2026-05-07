@@ -5,6 +5,10 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from django.core.mail import send_mail
 from pymongo import MongoClient
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from account.analysis.emotion_db import save_all_issues_to_mongodb, save_all_issues_to_mongodb_chart, \
     save_all_visualizations_chart, save_all_visualizations, save_all_historical_bubble_charts, \
@@ -17,7 +21,7 @@ def send_email_task():
     users = User.objects.all()
     subject = "그게 뭔데?! 차트업데이트 알림"
     message = "새로운 뉴스가 업데이트 되었어요! 확인해보세요!. \n 뉴스 보러가기 --> http://15.168.46.71:5070/account/chart"
-    from_email = "namsugb99@gmail.com"
+    from_email = os.getenv("EMAIL_HOST_USER")
     recipient_list = [user.email for user in users if user.email]
 
     send_mail(subject, message, from_email, recipient_list)
@@ -33,13 +37,7 @@ def start_scheduler(save_chart_to_mongo=None):
         'default': MongoDBJobStore(
             database='youtube_data',
             collection='apscheduler_jobs',
-            client=MongoClient(
-                host='mongodb://hello-news.site:27777',
-                username='entks',
-                password='entks',
-                authSource='admin',
-                authMechanism='SCRAM-SHA-256'
-            )
+            client=MongoClient(os.getenv("MONGO_URI"))
         )
     }
 
