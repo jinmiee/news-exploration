@@ -3,7 +3,7 @@ __pycache__/
 *.pyo
 
 venv/
-.env/
+.env
 ko.bin
 linux
 staticfiles/
