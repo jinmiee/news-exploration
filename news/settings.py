@@ -12,7 +12,8 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 import os.path
 import os
 from pathlib import Path
-
+from dotenv import load_dotenv
+load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -25,7 +26,7 @@ LOGOUT_URL = 'account:logout'
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-%v&8a5r%z%&(#mfpk03**e(@iv#kkvmnqbqr3*_)scs#bs3%j)'
+SECRET_KEY = os.getenv("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -89,10 +90,7 @@ DATABASES = {
         'NAME': 'youtube_data',
         'ENFORCE_SCHEMA': False,
         'CLIENT': {
-            'host': 'mongodb://entks:entks@hello-news.site:27777/youtube_data',
-            'port': 27777,
-            'username': 'entks',
-            'password': 'entks',
+            'host': f'mongodb://{os.getenv("MONGO_USER")}:{os.getenv("MONGO_PASSWORD")}@{os.getenv("MONGO_HOST")}:{os.getenv("MONGO_PORT")}/youtube_data',
             'authSource': 'admin',  # 중요: 인증 소스를 'admin'으로 변경
             'authMechanism': 'SCRAM-SHA-256'  # 최신 버전 메커니즘 
         }
@@ -150,7 +148,7 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'  # 이메일 호스트 (예: Gmail)
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'namsugb99@gmail.com'  # 발신자 이메일
-EMAIL_HOST_PASSWORD = 'gagl lbie riij ediz'  # 발신자 이메일 비밀번호
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
