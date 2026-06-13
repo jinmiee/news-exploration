@@ -1,0 +1,30 @@
+# 로컬 개발용 구성.
+# 데이터베이스(MongoDB)는 외부 MongoDB Atlas 를 .env 의 MONGO_URI 로 연결하므로
+# 여기서는 web 서비스만 정의한다. (Atlas 대신 로컬 Mongo 를 쓰려면 아래 mongo 서비스 주석 해제)
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - .:/app          # 코드 변경 즉시 반영 (개발용)
+    # 개발 중에는 자동 리로드되는 runserver 사용 (프로덕션은 Dockerfile 의 gunicorn)
+    command: python manage.py runserver 0.0.0.0:8000
+
+  # ---- 로컬 MongoDB 를 쓰고 싶을 때만 사용 ----
+  # mongo:
+  #   image: mongo:6
+  #   restart: unless-stopped
+  #   environment:
+  #     MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+  #     MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+  #   ports:
+  #     - "27017:27017"
+  #   volumes:
+  #     - mongo_data:/data/db
+  # 이때 .env 의 MONGO_URI 를 mongodb://<user>:<pw>@mongo:27017/ 로 변경한다.
+
+# volumes:
+#   mongo_data:

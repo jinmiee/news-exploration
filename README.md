@@ -35,9 +35,50 @@
 | 데이터 분석    | Pandas, NumPy, Scikit-learn           | 데이터 전처리 및 분석          |
 | AI/NLP    | KoBERT, Word2Vec, Okt, 임베딩 모델         | 감정 분석 및 연관어 분석        |
 | 데이터베이스    | MongoDB, SQLite                       | 뉴스 데이터 및 사용자 데이터 저장   |
-| 데이터 파이프라인 | Apache Airflow, Selenium, YouTube API | 데이터 수집 및 자동화 스케줄링     |
+| 데이터 파이프라인 | Apache Airflow, YouTube Data API      | 데이터 수집 및 자동화 스케줄링     |
 | 시각화       | Chart.js                              | 뉴스 차트 및 통계 시각화        |
 | 운영 환경     | Docker, GitHub                        | 개발 및 협업 환경 구성         |
+
+## 시스템 아키텍처
+
+```mermaid
+flowchart LR
+    subgraph 수집["① 수집 (스케줄: 11시/23시)"]
+        API[YouTube Data API]
+        CRAWL[crawl_all.py<br/>6개 뉴스채널 수집]
+    end
+
+    subgraph 분석["② 전처리 · 분석 (APScheduler)"]
+        CLEAN[clean_title / Okt<br/>전처리·불용어]
+        RANK[TF-IDF + KoBERT 4:6<br/>K-Means 클러스터링<br/>→ Top10 선정]
+        DUP[MinHashLSH + SBERT/SimCSE<br/>중복기사 제거]
+        EMO[감정분석<br/>긍정·부정·중립]
+        REL[연관어 분석<br/>네트워크 그래프]
+    end
+
+    subgraph 저장["③ 저장"]
+        MONGO[(MongoDB<br/>뉴스·댓글·분석결과 캐시)]
+        SQLITE[(SQLite<br/>회원·찜)]
+    end
+
+    subgraph 서비스["④ 서비스 (Django)"]
+        VIEW[views<br/>차트·상세·감정·연관어]
+        WEB[사용자 브라우저]
+        MAIL[이메일 알림]
+    end
+
+    API --> CRAWL --> MONGO
+    MONGO --> CLEAN --> RANK --> MONGO
+    CLEAN --> DUP --> MONGO
+    CLEAN --> EMO --> MONGO
+    CLEAN --> REL --> MONGO
+    MONGO --> VIEW
+    SQLITE --> VIEW
+    VIEW --> WEB
+    분석 -.업데이트 알림.-> MAIL --> WEB
+```
+
+> 분석 결과를 MongoDB에 **미리 계산·캐싱**해 두고, 사용자 요청 시에는 재계산 없이 조회만 하여 응답 속도를 확보하는 구조입니다.
 
 ---
 
@@ -193,11 +234,6 @@
 | 김OO      | NLP, Data       | 감정 분석 데이터 전처리 및 시각화 구현                                       |
 | 곽OO      | FE/BE           | 차트 및 주간 이슈 기능 구현, CSS 수정                                     |
 | 주OO      | NLP, Infra      | 연관어 분석, 모델 적용 및 시각화, 서버 관리 및 배포                              |
-
----|---|---|
-| 남OO (팀장) | Data, DS, FE/BE | 뉴스 분석 알고리즘, 감정 분석, 연관어 분석, 프로젝트 총괄 |
-| 진OO (DE) | Data, DE, FE/BE | MongoDB 구축, Airflow 자동화, 뉴스 데이터 수집/전처리, 로그인/마이페이지 기능 구현 |
-| 고OO | Data, FE/BE | UI/UX 개선, 차트 시각화, 뉴스 상세 페이지 구현 |
 
 ---
 
