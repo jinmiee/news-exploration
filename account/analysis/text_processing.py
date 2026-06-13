@@ -9,6 +9,24 @@ logger = logging.getLogger(__name__)
 #  - Django 기동 시 불필요한 라이브러리 로딩을 피해 시작 속도를 높이고,
 #  - clean_title 등 순수 함수가 무거운 의존성 없이 import/테스트 가능하도록 분리.
 
+# 차트 중요도 점수 가중치 (합 1.0)
+#  - 토픽 중심성: 여러 매체/영상이 동시에 다룬 큰 이슈일수록 높음(단순 조회수와 독립적인 '중요도' 신호)
+#  - 조회수: 대중적 관심도(인기)
+CHART_CENTRALITY_WEIGHT = 0.5
+CHART_VIEW_WEIGHT = 0.5
+
+# Okt 형태소 분석기는 JVM 초기화 비용이 크므로 프로세스당 1회만 생성해 재사용한다.
+_OKT = None
+
+
+def _get_okt():
+    global _OKT
+    if _OKT is None:
+        from konlpy.tag import Okt
+        _OKT = Okt()
+    return _OKT
+
+
 def clean_title(title):
     """
     뉴스 제목에서 /방송사이름만 제거하고 나머지 텍스트는 유지하는 함수
@@ -90,8 +108,7 @@ def process_text(title, transcript=None):
     """
     제목과 스크립트를 전처리하여 결합한 텍스트 반환
     """
-    from konlpy.tag import Okt
-    okt = Okt()
+    okt = _get_okt()
     cleaned_title = clean_title(title)
     stop_words = {'그', '저', '것', '수'}
     processed_title = ' '.join([word for word, tag in okt.pos(cleaned_title) if
@@ -164,11 +181,10 @@ def extract_keywords(corpus, n_keywords=5):
     dict: 각 문서별 중요한 키워드와 점수
     """
     from sklearn.feature_extraction.text import TfidfVectorizer
-    from konlpy.tag import Okt
     import numpy as np
 
-    # 형태소 분석기 (Okt) 초기화
-    okt = Okt()
+    # 형태소 분석기 (Okt) — 싱글톤 재사용
+    okt = _get_okt()
 
     # 텍스트 전처리 함수
     def preprocess_text(text):
@@ -254,116 +270,89 @@ def select_key_news(corpus, n_keywords=5, top_n=10):
     return top_articles, top_keywords
 
 
-def get_top10_chart_based(videos, num_clusters=5, additional_news=3):
+def get_top10_chart_based(videos, top_n=10):
     """
-    클러스터링, TF-IDF, BERT 코사인 유사도를 결합해 혼합 전략으로 상위 10개 동영상을 선정
+    유사 뉴스를 클러스터링해 토픽 중복을 제거하고,
+    '토픽 중요도 + 조회수'를 결합한 중요도 점수로 Top N 을 선정한다.
+
+    중요도 점수 = CHART_CENTRALITY_WEIGHT * 토픽중심성(정규화)
+                + CHART_VIEW_WEIGHT     * 조회수(log 정규화)
+      - 토픽중심성: 다른 기사들과의 (TF-IDF+KoBERT) 하이브리드 유사도 합.
+        여러 매체/영상이 동시에 다룬 큰 이슈일수록 높음 → 조회수와 독립적인 '중요도' 신호.
+      - 조회수: 분포가 크게 치우치므로 log 후 정규화.
+
+    반환 리스트의 순서가 곧 최종 순위(rank)다. (호출부에서 enumerate 로 rank 부여)
     """
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.metrics.pairwise import cosine_similarity
     from sklearn.preprocessing import MinMaxScaler
-
-    # 가중치 설정
-    TFIDF_WEIGHT = 0.4
-    VIEW_WEIGHT = 0.4
-    HYBRID_WEIGHT_TFIDF = 0.4
-    HYBRID_WEIGHT_BERT = 0.6
-
-    # 클러스터 수를 데이터 크기에 따라 동적으로 조정
-    num_clusters = max(2, min(len(videos) // 5, 10))  # 최소 2개, 최대 10개 클러스터
-
-    # 데이터 전처리
-    corpus = []
-    views_list = []
-    processed_videos = []
-
-    for video in videos:
-        combined_text = process_text(video.title, video.transcript or [])
-        corpus.append(combined_text)
-        views_list.append(video.views)
-
-        video.cleaned_title = clean_title(video.title)
-        processed_videos.append(video)
-
-    if not corpus:
-        raise ValueError("Error: corpus is empty. No videos to process.")
-
-    # TF-IDF 계산
-    vectorizer = TfidfVectorizer(max_features=5000, stop_words='english')
-    tfidf_matrix = vectorizer.fit_transform(corpus)
-    tfidf_similarity_matrix = cosine_similarity(tfidf_matrix)
-
-    logger.info(f"TF-IDF Similarity Matrix Shape: {tfidf_similarity_matrix.shape}")  # 디버깅
-
-    # BERT 계산
-    bert_similarity_matrix = get_bert_similarity_batch(corpus, batch_size=32)
-
-    # BERT 유사도 행렬 크기 확인
-    logger.info(f"BERT Similarity Matrix Shape: {bert_similarity_matrix.shape}")  # 디버깅
-
-    # Hybrid Similarity 계산
-    if tfidf_similarity_matrix.shape != bert_similarity_matrix.shape:
-        raise ValueError(f"Shape mismatch: TF-IDF {tfidf_similarity_matrix.shape}, BERT {bert_similarity_matrix.shape}")
-
-    hybrid_similarity_matrix = get_hybrid_similarity(
-        tfidf_similarity_matrix,  # TF-IDF 유사도 행렬
-        bert_similarity_matrix,  # BERT 유사도 행렬
-        HYBRID_WEIGHT_TFIDF,
-        HYBRID_WEIGHT_BERT
-    )
-
-    logger.info(f"Hybrid Similarity Matrix Shape: {hybrid_similarity_matrix.shape}")  # 디버깅
-
-    # Hybrid Similarity Matrix 정규화
-    scaler = MinMaxScaler()
-    normalized_hybrid_similarity = scaler.fit_transform(hybrid_similarity_matrix)
-
-    # 클러스터링 수행 (K-Means)
     from sklearn.cluster import KMeans
-    kmeans = KMeans(n_clusters=num_clusters, random_state=42)
-    cluster_labels = kmeans.fit_predict(normalized_hybrid_similarity)
 
-    # 클러스터별 대표 동영상 선택
-    clusters = {}
-    for i, label in enumerate(cluster_labels):
-        if label not in clusters:
-            clusters[label] = []
-        clusters[label].append((i, processed_videos[i], views_list[i]))  # (인덱스, 동영상 객체, 조회수)
+    videos = list(videos)
+    n = len(videos)
+    if n == 0:
+        raise ValueError("get_top10_chart_based: 입력 영상이 없습니다.")
 
-    cluster_representatives = []
-    for cluster, videos in clusters.items():
-        cluster_center = kmeans.cluster_centers_[cluster]
-        if len(videos) > 0:
-            best_video = min(
-                videos,
-                key=lambda x: (
-                    0.6 * np.linalg.norm(normalized_hybrid_similarity[x[0]] - cluster_center)  # 유사도 중심성
-                    - 0.4 * x[2]  # 조회수
-                )
-            )
-            cluster_representatives.append(best_video[1])  # 동영상 객체 추가
+    # 1) 전처리 + 조회수 수집
+    corpus, views_list = [], []
+    for v in videos:
+        corpus.append(process_text(v.title, v.transcript or []))
+        views_list.append(int(v.views or 0))
+        v.cleaned_title = clean_title(v.title)
 
-    # 핵심 뉴스 추가 (조회수 기준)
-    additional_videos_needed = max(0, 10 - len(cluster_representatives))
-    remaining_videos = sorted(
-        [video for video in processed_videos if video not in cluster_representatives],
-        key=lambda x: x.views,
-        reverse=True
-    )
-    additional_videos = remaining_videos[:additional_videos_needed]
+    # 표본이 너무 적으면 분석을 생략하고 중복 제거 + 조회수 정렬만 수행
+    if n <= 2:
+        uniq = list({v.cleaned_title: v for v in videos}.values())
+        return sorted(uniq, key=lambda v: int(v.views or 0), reverse=True)[:top_n]
 
-    # 최종 10개 동영상 선정
-    final_videos = cluster_representatives + additional_videos
+    # 2) TF-IDF + KoBERT 하이브리드 유사도 행렬
+    tfidf_sim = cosine_similarity(TfidfVectorizer(max_features=5000).fit_transform(corpus))
+    bert_sim = get_bert_similarity_batch(corpus, batch_size=32)
+    if tfidf_sim.shape != bert_sim.shape:
+        raise ValueError(f"Shape mismatch: TF-IDF {tfidf_sim.shape}, BERT {bert_sim.shape}")
+    hybrid = get_hybrid_similarity(tfidf_sim, bert_sim, 0.4, 0.6)
 
-    # 중복 제거 후 상위 10개
-    final_videos = list({video.cleaned_title: video for video in final_videos}.values())
-    final_videos = sorted(final_videos, key=lambda x: x.views, reverse=True)[:10]
+    # 3) 중요도 구성요소를 같은 [0,1] 스케일로 정규화 후 결합
+    mm = MinMaxScaler()
+    centrality = hybrid.sum(axis=1)  # 토픽 중심성(다른 기사와의 유사도 총합)
+    centrality_norm = mm.fit_transform(centrality.reshape(-1, 1)).ravel()
+    views_norm = mm.fit_transform(np.log1p(np.array(views_list, dtype=float)).reshape(-1, 1)).ravel()
+    importance = CHART_CENTRALITY_WEIGHT * centrality_norm + CHART_VIEW_WEIGHT * views_norm
 
-    # 디버깅 로그
-    logger.info("선택된 대표 동영상:")
-    for video in final_videos:
-        logger.info(f"- {video.cleaned_title} (조회수: {video.views})")
+    # 4) 유사 토픽 클러스터링 (중복 제거 / 다양성 확보)
+    num_clusters = min(max(2, n // 5), 10, n)
+    labels = KMeans(n_clusters=num_clusters, random_state=42, n_init=10).fit_predict(hybrid)
 
-    return final_videos
+    # 5) 클러스터별 대표 = 클러스터 내 중요도 최댓값 (스케일이 통일되어 정상 동작)
+    selected = {}
+    for i, label in enumerate(labels):
+        if label not in selected or importance[i] > importance[selected[label]]:
+            selected[label] = i
+    selected_idx = set(selected.values())
+
+    # 6) top_n 에 못 미치면 중요도 높은 순으로 채움
+    for i in sorted(range(n), key=lambda k: importance[k], reverse=True):
+        if len(selected_idx) >= top_n:
+            break
+        selected_idx.add(i)
+
+    # 7) 중요도 내림차순 정렬 + cleaned_title 중복 제거 → 최종 순위
+    final, seen = [], set()
+    for i in sorted(selected_idx, key=lambda k: importance[k], reverse=True):
+        title = videos[i].cleaned_title
+        if title in seen:
+            continue
+        seen.add(title)
+        videos[i].importance_score = round(float(importance[i]), 4)
+        final.append(videos[i])
+        if len(final) >= top_n:
+            break
+
+    logger.info("선택된 Top%d (중요도순):", len(final))
+    for rank, v in enumerate(final, 1):
+        logger.info("  %d. %s (조회수=%s, score=%.3f)", rank, v.cleaned_title, v.views, v.importance_score)
+
+    return final
 
 
 
