@@ -1,8 +1,11 @@
 '''
 pip install konlpy networkx matplotlib pandas
 '''
+import logging
 from collections import defaultdict
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.views import PasswordChangeView
@@ -44,6 +47,7 @@ from datetime import timedelta
 from .models import Like, YouTubeData, WeeklyIssue, Chart, WeeklyIssueDuplicateVideo, ChartDuplicateVideo, \
     RelatedWordAnalysis, Top10Word, BubbleChart, WordcloudPiechart
 from .analysis.visualization import generate_network_graph
+from .services import get_chart_query_window, get_chart_display_window
 
 
 def backtomain(request):
@@ -57,16 +61,8 @@ def chart(request):
     try:
         now = localtime()
 
-        # 기준 시간 설정
-        if now.hour < 11:  # 현재 시간이 오전 11시 이전
-            analysis_start = (now - timedelta(days=1)).replace(hour=11, minute=0, second=0, microsecond=0)
-            analysis_end = (now - timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)
-        elif now.hour < 23:  # 현재 시간이 오전 11시 이후, 오늘 오후 11시 이전
-            analysis_start = (now - timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)
-            analysis_end = now.replace(hour=11, minute=0, second=0, microsecond=0)
-        else:  # 현재 시간이 오후 11시 이후
-            analysis_start = now.replace(hour=11, minute=0, second=0, microsecond=0)
-            analysis_end = now.replace(hour=23, minute=0, second=0, microsecond=0)
+        # 분석 구간 계산(서비스 레이어) → DB 조회용(분=00 기준)
+        analysis_start, analysis_end = get_chart_query_window(now)
 
         analysis_start_utc = analysis_start.astimezone(utc)
         analysis_end_utc = analysis_end.astimezone(utc)
@@ -78,29 +74,21 @@ def chart(request):
         )
         chart_data = sorted(chart_data, key=lambda x: x.rank)[:10]
 
-        # QuerySet 개수를 확인하려면 .count()를 사용
-        print("DEBUG: QuerySet count before sorting:", Chart.objects.filter(
-            upload_date__gte=analysis_start_utc,
-            upload_date__lt=analysis_end_utc
-        ).count())
+        # 화면 표시용 갱신 시각/구간(분=07 기준). analysis_start/end 를 표시용 값으로 덮어씀
+        chart_update_time, analysis_start, analysis_end = get_chart_display_window(now)
 
-        # 리스트의 길이를 확인하려면 len()을 사용
-        print("DEBUG: chart_data count after sorting:", len(chart_data))
-        print(chart_data)
-
-        # Chart 업데이트 시간을 오전 11시 7분, 오후 11시 7분으로 설정
-        if now < now.replace(hour=11, minute=7, second=0, microsecond=0):  # 현재 시간이 오전 11시 7분 이전
-            chart_update_time = now.replace(hour=11, minute=7, second=0, microsecond=0)
-            analysis_start = (now - timedelta(days=1)).replace(hour=23, minute=7, second=0, microsecond=0)
-            analysis_end = now.replace(hour=11, minute=7, second=0, microsecond=0)
-        elif now < now.replace(hour=23, minute=7, second=0, microsecond=0):  # 현재 시간이 오전 11시 7분 이후, 오후 11시 7분 이전
-            chart_update_time = now.replace(hour=23, minute=7, second=0, microsecond=0)
-            analysis_start = now.replace(hour=11, minute=7, second=0, microsecond=0)
-            analysis_end = now.replace(hour=23, minute=7, second=0, microsecond=0)
-        else:  # 현재 시간이 오후 11시 7분 이후
-            chart_update_time = (now + timedelta(days=1)).replace(hour=11, minute=7, second=0, microsecond=0)
-            analysis_start = now.replace(hour=23, minute=7, second=0, microsecond=0)
-            analysis_end = (now + timedelta(days=1)).replace(hour=11, minute=7, second=0, microsecond=0)
+        # 찜 여부를 한 번의 쿼리로 일괄 조회 (N+1 방지)
+        # 기존: 항목마다 YouTubeData.get + Like.exists 를 호출 → 항목 N개당 2N 쿼리
+        # 변경: 사용자의 찜 youtube_data id 집합을 1쿼리로 가져와 메모리에서 판정
+        liked_ids = set()
+        if request.user.is_authenticated:
+            chart_ids = [chart._id for chart in chart_data]
+            liked_ids = set(
+                Like.objects.filter(
+                    user=request.user,
+                    youtube_data_id__in=chart_ids,
+                ).values_list('youtube_data_id', flat=True)
+            )
 
         processed_chart_data = []
         for chart in chart_data:
@@ -119,11 +107,9 @@ def chart(request):
 
                 })
                 if request.user.is_authenticated:
-                    processed_chart_data[-1]['is_liked_by_user'] = Like.objects.filter(user=request.user,
-                                                                                       youtube_data=YouTubeData.objects.get(
-                                                                                           _id=chart._id)).exists()
+                    processed_chart_data[-1]['is_liked_by_user'] = chart._id in liked_ids
             except Exception as e:
-                print(f"Error processing chart data: {e}")
+                logger.exception("차트 항목 처리 중 오류")
 
         # 템플릿에 전달할 데이터 구성
         context = {
@@ -134,12 +120,9 @@ def chart(request):
             "chart_update_time": chart_update_time  # 업데이트 시간 추가
         }
 
-        print("DEBUG: context", context)  # 전달 데이터 확인
         return render(request, 'analysis/chart.html', context)
     except Exception as e:
-        import traceback
-        print(f"Error in chart function: {e}")
-        print(traceback.format_exc())
+        logger.exception("chart 뷰 처리 중 오류")
         return JsonResponse({"error": str(e)}, status=500)
 
 
@@ -179,7 +162,7 @@ def video_details(request):
             return JsonResponse(response_data, safe=False, status=200)
 
         except Exception as e:
-            print(f"Error in video_details function: {e}")
+            logger.exception("video_details 뷰 처리 중 오류")
             return JsonResponse({"error": str(e)}, status=500)
 
     # 요청이 POST 방식이 아닐 경우 에러 응답
@@ -236,7 +219,7 @@ def weekly_issues(request):
         return render(request, 'analysis/weekly_issues.html', context)
 
     except Exception as e:
-        print(f"Error in weekly_issues function: {e}")
+        logger.exception("weekly_issues 뷰 처리 중 오류")
         return JsonResponse({"error": str(e)}, status=500)
 
 def get_related_duplicate_videos(request):
@@ -256,7 +239,6 @@ def get_related_duplicate_videos(request):
 
         # 3. 대상 비디오의 텍스트 전처리
         base_text = process_text(video.title, video.transcript or [])
-        print(f"DEBUG: Base text for similarity: {base_text}")
 
         # 4. 중복 모델 결정
         if WeeklyIssue.objects.filter(url=video_url).exists():
@@ -281,20 +263,17 @@ def get_related_duplicate_videos(request):
         ]
 
         # 7. TF-IDF 계산
-        print("DEBUG: Calculating TF-IDF similarities...")
         vectorizer = TfidfVectorizer(max_features=5000, stop_words='english')
         tfidf_matrix = vectorizer.fit_transform(candidate_corpus)
         base_vector = vectorizer.transform([base_text])
         tfidf_similarities = cosine_similarity(base_vector, tfidf_matrix).flatten()
 
         # 8. KoBERT 유사도 계산
-        print("DEBUG: Calculating KoBERT similarities...")
         bert_corpus = [base_text] + candidate_corpus
         bert_similarity_matrix = get_bert_similarity_batch(bert_corpus, batch_size=32)
         bert_similarities = bert_similarity_matrix[0, 1:]
 
         # 9. Hybrid 유사도 계산
-        print("DEBUG: Calculating hybrid similarities...")
         hybrid_similarities = get_hybrid_similarity(
             tfidf_similarities.reshape(-1, 1),
             bert_similarities.reshape(-1, 1),
@@ -306,7 +285,6 @@ def get_related_duplicate_videos(request):
         hybrid_threshold = 0.6  # 기존 0.7에서 0.6으로 조정
         duplicates = []
         for candidate, similarity in zip(recent_candidates, hybrid_similarities):
-            print(f"DEBUG: Title: {candidate.title}, Similarity: {similarity}")
             if similarity > hybrid_threshold:
                 duplicates.append(candidate)
 
@@ -326,7 +304,7 @@ def get_related_duplicate_videos(request):
         return JsonResponse({"duplicates": duplicate_list}, safe=False, status=200)
 
     except Exception as e:
-        print(f"중복 동영상 검색 오류: {e}")
+        logger.exception("중복 동영상 검색 중 오류")
         return JsonResponse({"error": "중복 동영상 검색 중 오류가 발생했습니다."}, status=500)
 
 #상세분석
@@ -406,7 +384,7 @@ def detail(request, video_id=None):
                             news.title = clean_title(news.title)
                             try:
                                 news.video_id = news.url.split('v=')[1].split('&')[0]
-                            except:
+                            except (IndexError, AttributeError):
                                 news.video_id = None
                             cleaned_news.append(news)
                         categorized_news[keyword] = cleaned_news
@@ -472,7 +450,7 @@ def detail(request, video_id=None):
             return render(request, 'analysis/detail.html', context)
 
     except Exception as e:
-        print(f"Error in detail function: {e}")
+        logger.exception("detail 뷰 처리 중 오류")
         return JsonResponse({"error": str(e)}, status=500)
 
 
@@ -488,7 +466,6 @@ def emotion(request):
     비디오 URL을 기반으로 감정 분석 데이터를 데이터베이스에서 조회하고 반환합니다.
     """
     video_url = request.GET.get('url')
-    print(f"요청된 비디오 URL: {video_url}")
 
     # YouTubeData 모델에서 비디오 조회
     video = YouTubeData.objects.filter(url=video_url).first()
@@ -537,7 +514,7 @@ def emotion(request):
             return render(request, 'analysis/emotion.html', context)
 
         except Exception as e:
-            print(f"오류 발생: {e}")
+            logger.exception("emotion 뷰 처리 중 오류")
             context = {'error_message': f"처리 중 오류가 발생했습니다: {str(e)}"}
             return render(request, 'analysis/emotion.html', context)
 
@@ -609,7 +586,7 @@ def relate(request):
                             news.title = clean_title(news.title)
                             try:
                                 news.video_id = news.url.split('v=')[1].split('&')[0]
-                            except:
+                            except (IndexError, AttributeError):
                                 news.video_id = None
                             cleaned_news.append(news)
                         categorized_news[keyword] = cleaned_news
@@ -629,7 +606,7 @@ def relate(request):
             }
             
         except Exception as e:
-            print(f"분석 중 오류 발생: {str(e)}")
+            logger.exception("relate 분석 중 오류")
             context = {
                 'section': 'relate',
                 'error_message': '분석 중 오류가 발생했습니다.'
