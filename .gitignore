@@ -9,3 +9,18 @@ linux
 staticfiles/
 models/
 custom_model/
+
+# 로컬 DB / IDE / 산출물
+db.sqlite3
+*.iml
+.idea/
+output/
+
+# 테스트 캐시
+.pytest_cache/
+
+# Claude Code 로컬 설정
+.claude/
+
+# 로그
+*.log
