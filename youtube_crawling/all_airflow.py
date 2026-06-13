@@ -8,6 +8,10 @@
 # from isodate import parse_duration
 import os
 from dotenv import load_dotenv
+import logging
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s %(name)s: %(message)s')
+logger = logging.getLogger(__name__)
+
 
 load_dotenv()
 
@@ -57,7 +61,7 @@ class YouTubeDataCollector:
             transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=['ko'])
             return [{"start": entry["start"], "text": entry["text"]} for entry in transcript]
         except Exception as e:
-            print(f"{video_id}: 자막을 가져오는 데 실패했습니다 - {e}")
+            logger.error(f"{video_id}: 자막을 가져오는 데 실패했습니다 - {e}")
             return None
 
     def get_video_comments(self, video_id):
@@ -103,9 +107,9 @@ class YouTubeDataCollector:
         except Exception as e:
             # 댓글 비활성화 에러 처리
             if "commentsDisabled" in str(e):
-                print(f"댓글 비활성화된 동영상: {video_id}")
+                logger.info(f"댓글 비활성화된 동영상: {video_id}")
             else:
-                print(f"댓글 수집 오류: {e}")
+                logger.error(f"댓글 수집 오류: {e}")
         return comments
 
     def collect_channel_data(self, channel_name, channel_id):
@@ -144,28 +148,28 @@ class YouTubeDataCollector:
                     try:
                         duration = parse_duration(video['contentDetails']['duration']).total_seconds()
                     except Exception as e:
-                        print(f"동영상 길이 파싱 실패: {e}")
+                        logger.error(f"동영상 길이 파싱 실패: {e}")
                         continue
 
                     # 10분(600초) 이상인 동영상은 건너뛰기
                     if duration > 600:
-                        print(f"[필터] 10분 초과: {video['id']}, 길이: {duration // 60}분")
+                        logger.info(f"[필터] 10분 초과: {video['id']}, 길이: {duration // 60}분")
                         continue
 
                     # 실시간 동영상 건너뛰기
                     if video['snippet'].get('liveBroadcastContent') != 'none':
-                        print(f"라이브 동영상 건너뜀: {video['id']}")
+                        logger.info(f"라이브 동영상 건너뜀: {video['id']}")
                         continue
 
                     # 댓글이 비활성화된 경우 건너뛰기
                     comments = self.get_video_comments(video['id'])
                     if not comments:  # 댓글이 비활성화된 경우
-                        print(f"댓글 비활성화된 동영상 건너뜀: {video['id']}")
+                        logger.info(f"댓글 비활성화된 동영상 건너뜀: {video['id']}")
                         continue
 
                     transcript = self.get_video_transcript(video['id'])
                     if not transcript:  # 자막이 없거나 가져오기 실패한 경우
-                        print(f"자막 비활성화된 동영상 건너뜀: {video['id']}")
+                        logger.info(f"자막 비활성화된 동영상 건너뜀: {video['id']}")
                         continue  # 자막이 없는 경우 건너뛰기
 
                     # 동영상 데이터 생성
@@ -213,12 +217,12 @@ class YouTubeDataCollector:
                         upsert=True
                     )
                     if result.upserted_id:
-                        print(f"[{channel_name}] 새로운 데이터 삽입: {video['title']}")
+                        logger.info(f"[{channel_name}] 새로운 데이터 삽입: {video['title']}")
                     else:
-                        print(f"[{channel_name}] 기존 데이터 업데이트: {video['title']}")
+                        logger.info(f"[{channel_name}] 기존 데이터 업데이트: {video['title']}")
 
         except Exception as e:
-            print(f"{channel_name} 데이터 수집 오류: {e}")
+            logger.error(f"{channel_name} 데이터 수집 오류: {e}")
 
     def collect_all_channel_data(self):
         """

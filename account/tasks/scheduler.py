@@ -6,7 +6,10 @@ from apscheduler.triggers.interval import IntervalTrigger
 from django.core.mail import send_mail
 from pymongo import MongoClient
 import os
+import logging
 from dotenv import load_dotenv
+logger = logging.getLogger(__name__)
+
 
 load_dotenv()
 
@@ -16,7 +19,7 @@ from account.analysis.emotion_db import save_all_issues_to_mongodb, save_all_iss
 
 
 def send_email_task():
-    print("send_email_task 실행됨")  # 디버깅 로그
+    logger.info("send_email_task 실행됨")  # 디버깅 로그
     from django.contrib.auth.models import User  # 함수 내부에서 import하여 초기화 시점 문제 방지
     users = User.objects.all()
     subject = "그게 뭔데?! 차트업데이트 알림"
@@ -48,7 +51,7 @@ def start_scheduler(save_chart_to_mongo=None):
     def ensure_scheduler_running():
         if not scheduler.running or scheduler.state == 0:  # 0은 종료 상태
             scheduler.start()
-            print("스케줄러가 시작되었습니다.")
+            logger.info("스케줄러가 시작되었습니다.")
 
     # 중복 등록 방지 및 기존 작업 제거
     def add_job_if_not_exists(job_id, func, trigger, **kwargs):
@@ -72,7 +75,7 @@ def start_scheduler(save_chart_to_mongo=None):
         trigger=CronTrigger(hour=0, minute=5),
         max_instances = 3  # 최대 3개까지 중복 실행 허용
     )
-    print("daily_top10 저장 작업이 실행됩니다.")
+    logger.info("daily_top10 저장 작업이 실행됩니다.")
 
     add_job_if_not_exists(
         'save_top10_to_chart',
@@ -80,7 +83,7 @@ def start_scheduler(save_chart_to_mongo=None):
         trigger=CronTrigger(hour='11,23', minute=5),  # 매시 5분에 실행
         max_instances=3  # 최대 3개까지 중복 실행 허용
     )
-    print("Chart 저장 작업이 매시 5분에 실행되도록 등록되었습니다.")
+    logger.info("Chart 저장 작업이 매시 5분에 실행되도록 등록되었습니다.")
 
     add_job_if_not_exists(
         'extract_weekly_duplicates',
@@ -88,7 +91,7 @@ def start_scheduler(save_chart_to_mongo=None):
         trigger=CronTrigger(hour=0, minute=10),
         max_instances=3  # 중복 실행 허용 추가
     )
-    print("Weekly Issues 중복 데이터 추출 작업이 실행됩니다.")
+    logger.info("Weekly Issues 중복 데이터 추출 작업이 실행됩니다.")
 
     add_job_if_not_exists(
         'extract_chart_duplicates',
@@ -96,14 +99,14 @@ def start_scheduler(save_chart_to_mongo=None):
         trigger=CronTrigger(hour='11,23', minute=10),  # 매시 5분에 실행
         max_instances=3  # 중복 실행 허용 추가
     )
-    print("Chart 중복 데이터 추출 작업이 매시 5분에 실행되도록 등록되었습니다.")
+    logger.info("Chart 중복 데이터 추출 작업이 매시 5분에 실행되도록 등록되었습니다.")
 
     add_job_if_not_exists(
         'delete_expired_charts',
         delete_expired_charts,
         trigger=CronTrigger(hour=0)
     )
-    print("스케줄러가 시작되었습니다: 24시간 지난 Chart 데이터를 삭제합니다.")
+    logger.info("스케줄러가 시작되었습니다: 24시간 지난 Chart 데이터를 삭제합니다.")
 
     # Django 종료 시 스케줄러 중지
     def stop_scheduler():
@@ -120,7 +123,7 @@ def start_scheduler(save_chart_to_mongo=None):
         trigger=CronTrigger(hour=0, minute=7),
         max_instances=3  # 중복 실행 허용 추가
     )
-    print("스케줄러가 시작되었습니다: 파이차트 시각화(주간이슈)가 0시 7분에 실행됩니다")
+    logger.info("스케줄러가 시작되었습니다: 파이차트 시각화(주간이슈)가 0시 7분에 실행됩니다")
 
     add_job_if_not_exists(
         'save_all_visualizations_chart',
@@ -128,7 +131,7 @@ def start_scheduler(save_chart_to_mongo=None):
         trigger=CronTrigger(hour='11,23', minute=7),
         max_instances=3  # 중복 실행 허용 추가
     )
-    print("스케줄러가 시작되었습니다: 파이차트 시각화(차트)가 11시 7분에 실행됩니다")
+    logger.info("스케줄러가 시작되었습니다: 파이차트 시각화(차트)가 11시 7분에 실행됩니다")
 
 ##########################
     add_job_if_not_exists(
@@ -137,7 +140,7 @@ def start_scheduler(save_chart_to_mongo=None):
         trigger=CronTrigger(hour=0, minute=7),
         max_instances = 3  # 중복 실행 허용 추가
     )
-    print("스케줄러가 시작되었습니다: 버블차트 시각화(주간이슈) 0시 7분에 실행됩니다")
+    logger.info("스케줄러가 시작되었습니다: 버블차트 시각화(주간이슈) 0시 7분에 실행됩니다")
 
 
 
@@ -147,7 +150,7 @@ def start_scheduler(save_chart_to_mongo=None):
         trigger=CronTrigger(hour='11,23',minute=7),
         max_instances=3  # 중복 실행 허용 추가
     )
-    print("스케줄러가 시작되었습니다: 버블차트 시각화(차트)가 11시 7분에 실행됩니다")
+    logger.info("스케줄러가 시작되었습니다: 버블차트 시각화(차트)가 11시 7분에 실행됩니다")
 
 ###########################
 
@@ -157,7 +160,7 @@ def start_scheduler(save_chart_to_mongo=None):
         trigger=CronTrigger(hour=0, minute=7),
         max_instances=3  # 중복 실행 허용 추가
     )
-    print("스케줄러가 시작되었습니다: TOP10 Word 시각화(주간이슈)가 11시 9분에 실행됩니다 ")
+    logger.info("스케줄러가 시작되었습니다: TOP10 Word 시각화(주간이슈)가 11시 9분에 실행됩니다 ")
 
 
     add_job_if_not_exists(
@@ -166,6 +169,6 @@ def start_scheduler(save_chart_to_mongo=None):
         trigger=CronTrigger(hour='11,23',minute=7),
         max_instances=3  # 중복 실행 허용 추가
     )
-    print("스케줄러가 시작되었습니다: TOP10 Word 시각화(차트)가 11시 9분에 실행됩니다   ")
+    logger.info("스케줄러가 시작되었습니다: TOP10 Word 시각화(차트)가 11시 9분에 실행됩니다   ")
 
 

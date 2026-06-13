@@ -1,3 +1,4 @@
+import logging
 import re
 import platform
 
@@ -18,6 +19,8 @@ import os
 import pandas as pd
 import platform
 import matplotlib
+logger = logging.getLogger(__name__)
+
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.font_manager
@@ -318,7 +321,7 @@ def analyze_sentiment(word):
         else:
             return '긍정'  # 긍정
     except Exception as e:
-        print(f"감정 분석 오류: {e}")
+        logger.error(f"감정 분석 오류: {e}")
         return '중립'  # 오류 발생 시 중립 반환
 
 import numpy as np
@@ -648,38 +651,38 @@ from collections import Counter
 def generate_tfidf_sentiment_visualizations(comments):
     # 1. 댓글 전처리
     try:
-        print("댓글 전처리 시작...")
+        logger.info("댓글 전처리 시작...")
         processed_comments = [preprocess_text(comment) for comment in comments]
         if not processed_comments:
             raise ValueError("처리된 댓글이 없습니다. 입력된 댓글을 확인해 주세요.")
-        print(f"처리된 댓글의 개수: {len(processed_comments)}개\n")
+        logger.info(f"처리된 댓글의 개수: {len(processed_comments)}개\n")
     except Exception as e:
-        print(f"댓글 전처리 오류: {e}")
+        logger.error(f"댓글 전처리 오류: {e}")
         return "댓글 전처리 오류"
 
     # 2. 명사와 동사만 추출
     try:
-        print("명사와 동사 추출 시작...")
+        logger.info("명사와 동사 추출 시작...")
         extracted_words = []
         for comment in processed_comments:
             nouns_and_verbs = extract_nouns_and_verbs(comment)
             extracted_words.append(" ".join(nouns_and_verbs))
-        print(f"명사와 동사 추출 완료: {extracted_words[:5]}...")
+        logger.info(f"명사와 동사 추출 완료: {extracted_words[:5]}...")
     except Exception as e:
-        print(f"명사 및 동사 추출 오류: {e}")
+        logger.error(f"명사 및 동사 추출 오류: {e}")
         return "명사 및 동사 추출 오류"
 
     # 3. TF-IDF 분석을 통한 중요한 단어 추출
     try:
-        print("TF-IDF 분석 시작...")
+        logger.info("TF-IDF 분석 시작...")
         tfidf_vectorizer = TfidfVectorizer(stop_words='english')
         tfidf_matrix = tfidf_vectorizer.fit_transform(extracted_words)
         feature_names = tfidf_vectorizer.get_feature_names_out()
         tfidf_scores = tfidf_matrix.sum(axis=0).A1
         word_score_pairs = list(zip(feature_names, tfidf_scores))
-        print(f"TF-IDF 분석 완료: {word_score_pairs[:5]}...")
+        logger.info(f"TF-IDF 분석 완료: {word_score_pairs[:5]}...")
     except Exception as e:
-        print(f"TF-IDF 분석 오류: {e}")
+        logger.error(f"TF-IDF 분석 오류: {e}")
         return "TF-IDF 분석 오류"
 
     # 4. TF-IDF 값 내림차순으로 정렬
@@ -698,14 +701,14 @@ def generate_tfidf_sentiment_visualizations(comments):
 
     # 7. 빈도가 높은 상위 10개 단어 추출
     top_10_words = word_counts.most_common(10)
-    print(f"빈도가 높은 상위 10개 단어: {top_10_words}\n")
+    logger.info(f"빈도가 높은 상위 10개 단어: {top_10_words}\n")
 
     # 8. 감정 분석 결과 수집
     sentiment_results = []
 
     # 9. 각 단어에 대해 감정 분석 수행
     for rank, (word, frequency) in enumerate(top_10_words, start=1):
-        print(f"순위 {rank}, 단어: {word}, 빈도: {frequency}에 대해 감정 분석 중...")
+        logger.info(f"순위 {rank}, 단어: {word}, 빈도: {frequency}에 대해 감정 분석 중...")
         sentiment = analyze_sentiment(word)  # 감정 분석 수행
         sentiment_results.append((rank, word, sentiment))
 
@@ -770,4 +773,4 @@ def main():
     result_html_table = save_visualizations_with_tfidf(comment_texts)
 
     # 결과를 출력 (또는 HTML 파일로 저장 등)
-    print(result_html_table)
+    logger.info(result_html_table)

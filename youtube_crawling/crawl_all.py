@@ -5,6 +5,10 @@ import pandas as pd
 import pytz
 import os
 from dotenv import load_dotenv
+import logging
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s %(name)s: %(message)s')
+logger = logging.getLogger(__name__)
+
 
 load_dotenv()
 
@@ -61,7 +65,7 @@ def get_video_comments(video_id):
             else:
                 break
     except Exception as e:
-        print(f"댓글 수집 오류: {e}")
+        logger.error(f"댓글 수집 오류: {e}")
     return comments
 
 def set_video(channel_name, channel_id):
@@ -126,9 +130,9 @@ def set_video(channel_name, channel_id):
 
         if videos:
             collection.insert_many(videos)
-            print(f"{channel_name} 데이터 저장 완료 (상위 20개)")
+            logger.info(f"{channel_name} 데이터 저장 완료 (상위 20개)")
     except Exception as e:
-        print(f"{channel_name} 데이터 수집 오류: {e}")
+        logger.error(f"{channel_name} 데이터 수집 오류: {e}")
 
 # 모든 채널 데이터 수집 실행
 for name, channel_id in channels.items():

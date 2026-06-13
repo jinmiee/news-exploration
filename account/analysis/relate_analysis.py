@@ -104,7 +104,7 @@ def relate(request):
             return render(request, 'analysis/relate.html', context)
             
         except Exception as e:
-            print(f"분석 중 오류 발생: {str(e)}")
+            logger.error(f"분석 중 오류 발생: {str(e)}")
             context = {
                 'section': 'relate',
                 'error_message': '분석 중 오류가 발생했습니다.'
@@ -297,7 +297,7 @@ def find_similar_keywords_lsh(target_keyword, candidate_keywords, threshold=0.8)
 
 def analyze_related_words(video_desc, transcript, clean_title_func=None):
     try:
-        print("\n[연관어 분석 시작]")
+        logger.info("\n[연관어 분석 시작]")
         
         # clean_title_func가 전달되지 않았다면 원본 텍스트 사용
         if clean_title_func:
@@ -313,7 +313,7 @@ def analyze_related_words(video_desc, transcript, clean_title_func=None):
         
         # 1. 설명에서 모든 키워드 추출
         desc_keywords = extract_keywords_from_desc(cleaned_desc)
-        print(f"[설명 키워드] 추출된 키워드 ({len(desc_keywords)}개): {desc_keywords}")
+        logger.info(f"[설명 키워드] 추출된 키워드 ({len(desc_keywords)}개): {desc_keywords}")
         
         # 2. 자막 처리 및 상위 키워드 추출
         transcript_keywords = []
@@ -327,11 +327,11 @@ def analyze_related_words(video_desc, transcript, clean_title_func=None):
                 
             # 자막에서 키워드 추출
             all_transcript_keywords = extract_keywords_from_desc(transcript_text)
-            print(f"[자막] 전체 추출 키워드 수: {len(all_transcript_keywords)}개")
-            print(f"[자막] 추출된 전체 키워드: {all_transcript_keywords}")  # 디버깅용
+            logger.info(f"[자막] 전체 추출 키워드 수: {len(all_transcript_keywords)}개")
+            logger.info(f"[자막] 추출된 전체 키워드: {all_transcript_keywords}")  # 디버깅용
             
             if not all_transcript_keywords:
-                print("[경고] 자막에서 추출된 키워드가 없습니다")
+                logger.info("[경고] 자막에서 추출된 키워드가 없습니다")
                 return nx.Graph(), [], [], None
             
             # TF-IDF 산 부분 수정
@@ -407,8 +407,8 @@ def analyze_related_words(video_desc, transcript, clean_title_func=None):
                     key=lambda x: (-x[1], x[0])
                 )[:TOP_KEYWORDS_COUNT]]
                 
-                print(f"[자막] 선정된 상위 {TOP_KEYWORDS_COUNT}개 키워드: {transcript_keywords}")
-                print(f"[자막] 각 키워드의 중요도 점수: {[(k, round(keyword_importance[k], 3)) for k in transcript_keywords]}")
+                logger.info(f"[자막] 선정된 상위 {TOP_KEYWORDS_COUNT}개 키워드: {transcript_keywords}")
+                logger.info(f"[자막] 각 키워드의 중요도 점수: {[(k, round(keyword_importance[k], 3)) for k in transcript_keywords]}")
                 
             except Exception as e:
                 logger.error(f"TF-IDF 계산 중 오류: {str(e)}")

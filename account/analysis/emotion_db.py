@@ -1,3 +1,4 @@
+import logging
 import re
 import platform
 import matplotlib.font_manager as fm
@@ -16,6 +17,8 @@ import os
 import pandas as pd
 import matplotlib
 from account.views import chart
+logger = logging.getLogger(__name__)
+
 
 
 matplotlib.use('Agg')
@@ -339,7 +342,7 @@ def analyze_sentiment(word):
         else:
             return '긍정'  # 긍정
     except Exception as e:
-        print(f"감정 분석 오류: {e}")
+        logger.error(f"감정 분석 오류: {e}")
         return '중립'  # 오류 발생 시 중립 반환
 
 
@@ -502,10 +505,10 @@ def save_bubble_chart_with_tfidf(comments, video_url,upload_date ):
         }
 
         inserted_id = collection.insert_one(document).inserted_id
-        print(f"MongoDB 저장 완료! ID: {inserted_id}")
+        logger.info(f"MongoDB 저장 완료! ID: {inserted_id}")
 
     except Exception as e:
-        print(f"MongoDB 저장 중 오류 발생: {e}")
+        logger.error(f"MongoDB 저장 중 오류 발생: {e}")
 
     finally:
         client.close()
@@ -522,7 +525,7 @@ def save_all_historical_bubble_charts():
         all_issues = WeeklyIssue.objects.all()
 
         if not all_issues.exists():
-            print("WeeklyIssue에 저장된 데이터가 없습니다.")
+            logger.info("WeeklyIssue에 저장된 데이터가 없습니다.")
             return
 
         # MongoDB 클라이언트 연결
@@ -533,13 +536,13 @@ def save_all_historical_bubble_charts():
         for issue in all_issues:
             # 댓글이 없는 경우 스킵
             if not issue.comments:
-                print(f"Video {issue.title}에 댓글이 없습니다. 스킵합니다.")
+                logger.info(f"Video {issue.title}에 댓글이 없습니다. 스킵합니다.")
                 continue
 
             # 중복 URL 확인
             video_url = issue.url
             if collection.find_one({"video_url": video_url}):
-                print(f"Video {issue.title}의 URL({video_url})이 이미 존재합니다. 스킵합니다.")
+                logger.info(f"Video {issue.title}의 URL({video_url})이 이미 존재합니다. 스킵합니다.")
                 continue
 
             # 버블 차트 생성 및 저장
@@ -557,20 +560,20 @@ def save_all_historical_bubble_charts():
 
                 # MongoDB에 버블 차트 저장
                 inserted_id = collection.insert_one(document).inserted_id
-                print(f"MongoDB 저장 완료! ID: {inserted_id}")
+                logger.info(f"MongoDB 저장 완료! ID: {inserted_id}")
 
                 # WeeklyIssue 모델에 버블 차트 저장
                 issue.bubble_chart = bubble_chart_base64  # 실제 모델에 맞게 수정 필요
                 issue.save()
 
-                print(f"{issue.title}의 버블 차트 생성 및 저장 성공!")
+                logger.info(f"{issue.title}의 버블 차트 생성 및 저장 성공!")
             except Exception as e:
-                print(f"Video {issue.title}의 버블 차트 생성 중 오류 발생: {e}")
+                logger.error(f"Video {issue.title}의 버블 차트 생성 중 오류 발생: {e}")
 
-        print("모든 버블 차트 생성 및 저장 작업 완료.")
+        logger.info("모든 버블 차트 생성 및 저장 작업 완료.")
 
     except Exception as e:
-        print(f"save_all_historical_bubble_charts 실행 중 오류 발생: {e}")
+        logger.error(f"save_all_historical_bubble_charts 실행 중 오류 발생: {e}")
 
 
 
@@ -581,7 +584,7 @@ def save_all_historical_bubble_charts_CHART():
         all_issues = Chart.objects.all()
 
         if not all_issues.exists():
-            print("Chart에 저장된 데이터가 없습니다.")
+            logger.info("Chart에 저장된 데이터가 없습니다.")
             return
 
         # MongoDB 클라이언트 연결
@@ -592,13 +595,13 @@ def save_all_historical_bubble_charts_CHART():
         for issue in all_issues:
             # 댓글이 없는 경우 스킵
             if not issue.comments:
-                print(f"Video {issue.title}에 댓글이 없습니다. 스킵합니다.")
+                logger.info(f"Video {issue.title}에 댓글이 없습니다. 스킵합니다.")
                 continue
 
             # 중복 URL 확인
             video_url = issue.url  # video_url 추가 **수정됨**
             if collection.find_one({"video_url": video_url}):
-                print(f"Video {issue.title}의 URL({video_url})이 이미 존재합니다. 스킵합니다.")
+                logger.info(f"Video {issue.title}의 URL({video_url})이 이미 존재합니다. 스킵합니다.")
                 continue
 
             # 버블 차트 생성 및 저장
@@ -616,20 +619,20 @@ def save_all_historical_bubble_charts_CHART():
 
                 # 버블 차트를 MongoDB에 저장
                 inserted_id = collection.insert_one(document).inserted_id
-                print(f"MongoDB 저장 완료! ID: {inserted_id}")
+                logger.info(f"MongoDB 저장 완료! ID: {inserted_id}")
 
                 # Chart에 버블 차트 이미지 저장
                 issue.bubble_chart = bubble_chart_base64  # 예시로 추가된 필드, 실제로 차트를 저장할 방법에 맞게 수정 필요
                 issue.save()  # 데이터를 저장 (필드가 없다면 모델에 맞게 필드 추가 필요)
 
-                print(f"{issue.title}의 버블 차트 생성 및 저장 성공!")
+                logger.info(f"{issue.title}의 버블 차트 생성 및 저장 성공!")
             except Exception as e:
-                print(f"Video {issue.title}의 버블 차트 생성 중 오류 발생: {e}")
+                logger.error(f"Video {issue.title}의 버블 차트 생성 중 오류 발생: {e}")
 
-        print("모든 버블 차트 생성 및 저장 작업 완료.")
+        logger.info("모든 버블 차트 생성 및 저장 작업 완료.")
 
     except Exception as e:
-        print(f"save_all_historical_bubble_charts 실행 중 오류 발생: {e}")
+        logger.error(f"save_all_historical_bubble_charts 실행 중 오류 발생: {e}")
 
 
 
@@ -808,10 +811,10 @@ def save_visualizations_with_tfidf(comments, video_url, upload_date):
         }
 
         inserted_id = collection.insert_one(document).inserted_id
-        print(f"MongoDB 저장 완료! ID: {inserted_id}")
+        logger.info(f"MongoDB 저장 완료! ID: {inserted_id}")
 
     except Exception as e:
-        print(f"MongoDB 저장 중 오류 발생: {e}")
+        logger.error(f"MongoDB 저장 중 오류 발생: {e}")
 
     finally:
         client.close()
@@ -847,12 +850,12 @@ def remove_duplicate_documents():
             # 하나만 남기고 나머지는 삭제
             ids_to_delete = ids[1:]  # 첫 번째 ID를 제외한 나머지
             collection.delete_many({"_id": {"$in": ids_to_delete}})
-            print(f"URL {duplicate['_id']}의 중복 문서를 삭제했습니다.")
+            logger.info(f"URL {duplicate['_id']}의 중복 문서를 삭제했습니다.")
 
-        print("중복 문서 삭제 작업 완료.")
+        logger.info("중복 문서 삭제 작업 완료.")
 
     except Exception as e:
-        print(f"중복 문서 삭제 중 오류 발생: {e}")
+        logger.error(f"중복 문서 삭제 중 오류 발생: {e}")
 
     finally:
         client.close()
@@ -864,13 +867,13 @@ def save_all_visualizations():
         all_issues = WeeklyIssue.objects.all()
 
         if not all_issues.exists():
-            print("WeeklyIssue에 저장된 데이터가 없습니다.")
+            logger.info("WeeklyIssue에 저장된 데이터가 없습니다.")
             return
 
         for issue in all_issues:
             # 댓글이 없는 경우 스킵
             if not issue.comments:
-                print(f"Video {issue.title}에 댓글이 없습니다. 스킵합니다.")
+                logger.info(f"Video {issue.title}에 댓글이 없습니다. 스킵합니다.")
                 continue
 
             # MongoDB 연결 설정
@@ -879,13 +882,13 @@ def save_all_visualizations():
                 db = client['youtube_data']
                 collection = db['wordcloud_pie_chart']
             except Exception as e:
-                print(f"MongoDB 연결 오류: {e}")
+                logger.error(f"MongoDB 연결 오류: {e}")
                 continue
 
             # MongoDB에서 중복 데이터 확인
             existing_document = collection.find_one({"video_url": issue.url})
             if existing_document:
-                print(f"Video {issue.title}의 데이터가 이미 존재합니다. 스킵합니다.")
+                logger.info(f"Video {issue.title}의 데이터가 이미 존재합니다. 스킵합니다.")
                 continue
 
             # TF-IDF 분석 및 감정 분석 후 워드클라우드, 파이차트 생성
@@ -899,15 +902,15 @@ def save_all_visualizations():
                 if not wordcloud_base64 or not pie_chart_base64:
                     raise ValueError(f"Wordcloud or Pie chart generation failed for {issue.title}")
 
-                print(f"{issue.title}의 워드클라우드 및 파이차트 저장 성공!")
+                logger.info(f"{issue.title}의 워드클라우드 및 파이차트 저장 성공!")
 
             except Exception as e:
-                print(f"Video {issue.title}의 분석 및 저장 중 오류 발생: {e}")
+                logger.error(f"Video {issue.title}의 분석 및 저장 중 오류 발생: {e}")
 
-        print("모든 데이터에 대한 분석 및 저장 작업 완료.")
+        logger.info("모든 데이터에 대한 분석 및 저장 작업 완료.")
 
     except Exception as e:
-        print(f"save_all_visualizations 실행 중 오류 발생: {e}")
+        logger.error(f"save_all_visualizations 실행 중 오류 발생: {e}")
 
 
 
@@ -918,13 +921,13 @@ def save_all_visualizations_chart():
         all_issues = Chart.objects.all()
 
         if not all_issues.exists():
-            print("Chart에 저장된 데이터가 없습니다.")
+            logger.info("Chart에 저장된 데이터가 없습니다.")
             return
 
         for issue in all_issues:
             # 댓글이 없는 경우 스킵
             if not issue.comments:
-                print(f"Video {issue.title}에 댓글이 없습니다. 스킵합니다.")
+                logger.info(f"Video {issue.title}에 댓글이 없습니다. 스킵합니다.")
                 continue
 
             # MongoDB 연결 설정
@@ -935,10 +938,10 @@ def save_all_visualizations_chart():
             # MongoDB에서 중복 데이터 확인
             existing_document = collection.find_one({"video_url": issue.url})
             if existing_document:
-                print(f"Video {issue.title}의 데이터가 이미 존재합니다. 스킵합니다.")
+                logger.info(f"Video {issue.title}의 데이터가 이미 존재합니다. 스킵합니다.")
                 # 중복된 경우 아래 코드로 삭제 후 재생성할 수 있음
                 # collection.delete_one({"video_url": issue.url})
-                # print(f"Video {issue.title}의 기존 데이터를 삭제했습니다.")
+                # logger.info(f"Video {issue.title}의 기존 데이터를 삭제했습니다.")
                 continue
 
             # TF-IDF 분석 및 감정 분석 후 워드클라우드, 파이차트 생성
@@ -948,7 +951,7 @@ def save_all_visualizations_chart():
                 video_url = issue.url
                 wordcloud_base64, pie_chart_base64 = save_visualizations_with_tfidf(issue.comments, upload_date, video_url)
 
-                print(f"{issue.title}의 워드클라우드 및 파이차트 저장 성공!")
+                logger.info(f"{issue.title}의 워드클라우드 및 파이차트 저장 성공!")
 
                 # MongoDB에 결과 저장
                 document = {
@@ -959,15 +962,15 @@ def save_all_visualizations_chart():
                 }
 
                 inserted_id = collection.insert_one(document).inserted_id
-                print(f"MongoDB 저장 완료! ID: {inserted_id}")
+                logger.info(f"MongoDB 저장 완료! ID: {inserted_id}")
 
             except Exception as e:
-                print(f"Video {issue.title}의 분석 및 저장 중 오류 발생: {e}")
+                logger.error(f"Video {issue.title}의 분석 및 저장 중 오류 발생: {e}")
 
-        print("모든 데이터에 대한 분석 및 저장 작업 완료.")
+        logger.info("모든 데이터에 대한 분석 및 저장 작업 완료.")
 
     except Exception as e:
-        print(f"save_all_visualizations 실행 중 오류 발생: {e}")
+        logger.error(f"save_all_visualizations 실행 중 오류 발생: {e}")
 
 
 
@@ -976,38 +979,38 @@ def save_all_visualizations_chart():
 def generate_tfidf_sentiment_visualizations(comments, video_url, upload_date ):
     # 1. 댓글 전처리
     try:
-        print("댓글 전처리 시작...")
+        logger.info("댓글 전처리 시작...")
         processed_comments = [preprocess_text(comment) for comment in comments]
         if not processed_comments:
             raise ValueError("처리된 댓글이 없습니다. 입력된 댓글을 확인해 주세요.")
-        print(f"처리된 댓글의 개수: {len(processed_comments)}개\n")
+        logger.info(f"처리된 댓글의 개수: {len(processed_comments)}개\n")
     except Exception as e:
-        print(f"댓글 전처리 오류: {e}")
+        logger.error(f"댓글 전처리 오류: {e}")
         return "댓글 전처리 오류"
 
     # 2. 명사와 동사만 추출
     try:
-        print("명사와 동사 추출 시작...")
+        logger.info("명사와 동사 추출 시작...")
         extracted_words = []
         for comment in processed_comments:
             nouns_and_verbs = extract_nouns_and_verbs(comment)
             extracted_words.append(" ".join(nouns_and_verbs))
-        print(f"명사와 동사 추출 완료: {extracted_words[:5]}...")
+        logger.info(f"명사와 동사 추출 완료: {extracted_words[:5]}...")
     except Exception as e:
-        print(f"명사 및 동사 추출 오류: {e}")
+        logger.error(f"명사 및 동사 추출 오류: {e}")
         return "명사 및 동사 추출 오류"
 
     # 3. TF-IDF 분석을 통한 중요한 단어 추출
     try:
-        print("TF-IDF 분석 시작...")
+        logger.info("TF-IDF 분석 시작...")
         tfidf_vectorizer = TfidfVectorizer(stop_words='english')
         tfidf_matrix = tfidf_vectorizer.fit_transform(extracted_words)
         feature_names = tfidf_vectorizer.get_feature_names_out()
         tfidf_scores = tfidf_matrix.sum(axis=0).A1
         word_score_pairs = list(zip(feature_names, tfidf_scores))
-        print(f"TF-IDF 분석 완료: {word_score_pairs[:5]}...")
+        logger.info(f"TF-IDF 분석 완료: {word_score_pairs[:5]}...")
     except Exception as e:
-        print(f"TF-IDF 분석 오류: {e}")
+        logger.error(f"TF-IDF 분석 오류: {e}")
         return "TF-IDF 분석 오류"
 
     # 4. TF-IDF 값 내림차순으로 정렬
@@ -1026,14 +1029,14 @@ def generate_tfidf_sentiment_visualizations(comments, video_url, upload_date ):
 
     # 7. 빈도가 높은 상위 10개 단어 추출
     top_10_words = word_counts.most_common(10)
-    print(f"빈도가 높은 상위 10개 단어: {top_10_words}\n")
+    logger.info(f"빈도가 높은 상위 10개 단어: {top_10_words}\n")
 
     # 8. 감정 분석 결과 수집
     sentiment_results = []
 
     # 9. 각 단어에 대해 감정 분석 수행
     for rank, (word, frequency) in enumerate(top_10_words, start=1):
-        print(f"순위 {rank}, 단어: {word}, 빈도: {frequency}에 대해 감정 분석 중...")
+        logger.info(f"순위 {rank}, 단어: {word}, 빈도: {frequency}에 대해 감정 분석 중...")
         sentiment = analyze_sentiment(word)  # 감정 분석 수행
         sentiment_results.append({"순위": rank, "단어": word, "빈도": frequency, "감정": sentiment})
 
@@ -1060,10 +1063,10 @@ def generate_tfidf_sentiment_visualizations(comments, video_url, upload_date ):
 
         # MongoDB에 삽입
         inserted_id = collection.insert_one(document).inserted_id
-        print(f"MongoDB 저장 완료! ID: {inserted_id}")
+        logger.info(f"MongoDB 저장 완료! ID: {inserted_id}")
 
     except Exception as e:
-        print(f"MongoDB 저장 중 오류 발생: {e}")
+        logger.error(f"MongoDB 저장 중 오류 발생: {e}")
 
     finally:
         client.close()
@@ -1109,12 +1112,12 @@ def generate_tfidf_sentiment_visualizations(comments, video_url, upload_date ):
 def save_all_issues_to_mongodb():
     client = None  # client 변수를 finally 블록에서 참조하기 위해 초기화
     try:
-        print("WeeklyIssue 데이터를 처리하여 MongoDB에 저장을 시작합니다.")
+        logger.info("WeeklyIssue 데이터를 처리하여 MongoDB에 저장을 시작합니다.")
         # WeeklyIssue의 모든 데이터를 가져옵니다.
         all_issues = WeeklyIssue.objects.all()
 
         if not all_issues.exists():
-            print("WeeklyIssue에 저장된 데이터가 없습니다.")
+            logger.info("WeeklyIssue에 저장된 데이터가 없습니다.")
             return
 
         # MongoDB 연결 설정
@@ -1125,7 +1128,7 @@ def save_all_issues_to_mongodb():
         for issue in all_issues:
             # 댓글이 없는 경우 스킵
             if not issue.comments:
-                print(f"Video {issue.title}에 댓글이 없습니다. 스킵합니다.")
+                logger.info(f"Video {issue.title}에 댓글이 없습니다. 스킵합니다.")
                 continue
 
             try:
@@ -1133,18 +1136,18 @@ def save_all_issues_to_mongodb():
                 comments = issue.comments
                 video_url = issue.url
                 upload_date = issue.upload_date
-                print(f"'{issue.title}'에 대해 데이터 처리 시작...")
+                logger.info(f"'{issue.title}'에 대해 데이터 처리 시작...")
 
                 sentiment_html = generate_tfidf_sentiment_visualizations(comments, video_url, upload_date)
                 if sentiment_html.startswith("오류"):
-                    print(f"'{issue.title}'의 데이터 처리 중 오류가 발생했습니다. 스킵합니다.")
+                    logger.error(f"'{issue.title}'의 데이터 처리 중 오류가 발생했습니다. 스킵합니다.")
                     continue
 
                 # 기존 데이터 중복 확인 및 삭제
                 existing_document = collection.find_one({"video_url": video_url})
                 if existing_document:
                     collection.delete_one({"_id": existing_document["_id"]})
-                    print(f"'{issue.title}'의 기존 데이터가 중복되어 삭제되었습니다.")
+                    logger.info(f"'{issue.title}'의 기존 데이터가 중복되어 삭제되었습니다.")
 
                 # MongoDB에 저장
                 document = {
@@ -1155,15 +1158,15 @@ def save_all_issues_to_mongodb():
                 }
 
                 inserted_id = collection.insert_one(document).inserted_id
-                print(f"'{issue.title}'의 데이터가 MongoDB에 저장되었습니다. ID: {inserted_id}")
+                logger.info(f"'{issue.title}'의 데이터가 MongoDB에 저장되었습니다. ID: {inserted_id}")
 
             except Exception as e:
-                print(f"'{issue.title}' 처리 중 오류 발생: {e}")
+                logger.error(f"'{issue.title}' 처리 중 오류 발생: {e}")
 
-        print("모든 WeeklyIssue 데이터 저장 작업이 완료되었습니다.")
+        logger.info("모든 WeeklyIssue 데이터 저장 작업이 완료되었습니다.")
 
     except Exception as e:
-        print(f"save_all_issues_to_mongodb 실행 중 오류 발생: {e}")
+        logger.error(f"save_all_issues_to_mongodb 실행 중 오류 발생: {e}")
 
     finally:
         if client:
@@ -1198,12 +1201,12 @@ def remove_top10_word():
             # 하나만 남기고 나머지는 삭제
             ids_to_delete = ids[1:]  # 첫 번째 ID를 제외한 나머지
             collection.delete_many({"_id": {"$in": ids_to_delete}})
-            print(f"URL {duplicate['_id']}의 중복 문서를 삭제했습니다.")
+            logger.info(f"URL {duplicate['_id']}의 중복 문서를 삭제했습니다.")
 
-        print("중복 문서 삭제 작업 완료.")
+        logger.info("중복 문서 삭제 작업 완료.")
 
     except Exception as e:
-        print(f"중복 문서 삭제 중 오류 발생: {e}")
+        logger.error(f"중복 문서 삭제 중 오류 발생: {e}")
 
     finally:
         client.close()
@@ -1233,12 +1236,12 @@ def save_wordcloud_with_tfidf(comments):
 def save_all_issues_to_mongodb_chart():
     client = None  # client 변수를 finally 블록에서 참조하기 위해 초기화
     try:
-        print("Chart 데이터를 처리하여 MongoDB에 저장을 시작합니다.")
+        logger.info("Chart 데이터를 처리하여 MongoDB에 저장을 시작합니다.")
         # WeeklyIssue의 모든 데이터를 가져옵니다.
         all_issues = Chart.objects.all()
 
         if not all_issues.exists():
-            print("chart에 저장된 데이터가 없습니다.")
+            logger.info("chart에 저장된 데이터가 없습니다.")
             return
 
         # MongoDB 연결 설정
@@ -1248,7 +1251,7 @@ def save_all_issues_to_mongodb_chart():
         for issue in all_issues:
             # 댓글이 없는 경우 스킵
             if not issue.comments:
-                print(f"Video {issue.title}에 댓글이 없습니다. 스킵합니다.")
+                logger.info(f"Video {issue.title}에 댓글이 없습니다. 스킵합니다.")
                 continue
 
             try:
@@ -1257,18 +1260,18 @@ def save_all_issues_to_mongodb_chart():
                 video_url = issue.url
                 upload_date = issue.upload_date
                 title = issue.title
-                print(f"'{issue.title}'에 대해 데이터 처리 시작...")
+                logger.info(f"'{issue.title}'에 대해 데이터 처리 시작...")
 
                 sentiment_html ,sentiment_results = generate_tfidf_sentiment_visualizations(comments, video_url,upload_date)
                 if sentiment_html.startswith("오류"):
-                    print(f"'{issue.title}'의 데이터 처리 중 오류가 발생했습니다. 스킵합니다.")
+                    logger.error(f"'{issue.title}'의 데이터 처리 중 오류가 발생했습니다. 스킵합니다.")
                     continue
 
                 # 기존 데이터 중복 확인 및 삭제
                 existing_document = collection.find_one({"video_url": video_url})
                 if existing_document:
                     collection.delete_one({"_id": existing_document["_id"]})
-                    print(f"'{issue.title}'의 기존 데이터가 중복되어 삭제되었습니다.")
+                    logger.info(f"'{issue.title}'의 기존 데이터가 중복되어 삭제되었습니다.")
 
                 # MongoDB에 저장
                 document = {
@@ -1293,17 +1296,17 @@ def save_all_issues_to_mongodb_chart():
                 )
 
                 if result.upserted_id:
-                    print(f"'{issue.title}'의 데이터가 MongoDB에 저장되었습니다. ID: {result.upserted_id}")
+                    logger.info(f"'{issue.title}'의 데이터가 MongoDB에 저장되었습니다. ID: {result.upserted_id}")
                 else:
-                    print(f"'{issue.title}'의 기존 데이터가 업데이트되었습니다.")
+                    logger.info(f"'{issue.title}'의 기존 데이터가 업데이트되었습니다.")
 
             except Exception as e:
-                print(f"'{issue.title}' 처리 중 오류 발생: {e}")
+                logger.error(f"'{issue.title}' 처리 중 오류 발생: {e}")
 
-        print("모든 WeeklyIssue 데이터 저장 작업이 완료되었습니다.")
+        logger.info("모든 WeeklyIssue 데이터 저장 작업이 완료되었습니다.")
 
     except Exception as e:
-            print(f"save_all_issues_to_mongodb 실행 중 오류 발생: {e}")
+            logger.error(f"save_all_issues_to_mongodb 실행 중 오류 발생: {e}")
 
     finally:
         if client:
@@ -1313,12 +1316,12 @@ def save_all_issues_to_mongodb_chart():
 def save_all_issues_to_mongodb():
     client = None  # client 변수를 finally 블록에서 참조하기 위해 초기화
     try:
-        print("WeeklyIssue 데이터를 처리하여 MongoDB에 저장을 시작합니다.")
+        logger.info("WeeklyIssue 데이터를 처리하여 MongoDB에 저장을 시작합니다.")
         # WeeklyIssue의 모든 데이터를 가져옵니다.
         all_issues = WeeklyIssue.objects.all()
 
         if not all_issues.exists():
-            print("WeeklyIssue에 저장된 데이터가 없습니다.")
+            logger.info("WeeklyIssue에 저장된 데이터가 없습니다.")
             return
 
         # MongoDB 연결 설정
@@ -1329,7 +1332,7 @@ def save_all_issues_to_mongodb():
         for issue in all_issues:
             # 댓글이 없는 경우 스킵
             if not issue.comments:
-                print(f"Video {issue.title}에 댓글이 없습니다. 스킵합니다.")
+                logger.info(f"Video {issue.title}에 댓글이 없습니다. 스킵합니다.")
                 continue
 
             try:
@@ -1337,18 +1340,18 @@ def save_all_issues_to_mongodb():
                 comments = issue.comments
                 video_url = issue.url
                 upload_date = issue.upload_date
-                print(f"'{issue.title}'에 대해 데이터 처리 시작...")
+                logger.info(f"'{issue.title}'에 대해 데이터 처리 시작...")
 
                 sentiment_html, sentiment_results = generate_tfidf_sentiment_visualizations(comments, video_url, upload_date)
                 if sentiment_html.startswith("오류"):
-                    print(f"'{issue.title}'의 데이터 처리 중 오류가 발생했습니다. 스킵합니다.")
+                    logger.error(f"'{issue.title}'의 데이터 처리 중 오류가 발생했습니다. 스킵합니다.")
                     continue
 
                 # 기존 데이터 중복 확인 및 삭제
                 existing_document = collection.find_one({"video_url": video_url})
                 if existing_document:
                     collection.delete_one({"_id": existing_document["_id"]})
-                    print(f"'{issue.title}'의 기존 데이터가 중복되어 삭제되었습니다.")
+                    logger.info(f"'{issue.title}'의 기존 데이터가 중복되어 삭제되었습니다.")
 
                 # MongoDB에 저장
                 document = {
@@ -1372,17 +1375,17 @@ def save_all_issues_to_mongodb():
                     )
 
                 if result.upserted_id:
-                    print(f"'{issue.title}'의 데이터가 MongoDB에 저장되었습니다. ID: {result.upserted_id}")
+                    logger.info(f"'{issue.title}'의 데이터가 MongoDB에 저장되었습니다. ID: {result.upserted_id}")
                 else:
-                    print(f"'{issue.title}'의 기존 데이터가 업데이트되었습니다.")
+                    logger.info(f"'{issue.title}'의 기존 데이터가 업데이트되었습니다.")
 
             except Exception as e:
-                print(f"'{issue.title}' 처리 중 오류 발생: {e}")
+                logger.error(f"'{issue.title}' 처리 중 오류 발생: {e}")
 
-        print("모든 WeeklyIssue 데이터 저장 작업이 완료되었습니다.")
+        logger.info("모든 WeeklyIssue 데이터 저장 작업이 완료되었습니다.")
 
     except Exception as e:
-        print(f"save_all_issues_to_mongodb 실행 중 오류 발생: {e}")
+        logger.error(f"save_all_issues_to_mongodb 실행 중 오류 발생: {e}")
 
     finally:
         if client:

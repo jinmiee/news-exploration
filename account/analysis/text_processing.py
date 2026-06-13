@@ -1,5 +1,8 @@
 import re
 import numpy as np
+import logging
+logger = logging.getLogger(__name__)
+
 
 # 무거운 ML 의존성(sklearn / konlpy / torch / transformers)은 모듈 최상단이 아니라
 # 실제로 사용하는 함수 내부에서 import 한다.
@@ -100,7 +103,7 @@ def process_text(title, transcript=None):
             transcript_text = ' '.join([item.get('text', '') for item in transcript if
                                         isinstance(item, dict) and len(item.get('text', '')) > 2])
         else:
-            print(f"Unexpected transcript format: {type(transcript)}")
+            logger.info(f"Unexpected transcript format: {type(transcript)}")
             transcript_text = ""
         script_text = ' '.join([word for word, tag in okt.pos(transcript_text) if
                                 tag in ['Noun', 'Verb', 'Adjective'] and word not in stop_words])
@@ -138,7 +141,7 @@ def get_bert_similarity_batch(corpus, batch_size=32):
     # 코사인 유사도 계산
     similarity_matrix = cosine_similarity(embeddings)
 
-    print(f"Generated KoBERT Similarity Matrix Shape: {similarity_matrix.shape}")  # 디버깅 출력
+    logger.info(f"Generated KoBERT Similarity Matrix Shape: {similarity_matrix.shape}")  # 디버깅 출력
     return similarity_matrix
 
 
@@ -289,13 +292,13 @@ def get_top10_chart_based(videos, num_clusters=5, additional_news=3):
     tfidf_matrix = vectorizer.fit_transform(corpus)
     tfidf_similarity_matrix = cosine_similarity(tfidf_matrix)
 
-    print(f"TF-IDF Similarity Matrix Shape: {tfidf_similarity_matrix.shape}")  # 디버깅
+    logger.info(f"TF-IDF Similarity Matrix Shape: {tfidf_similarity_matrix.shape}")  # 디버깅
 
     # BERT 계산
     bert_similarity_matrix = get_bert_similarity_batch(corpus, batch_size=32)
 
     # BERT 유사도 행렬 크기 확인
-    print(f"BERT Similarity Matrix Shape: {bert_similarity_matrix.shape}")  # 디버깅
+    logger.info(f"BERT Similarity Matrix Shape: {bert_similarity_matrix.shape}")  # 디버깅
 
     # Hybrid Similarity 계산
     if tfidf_similarity_matrix.shape != bert_similarity_matrix.shape:
@@ -308,7 +311,7 @@ def get_top10_chart_based(videos, num_clusters=5, additional_news=3):
         HYBRID_WEIGHT_BERT
     )
 
-    print(f"Hybrid Similarity Matrix Shape: {hybrid_similarity_matrix.shape}")  # 디버깅
+    logger.info(f"Hybrid Similarity Matrix Shape: {hybrid_similarity_matrix.shape}")  # 디버깅
 
     # Hybrid Similarity Matrix 정규화
     scaler = MinMaxScaler()
@@ -356,9 +359,9 @@ def get_top10_chart_based(videos, num_clusters=5, additional_news=3):
     final_videos = sorted(final_videos, key=lambda x: x.views, reverse=True)[:10]
 
     # 디버깅 로그
-    print("선택된 대표 동영상:")
+    logger.info("선택된 대표 동영상:")
     for video in final_videos:
-        print(f"- {video.cleaned_title} (조회수: {video.views})")
+        logger.info(f"- {video.cleaned_title} (조회수: {video.views})")
 
     return final_videos
 
