@@ -29,13 +29,14 @@ LOGOUT_URL = 'account:logout'
 SECRET_KEY = os.getenv("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv("DEBUG", "False") == "True"
 
 
 # Scheduler 설정
 ENABLE_SCHEDULER = True
 
-ALLOWED_HOSTS = ['15.168.46.71','*']
+# 쉼표로 구분된 호스트 목록을 환경변수에서 읽음 (와일드카드 '*' 미사용)
+ALLOWED_HOSTS = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
 
 
 # Application definition
@@ -90,9 +91,10 @@ DATABASES = {
         'NAME': 'youtube_data',
         'ENFORCE_SCHEMA': False,
         'CLIENT': {
-            'host': f'mongodb://{os.getenv("MONGO_USER")}:{os.getenv("MONGO_PASSWORD")}@{os.getenv("MONGO_HOST")}:{os.getenv("MONGO_PORT")}/youtube_data',
-            'authSource': 'admin',  # 중요: 인증 소스를 'admin'으로 변경
-            'authMechanism': 'SCRAM-SHA-256'  # 최신 버전 메커니즘 
+            'host': os.getenv("MONGO_URI"),
+            'authSource': 'admin',  # 인증 소스 DB
+            # authMechanism 은 명시하지 않고 pymongo 자동 협상에 맡긴다.
+            # (계정이 SCRAM-SHA-1 로 생성되어 SCRAM-SHA-256 강제 시 'bad auth' 발생)
         }
     }
 }
@@ -152,3 +154,34 @@ EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+
+
+# Logging
+# print 디버깅 대신 표준 logging 사용. 콘솔로 출력하며, 레벨은 LOG_LEVEL 환경변수로 조정.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{asctime}] {levelname} {name}: {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'WARNING',
+    },
+    'loggers': {
+        'account': {
+            'handlers': ['console'],
+            'level': os.getenv('LOG_LEVEL', 'INFO'),
+            'propagate': False,
+        },
+    },
+}

@@ -1,0 +1,17 @@
+# Airflow 데이터 파이프라인 전용 의존성 (웹앱과 분리)
+#
+# 주의: Airflow 계열은 sqlparse>=0.5.1 을 요구하는데,
+# 웹앱의 djongo 는 sqlparse==0.2.4 를 요구하여 서로 충돌한다.
+# 따라서 Airflow 는 웹앱(requirements.txt)과 **별도의 가상환경**에 설치한다.
+#
+# 설치:  pip install -r requirements-airflow.txt
+apache-airflow==2.10.3
+apache-airflow-providers-common-compat==1.2.2
+apache-airflow-providers-common-io==1.4.2
+apache-airflow-providers-common-sql==1.20.0
+apache-airflow-providers-fab==1.5.1
+apache-airflow-providers-ftp==3.11.1
+apache-airflow-providers-http==4.13.3
+apache-airflow-providers-imap==3.7.0
+apache-airflow-providers-smtp==1.8.1
+apache-airflow-providers-sqlite==3.9.1
