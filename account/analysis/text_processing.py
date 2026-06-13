@@ -1,12 +1,10 @@
-import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.preprocessing import MinMaxScaler
-from konlpy.tag import Okt
 import re
-from kobert_transformers import get_tokenizer
-from transformers import BertModel
-import torch
+import numpy as np
+
+# 무거운 ML 의존성(sklearn / konlpy / torch / transformers)은 모듈 최상단이 아니라
+# 실제로 사용하는 함수 내부에서 import 한다.
+#  - Django 기동 시 불필요한 라이브러리 로딩을 피해 시작 속도를 높이고,
+#  - clean_title 등 순수 함수가 무거운 의존성 없이 import/테스트 가능하도록 분리.
 
 def clean_title(title):
     """
@@ -89,6 +87,7 @@ def process_text(title, transcript=None):
     """
     제목과 스크립트를 전처리하여 결합한 텍스트 반환
     """
+    from konlpy.tag import Okt
     okt = Okt()
     cleaned_title = clean_title(title)
     stop_words = {'그', '저', '것', '수'}
@@ -112,6 +111,11 @@ def get_bert_similarity_batch(corpus, batch_size=32):
     """
        KoBERT를 사용하여 문서 간 유사도를 계산하는 함수
        """
+    from kobert_transformers import get_tokenizer
+    from transformers import BertModel
+    import torch
+    from sklearn.metrics.pairwise import cosine_similarity
+
     tokenizer = get_tokenizer()
     model = BertModel.from_pretrained('skt/kobert-base-v1')  # KoBERT 모델 로드
     model.eval()
@@ -219,6 +223,9 @@ def select_key_news(corpus, n_keywords=5, top_n=10):
     Returns:
     list: 상위 주요 뉴스 텍스트와 키워드 리스트
     """
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.metrics.pairwise import cosine_similarity
+
     # Step 1: TF-IDF 키워드 추출
     keywords_by_doc = extract_keywords(corpus, n_keywords=n_keywords)
 
@@ -248,6 +255,10 @@ def get_top10_chart_based(videos, num_clusters=5, additional_news=3):
     """
     클러스터링, TF-IDF, BERT 코사인 유사도를 결합해 혼합 전략으로 상위 10개 동영상을 선정
     """
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.metrics.pairwise import cosine_similarity
+    from sklearn.preprocessing import MinMaxScaler
+
     # 가중치 설정
     TFIDF_WEIGHT = 0.4
     VIEW_WEIGHT = 0.4
